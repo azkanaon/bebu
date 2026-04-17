@@ -10,6 +10,17 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* This creates 'text-brand', 'bg-brand', 'border-brand', etc. */
+  --color-brand: #1d4480;
+  --color-brand-dark: #15335f;
+
+  /* You can also define your gradient here to use as 'bg-my-gradient' */
+  --background-image-my: linear-gradient(to right, #1d4480, #15335f);
+
+  --background-image-desktop-bg: url('/images/bg_desktop.png');
+  --background-image-tablet-bg: url('/images/bg_tablet.png');
+  --background-image-mobile-bg: url('/images/bg_mobile.png');
 }
 
 @media (prefers-color-scheme: dark) {
