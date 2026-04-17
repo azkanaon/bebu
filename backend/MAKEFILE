@@ -1,0 +1,14 @@
+# Mengambil variabel dari file .env
+include .env
+export
+
+migrate-up:
+	migrate -path migrations/ -database "$(DB_URL)" up
+
+migrate-down:
+	migrate -path migrations/ -database "$(DB_URL)" down 1
+
+# Tambahan: Perintah untuk membuat file migrasi baru dengan cepat
+# Contoh penggunaan: make create-migration name=create_users_table
+create-migration:
+	migrate create -ext sql -dir migrations/ -seq $(name)
