@@ -19,12 +19,14 @@ func ConnectDB() {
 
     dsn := os.Getenv("DB_URL")
 
-    db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+    DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
     if err != nil {
         panic("Failed to connect database")
     }
 
-    DB = db
+    log.Println("✅ Database connected successfully")
+}
 
-    // log.Println("✅ Database connected successfully")
+func GetDB() *gorm.DB {
+	return DB
 }
