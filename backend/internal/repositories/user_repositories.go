@@ -46,9 +46,9 @@ func (r *userRepository) CreateUserAndProfile(user *models.User) (*models.User, 
 // FindByEmailOrUsername akan kita gunakan di service layer untuk memeriksa duplikasi
 func (r *userRepository) FindByEmailOrUsername(emailOrUsername string) (*models.User, error) {
 	var user models.User
-	err := r.db.Where("email = ?", emailOrUsername).Or("username = ?", emailOrUsername).First(&user).Error
+	err := r.db.Preload("Profile").Where("email = ?", emailOrUsername).Or("username = ?", emailOrUsername).First(&user).Error
 	if err != nil {
-		return nil, err // gorm.ErrRecordNotFound jika tidak ada
+		return nil, err
 	}
 	return &user, nil
 }

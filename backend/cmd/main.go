@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-    config.ConnectDB()
+    config.LoadAndConnectDB()
 	db := config.GetDB()
     
     userRepo := repositories.NewUserRepository(db)
@@ -34,7 +34,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 		{
 			// --> Daftarkan route register Anda di sini
 			auth.POST("/register", authHandler.Register)
-			// auth.POST("/login", authHandler.Login) // Siap untuk nanti
+			auth.POST("/login", authHandler.Login)
 		}
 
 		// --> Contoh route "me" yang dilindungi (akan butuh middleware nanti)
