@@ -59,19 +59,3 @@ type PasswordReset struct {
     UsedAt          *time.Time
     CreatedAt       time.Time
 }
-
-// RegisterRequest adalah struktur data yang diharapkan dari body request pendaftaran
-type RegisterRequest struct {
-	Username    string `json:"username" validate:"required,min=3,max=100"`
-	Email       string `json:"email" validate:"required,email"`
-	Password    string `json:"password" validate:"required,min=8"`
-	DisplayName string `json:"display_name,omitempty"` // omitempty berarti opsional
-}
-
-// RegisterResponse adalah struktur data yang dikirim kembali setelah pendaftaran berhasil
-type RegisterResponse struct {
-	UserPublicID uuid.UUID `json:"user_public_id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	DisplayName  string    `json:"display_name"`
-}

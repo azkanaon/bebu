@@ -10,6 +10,7 @@ CREATE TABLE users (
     role          VARCHAR(50)  NOT NULL DEFAULT 'user',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
     email_verified BOOLEAN     NOT NULL DEFAULT FALSE,
+    status         VARCHAR(10)  NOT NULL DEFAULT 'active',
     last_login    TIMESTAMPTZ,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
