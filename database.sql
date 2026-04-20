@@ -17,6 +17,7 @@ CREATE TABLE users (
     username      VARCHAR(100) NOT NULL UNIQUE,
     password_hash TEXT         NOT NULL,
     role          VARCHAR(50)  NOT NULL DEFAULT 'user',
+    status        VARCHAR(10)  NOT NULL DEFAULT 'active',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
     email_verified BOOLEAN     NOT NULL DEFAULT FALSE,
     last_login    TIMESTAMPTZ,
