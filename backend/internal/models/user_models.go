@@ -22,6 +22,7 @@ type User struct {
     DeletedAt      gorm.DeletedAt `gorm:"index"`
     Profile        UserProfile    `gorm:"foreignKey:UserID"`
     PasswordResets []PasswordReset `gorm:"foreignKey:UserID"`
+    Sessions       []UserSession   `gorm:"foreignKey:UserID"`
 }
 
 type UserProfile struct {
@@ -44,10 +45,14 @@ type UserSettings struct {
 }
 
 type UserSession struct {
-	ID        uint      `gorm:"primaryKey"`
-	UserID    uint      `gorm:"index"`
-	Token     string    `gorm:"uniqueIndex"`
-	ExpiresAt time.Time
+	UserSessionID    uint      `gorm:"primaryKey"`
+	PublicID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();unique"`
+	UserID           uint      `gorm:"not null"`
+	RefreshTokenHash string    `gorm:"type:text;not null"`
+	DeviceInfo       string    `gorm:"type:text"`
+	IpAddress        string    `gorm:"type:inet"`
+	ExpiresAt        time.Time `gorm:"not null"`
+	RevokedAt        *time.Time
 }
 
 type PasswordReset struct {

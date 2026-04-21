@@ -35,6 +35,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 			// --> Daftarkan route register Anda di sini
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.Refresh)
 		}
 
 		// --> Contoh route "me" yang dilindungi (akan butuh middleware nanti)
