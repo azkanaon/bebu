@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Sidebar from "@/components/Sidebar";
+import Sidebar from "@/components/leftbar/Sidebar";
+import RightSidebar from "@/components/rightbar/RightSidebar";
 
 type User = {
 	id: number;
@@ -24,9 +25,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 	if (!user) return <div>Loading...</div>;
 
 	return (
-		<div className="flex">
-			<Sidebar user={user} />
-			<main className="flex-1">{children}</main>
+		<div className="flex justify-center">
+			{/* LEFT SIDEBAR */}
+			<aside className="w-84 hidden lg:block">
+				<div className="sticky top-0 h-screen">
+					<Sidebar user={user} />
+				</div>
+			</aside>
+
+			{/* MAIN CONTENT */}
+			<main className="flex-1 max-w-[600px]">{children}</main>
+
+			{/* RIGHT SIDEBAR */}
+			<aside className="w-84 hidden xl:block">
+				<div className="sticky top-0 h-screen overflow-y-auto">
+					<RightSidebar />
+				</div>
+			</aside>
 		</div>
 	);
 }

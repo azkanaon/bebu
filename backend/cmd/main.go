@@ -25,6 +25,7 @@ func main() {
     r.Run(":8080")
 }
 
+<<<<<<< HEAD
 // --> Ubah signature fungsi untuk menerima AuthHandler
 func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
@@ -44,4 +45,15 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 			users.GET("/me", handlers.GetCurrentUser)
 		}
 	}
+=======
+func SetupRoutes(r *gin.Engine) {
+    api := r.Group("/api")
+    {
+        api.GET("/me", handlers.GetCurrentUser)
+        api.GET("/users/recommendation", handlers.GetUserRecommendations)
+        api.GET("/books/trending", handlers.GetTrendingBooks)
+        api.GET("/categories/user", handlers.GetUserCategories)
+        api.GET("/leaderboard", handlers.GetLeaderboard)
+    }
+>>>>>>> 4893e60 (right-navbar)
 }

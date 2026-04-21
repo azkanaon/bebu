@@ -1,5 +1,9 @@
 package models
 
+import (
+	"time"
+)
+
 type LevelMaster struct {
 	ID        uint `gorm:"primaryKey"`
 	Level     int
@@ -40,6 +44,10 @@ type UserAchievement struct {
 }
 
 type UserRanking struct {
-	UserID uint `gorm:"primaryKey"`
-	Score  int
+	UserID     uint      `gorm:"column:user_id;primaryKey"`
+	GlobalRank int       `gorm:"column:global_rank"`
+	UpdatedAt  time.Time `gorm:"column:updated_at;autoUpdateTime"`
+
+	// Relasi ke tabel users
+	User User `gorm:"foreignKey:UserID;references:UserID"`
 }

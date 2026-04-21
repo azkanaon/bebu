@@ -218,7 +218,7 @@ CREATE TABLE categories (
 
 CREATE TABLE user_categories (
     user_id       INT         NOT NULL REFERENCES users(user_id)      ON DELETE CASCADE,
-    categories_id INT         NOT NULL REFERENCES categories(category_id) ON DELETE CASCADE,
+    category_id   INT         NOT NULL REFERENCES categories(category_id) ON DELETE CASCADE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at    TIMESTAMPTZ,
     PRIMARY KEY (user_id, categories_id)
