@@ -5,10 +5,14 @@ package services
 import (
 	"errors"
 	"regexp"
-	"backend-bebu/internal/models" // Ganti 'backend-bebu'
+	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"crypto/sha256"
+	"encoding/hex"
+	"crypto/rand"
+	"encoding/base64"
 
 	"time"
 	"backend-bebu/config"
@@ -20,11 +24,14 @@ import (
 var ErrUserAlreadyExists = errors.New("user with this email or username already exists")
 var ErrInvalidPassword = errors.New("must be at least 8 characters and contain both letters and numbers")
 var ErrInvalidCredentials = errors.New("invalid email/username or password")
+var ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
 
 type AuthService interface {
 	Register(req *models.RegisterRequest) (*models.RegisterResponse, error)
-	Login(req *models.LoginRequest) (string, *models.LoginResponse, error)
+	Login(req *models.LoginRequest, ipAddress, userAgent string) (string, string, *models.LoginResponse, error)
+	RefreshToken(refreshToken string) (string, error)
 }
+
 
 type authService struct {
 	userRepo repositories.UserRepository
@@ -108,42 +115,62 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.RegisterRes
 		Email:        createdUser.Email,
 		DisplayName:  createdUser.Profile.DisplayName,
 		Bio:          createdUser.Profile.Bio,
-		Gender:  createdUser.Profile.Gender,
-		AvatarUrl:  createdUser.Profile.AvatarUrl,
+		Gender:		  createdUser.Profile.Gender,
+		AvatarUrl:    createdUser.Profile.AvatarUrl,
 	}
 
 	return response, nil
 }
 
-func (s *authService) Login(req *models.LoginRequest) (string, *models.LoginResponse, error) {
-	// 1. Cari user di database
+func (s *authService) Login(req *models.LoginRequest, ipAddress, userAgent string) (string, string, *models.LoginResponse, error) {
+	// 1. Cari user di database (sudah termasuk Preload("Profile"))
 	user, err := s.userRepo.FindByEmailOrUsername(req.EmailOrUsername)
 	if err != nil {
-		// Jika record tidak ditemukan atau error lain, kembalikan error kredensial.
-		// Ini mencegah "user enumeration attacks".
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", nil, ErrInvalidCredentials
+			return "", "", nil, ErrInvalidCredentials
 		}
-		return "", nil, err // Error database lainnya
+		return "", "", nil, err // Error database lainnya
 	}
 
-	// 2. Bandingkan password yang di-hash dengan password yang diberikan
+	// 2. Bandingkan password
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
-		// Jika password salah, bcrypt akan mengembalikan error
-		return "", nil, ErrInvalidCredentials
+		return "", "", nil, ErrInvalidCredentials
 	}
 
-	// 3. Generate JWT Token
-	token, err := generateJWT(user.PublicID)
+	// 3. Generate Access Token (JWT) - seperti sebelumnya
+	accessToken, err := generateJWT(user.PublicID)
 	if err != nil {
-		return "", nil, err
+		return "", "", nil, err
 	}
 
-	// 4. Siapkan data response
-	// Kita perlu memuat profile-nya. Tambahkan method di repo jika perlu,
-	// atau pastikan FindBy... sudah me-load relasi Profile (Preload).
-	// Untuk sekarang, kita asumsikan 'user' sudah mengandung data profile.
+	// 4. Generate Refresh Token (string acak yang aman)
+	refreshTokenBytes := make([]byte, 32)
+	if _, err := rand.Read(refreshTokenBytes); err != nil {
+		return "", "", nil, err
+	}
+	refreshToken := base64.URLEncoding.EncodeToString(refreshTokenBytes)
+
+	// 5. Hash Refresh Token menggunakan SHA256
+	hasher := sha256.New()
+	hasher.Write([]byte(refreshToken))
+	refreshTokenHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// 6. Buat entri sesi baru untuk disimpan
+	session := &models.UserSession{
+		UserID:           user.UserID,
+		RefreshTokenHash: refreshTokenHash,
+		DeviceInfo:       userAgent,
+		IpAddress:        ipAddress,
+		ExpiresAt:        time.Now().Add(30 * 24 * time.Hour), // Berlaku 30 hari
+	}
+    
+    // Simpan sesi ke database
+    if err := s.userRepo.CreateSession(session); err != nil {
+        return "", "", nil, err
+    }
+
+	// 7. Siapkan response data (tidak berubah)
 	loginResponse := &models.LoginResponse{
 		UserPublicID: user.PublicID,
 		Username:     user.Username,
@@ -153,7 +180,8 @@ func (s *authService) Login(req *models.LoginRequest) (string, *models.LoginResp
 		Gender:	   	  user.Profile.Gender,
 	}
 
-	return token, loginResponse, nil
+	// 8. Kembalikan KEDUA token
+	return accessToken, refreshToken, loginResponse, nil
 }
 
 // generateJWT adalah fungsi helper untuk membuat token
@@ -178,4 +206,33 @@ func generateJWT(userPublicID uuid.UUID) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func (s *authService) RefreshToken(refreshToken string) (string, error) {
+	if refreshToken == "" { return "", ErrInvalidRefreshToken }
+
+	// 1. Hash token yang masuk
+	hasher := sha256.New()
+	hasher.Write([]byte(refreshToken))
+	refreshTokenHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// 2. Cari sesi
+	session, err := s.userRepo.FindSessionByRefreshTokenHash(refreshTokenHash)
+	if err != nil { return "", ErrInvalidRefreshToken }
+
+	// 3. Validasi sesi
+	if session.RevokedAt != nil || time.Now().After(session.ExpiresAt) {
+		// Opsional: Hapus sesi yang sudah tidak valid dari DB
+		return "", ErrInvalidRefreshToken
+	}
+
+	// 4. Ambil data user dari UserID di sesi
+	user, err := s.userRepo.FindUserByID(session.UserID)
+	if err != nil { return "", ErrInvalidRefreshToken }
+
+	// 5. Buat Access Token baru
+	newAccessToken, err := generateJWT(user.PublicID)
+	if err != nil { return "", err }
+
+	return newAccessToken, nil
 }

@@ -10,6 +10,9 @@ import (
 type UserRepository interface {
 	CreateUserAndProfile(user *models.User) (*models.User, error)
 	FindByEmailOrUsername(emailOrUsername string) (*models.User, error)
+	CreateSession(session *models.UserSession) error
+	FindSessionByRefreshTokenHash(hash string) (*models.UserSession, error)
+	FindUserByID(id uint) (*models.User, error)
 }
 
 type userRepository struct {
@@ -51,4 +54,20 @@ func (r *userRepository) FindByEmailOrUsername(emailOrUsername string) (*models.
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *userRepository) CreateSession(session *models.UserSession) error {
+	return r.db.Create(session).Error
+}
+
+func (r *userRepository) FindSessionByRefreshTokenHash(hash string) (*models.UserSession, error) {
+	var session models.UserSession
+	err := r.db.Where("refresh_token_hash = ?", hash).First(&session).Error
+	return &session, err
+}
+
+func (r *userRepository) FindUserByID(id uint) (*models.User, error) {
+    var user models.User
+    err := r.db.First(&user, id).Error
+    return &user, err
 }
