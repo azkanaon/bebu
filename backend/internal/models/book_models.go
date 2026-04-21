@@ -1,31 +1,83 @@
 package models
 
-type Book struct {
-	ID          uint   `gorm:"primaryKey"`
-	Title       string
-	Description string
-	PublishedYear int
+import "time"
 
-	Authors []Author `gorm:"many2many:books_authors;"`
-	Genres  []Genre  `gorm:"many2many:books_genres;"`
+// ==============================
+// 📚 BOOK
+// ==============================
+
+type Book struct {
+	BookID         uint       `gorm:"primaryKey;column:book_id"`
+	PublicID       string     `gorm:"column:public_id"`
+	Title          string     `gorm:"column:title"`
+	Synopsis       string     `gorm:"column:synopsis"`
+	CoverImgURL    string     `gorm:"column:cover_img_url"`
+	PublicationYear int       `gorm:"column:publication_year"`
+	Language       string     `gorm:"column:language"`
+	TotalPages     int        `gorm:"column:total_pages"`
+	Slug           string     `gorm:"column:slug"`
+	CreatedAt      time.Time  `gorm:"column:created_at"`
+	UpdatedAt      time.Time  `gorm:"column:updated_at"`
+	DeletedAt      *time.Time `gorm:"column:deleted_at"`
+
+	// 🔗 Relations
+	Authors []Author `gorm:"many2many:books_authors;joinForeignKey:BookID;joinReferences:AuthorID"`
+	Genres  []Genre  `gorm:"many2many:books_genres;joinForeignKey:BookID;joinReferences:GenreID"`
 }
+
+
+// ==============================
+// ✍️ AUTHOR
+// ==============================
 
 type Author struct {
-	ID   uint   `gorm:"primaryKey"`
-	Name string
+	AuthorID  uint       `gorm:"primaryKey;column:author_id"`
+	PublicID  string     `gorm:"column:public_id"`
+	AuthorName string    `gorm:"column:author_name"`
+	Slug      string     `gorm:"column:slug"`
+	CreatedAt time.Time  `gorm:"column:created_at"`
+	UpdatedAt time.Time  `gorm:"column:updated_at"`
+	DeletedAt *time.Time `gorm:"column:deleted_at"`
+
+	// 🔗 Relations
+	Books []Book `gorm:"many2many:books_authors;joinForeignKey:AuthorID;joinReferences:BookID"`
 }
+
+
+// ==============================
+// 🎭 GENRE
+// ==============================
 
 type Genre struct {
-	ID   uint   `gorm:"primaryKey"`
-	Name string
+	GenreID   uint       `gorm:"primaryKey;column:genre_id"`
+	GenreName string     `gorm:"column:genre_name"`
+	Slug      string     `gorm:"column:slug"`
+	CreatedAt time.Time  `gorm:"column:created_at"`
+	UpdatedAt time.Time  `gorm:"column:updated_at"`
+	DeletedAt *time.Time `gorm:"column:deleted_at"`
+
+	// 🔗 Relations
+	Books []Book `gorm:"many2many:books_genres;joinForeignKey:GenreID;joinReferences:BookID"`
 }
+
+
+// ==============================
+// 🔗 BOOKS_AUTHORS (JUNCTION)
+// ==============================
 
 type BookAuthor struct {
-	BookID   uint `gorm:"primaryKey"`
-	AuthorID uint `gorm:"primaryKey"`
+	BookID   uint      `gorm:"column:book_id"`
+	AuthorID uint      `gorm:"column:author_id"`
+	CreatedAt time.Time `gorm:"column:created_at"`
 }
 
+
+// ==============================
+// 🔗 BOOKS_GENRES (JUNCTION)
+// ==============================
+
 type BookGenre struct {
-	BookID  uint `gorm:"primaryKey"`
-	GenreID uint `gorm:"primaryKey"`
+	BookID   uint      `gorm:"column:book_id"`
+	GenreID  uint      `gorm:"column:genre_id"`
+	CreatedAt time.Time `gorm:"column:created_at"`
 }

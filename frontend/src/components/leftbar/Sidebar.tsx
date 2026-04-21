@@ -9,8 +9,9 @@ import {
 	Shield,
 	Flag,
 } from "lucide-react";
-import SidebarItem from "./SidebarItem";
-import UserProfile from "./UserProfile";
+import { SidebarItem } from "./SidebarItem";
+import { UserProfile } from "./UserProfile";
+import Image from "next/image";
 
 type SidebarProps = {
 	user: {
@@ -23,23 +24,31 @@ type SidebarProps = {
 
 export default function Sidebar({ user }: SidebarProps) {
 	return (
-		<div className="h-screen w-64 bg-[#0B1120] text-white flex flex-col justify-between px-4 py-6">
+		<div className="h-screen w-64 bg-[#0B1120] text-white flex flex-col justify-between py-6">
 			{/* TOP SECTION */}
-			<div>
+			<div className="px-4">
 				{/* LOGO */}
 				<div className="flex items-center gap-2 mb-10">
-					<div className="text-2xl">📘</div>
-					<span className="text-xl font-bold">BeBu</span>
+					<Image
+						src="/logo.png"
+						alt="BeBu Logo"
+						width={50}
+						height={50}
+						className="object-contain"
+					/>
+					<span className="text-xl font-bold tracking-wide">
+						BeBu
+					</span>
 				</div>
 
 				{/* SEARCH */}
 				<div className="mb-6">
-					<div className="flex items-center bg-gray-800 rounded-lg px-3 py-2">
+					<div className="flex items-center bg-white/5 rounded-lg px-3 py-2 backdrop-blur-sm">
 						<Search size={18} className="mr-2 text-gray-400" />
 						<input
 							type="text"
 							placeholder="Search..."
-							className="bg-transparent outline-none text-sm w-full"
+							className="bg-transparent outline-none text-sm w-full placeholder:text-gray-500"
 						/>
 					</div>
 				</div>
@@ -70,7 +79,7 @@ export default function Sidebar({ user }: SidebarProps) {
 					{/* ADMIN ONLY */}
 					{user.role === "admin" && (
 						<>
-							<div className="mt-4 text-xs text-gray-400">
+							<div className="mt-4 text-[10px] tracking-widest text-gray-500">
 								ADMIN
 							</div>
 							<SidebarItem
@@ -88,8 +97,25 @@ export default function Sidebar({ user }: SidebarProps) {
 				</div>
 			</div>
 
-			{/* BOTTOM USER PROFILE */}
-			<UserProfile user={user} />
+			{/* 🔥 BOTTOM SECTION (FULL WIDTH + PREMIUM DIVIDER) */}
+			<div className="relative mt-4">
+				{/* ✨ Premium Divider */}
+				<div className="relative">
+					{/* main gradient line */}
+					<div className="h-px w-full bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+
+					{/* subtle glow */}
+					<div className="absolute inset-0 h-px w-full blur-sm bg-white/20 opacity-60" />
+				</div>
+
+				{/* 🔥 Depth shadow (lebih rapat & halus) */}
+				<div className="absolute left-0 right-0 h-4 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
+
+				{/* User Profile */}
+				<div className="px-4 pt-2">
+					<UserProfile user={user} />
+				</div>
+			</div>
 		</div>
 	);
 }
