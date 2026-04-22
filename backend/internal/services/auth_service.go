@@ -90,7 +90,7 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.RegisterRes
 		Email:        req.Email,
 		Username:     req.Username,
 		PasswordHash: string(hashedPassword),
-		Profile: models.UserProfile{
+		Profile: &models.UserProfile{
 			DisplayName: 	req.DisplayName,
 			Bio:         	req.Bio,
 			Gender:	  		req.Gender,

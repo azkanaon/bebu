@@ -121,6 +121,7 @@ CREATE TABLE level_master (
     level_number    INT         NOT NULL UNIQUE,
     min_total_exp   INT         NOT NULL,
     max_total_exp   INT         NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -218,10 +219,10 @@ CREATE TABLE categories (
 
 CREATE TABLE user_categories (
     user_id       INT         NOT NULL REFERENCES users(user_id)      ON DELETE CASCADE,
-    category_id   INT         NOT NULL REFERENCES categories(category_id) ON DELETE CASCADE,
+    category_id INT         NOT NULL REFERENCES categories(category_id) ON DELETE CASCADE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at    TIMESTAMPTZ,
-    PRIMARY KEY (user_id, categories_id)
+    PRIMARY KEY (user_id, category_id)
 );
 
 CREATE TABLE authors (
@@ -229,7 +230,6 @@ CREATE TABLE authors (
     public_id   UUID        NOT NULL DEFAULT gen_random_uuid() UNIQUE,
     author_name VARCHAR(200) NOT NULL,
     slug        VARCHAR(220) NOT NULL UNIQUE,
-    bio         TEXT,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at  TIMESTAMPTZ
@@ -254,7 +254,6 @@ CREATE TABLE books_authors (
     book_id    INT         NOT NULL REFERENCES books(book_id)   ON DELETE CASCADE,
     author_id  INT         NOT NULL REFERENCES authors(author_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (book_id, author_id)
 );
 
@@ -262,7 +261,6 @@ CREATE TABLE books_genres (
     book_id    INT         NOT NULL REFERENCES books(book_id)  ON DELETE CASCADE,
     genre_id   INT         NOT NULL REFERENCES genres(genre_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (book_id, genre_id)
 );
 
@@ -421,16 +419,6 @@ CREATE TABLE conversations (
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE conversation_members (
-    conversation_id      INT         NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
-    user_id              INT         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    last_read_message_id INT,
-    role                 VARCHAR(50) NOT NULL DEFAULT 'member',
-    joined_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    left_at              TIMESTAMPTZ,
-    PRIMARY KEY (conversation_id, user_id)
-);
-
 CREATE TABLE messages (
     message_id      SERIAL      PRIMARY KEY,
     conversation_id INT         NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
@@ -441,6 +429,16 @@ CREATE TABLE messages (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at      TIMESTAMPTZ
+);
+
+CREATE TABLE conversation_members (
+    conversation_id      INT NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    user_id              INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    last_read_message_id INT REFERENCES messages(message_id) ON DELETE SET NULL,
+    role                 VARCHAR(50) NOT NULL DEFAULT 'member',
+    joined_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    left_at              TIMESTAMPTZ,
+    PRIMARY KEY (conversation_id, user_id)
 );
 
 CREATE TABLE message_reads (

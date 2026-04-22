@@ -25,7 +25,6 @@ func main() {
     r.Run(":8080")
 }
 
-<<<<<<< HEAD
 // --> Ubah signature fungsi untuk menerima AuthHandler
 func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
@@ -39,21 +38,22 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 			auth.POST("/refresh", authHandler.Refresh)
 		}
 
-		// --> Contoh route "me" yang dilindungi (akan butuh middleware nanti)
 		users := v1.Group("/users")
 		{
 			users.GET("/me", handlers.GetCurrentUser)
+			users.GET("/recommendation", handlers.GetUserRecommendations)
 		}
+
+		books := v1.Group("/books")
+		{
+			books.GET("/trending", handlers.GetTrendingBooks)
+		}
+
+		categories := v1.Group("/categories")
+		{
+			categories.GET("/user", handlers.GetUserCategories)
+		}
+
+		v1.GET("/leaderboard", handlers.GetLeaderboard)
 	}
-=======
-func SetupRoutes(r *gin.Engine) {
-    api := r.Group("/api")
-    {
-        api.GET("/me", handlers.GetCurrentUser)
-        api.GET("/users/recommendation", handlers.GetUserRecommendations)
-        api.GET("/books/trending", handlers.GetTrendingBooks)
-        api.GET("/categories/user", handlers.GetUserCategories)
-        api.GET("/leaderboard", handlers.GetLeaderboard)
-    }
->>>>>>> 4893e60 (right-navbar)
 }
