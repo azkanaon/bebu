@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #ffffff;
@@ -14,9 +14,17 @@
   /* This creates 'text-brand', 'bg-brand', 'border-brand', etc. */
   --color-brand: #1d4480;
   --color-brand-dark: #15335f;
+  --color-font-button: #b1c5e7;
 
   /* You can also define your gradient here to use as 'bg-my-gradient' */
+  --background-image-logo-gradient: linear-gradient(
+    to bottom right,
+    #cbdcfa,
+    #bbc9eb
+  );
   --background-image-my: linear-gradient(to right, #1d4480, #15335f);
+  --background-image-ym: linear-gradient(to left, #1d4480, #15335f);
+  --background-image-auth-form: linear-gradient(to right, #101522, #090c17);
 
   --background-image-desktop-bg: url('/images/bg_desktop.png');
   --background-image-tablet-bg: url('/images/bg_tablet.png');
@@ -34,4 +42,15 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 2px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #161922;
+  border-radius: 10px;
 }

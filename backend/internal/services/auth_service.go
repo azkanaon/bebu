@@ -18,6 +18,12 @@ import (
 	"backend-bebu/config"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	"mime/multipart"
+
+	"context" // Import ini
+    "github.com/cloudinary/cloudinary-go/v2"
+    "github.com/cloudinary/cloudinary-go/v2/api/uploader"
 )
 
 // Definisikan error custom agar bisa dicek di handler
@@ -27,7 +33,7 @@ var ErrInvalidCredentials = errors.New("invalid email/username or password")
 var ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
 
 type AuthService interface {
-	Register(req *models.RegisterRequest) (*models.RegisterResponse, error)
+	Register(req *models.RegisterRequest, file *multipart.FileHeader) (*models.RegisterResponse, error)
 	Login(req *models.LoginRequest, ipAddress, userAgent string) (string, string, *models.LoginResponse, error)
 	RefreshToken(refreshToken string) (string, error)
 }
@@ -42,7 +48,7 @@ func NewAuthService(userRepo repositories.UserRepository) AuthService {
 	return &authService{userRepo: userRepo}
 }
 
-func (s *authService) Register(req *models.RegisterRequest) (*models.RegisterResponse, error) {
+func (s *authService) Register(req *models.RegisterRequest, file *multipart.FileHeader) (*models.RegisterResponse, error){
 	// 1. Validasi (bisa ditambahkan validator library di sini)
 
 	// 2. Cek apakah user sudah ada
@@ -85,6 +91,37 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.RegisterRes
 		return nil, err
 	}
 
+	// 4. Proses upload file jika ada
+	var avatarURL string
+	if file != nil {
+		// Buka file stream
+		src, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer src.Close()
+
+		// Inisialisasi instance Cloudinary
+		cld, err := cloudinary.NewFromURL(config.CloudinaryURL)
+		if err != nil {
+			return nil, err
+		}
+
+		// Upload ke Cloudinary
+		uploadParams := uploader.UploadParams{
+			UploadPreset: config.CloudinaryUploadPreset,
+			Folder:       "bebu/avatars", // Opsional: untuk mengorganisir file di Cloudinary
+		}
+		
+		uploadResult, err := cld.Upload.Upload(context.Background(), src, uploadParams)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ambil URL yang aman (HTTPS)
+		avatarURL = uploadResult.SecureURL
+	}
+
 	// 4. Siapkan model User dan UserProfile
 	newUser := &models.User{
 		Email:        req.Email,
@@ -94,7 +131,7 @@ func (s *authService) Register(req *models.RegisterRequest) (*models.RegisterRes
 			DisplayName: 	req.DisplayName,
 			Bio:         	req.Bio,
 			Gender:	  		req.Gender,
-			AvatarUrl:  	req.AvatarUrl,
+			AvatarUrl:  	avatarURL,
 		},
 	}
 	// Jika display_name kosong, gunakan username

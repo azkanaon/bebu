@@ -10,6 +10,8 @@ import (
 	"backend-bebu/internal/services"
 	"backend-bebu/config"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 )
 
 type AuthHandler struct {
@@ -23,38 +25,50 @@ func NewAuthHandler(authService services.AuthService) *AuthHandler {
 
 // Register adalah handler untuk endpoint pendaftaran yang disesuaikan untuk Gin
 func (h *AuthHandler) Register(c *gin.Context) {
+	// 1. Bind data form (non-file)
 	var req models.RegisterRequest
+	// if err := c.ShouldBind(&req); err != nil { 
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// 	return
+	// }
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) // Gin akan memberikan pesan error yang jelas
+	req.Username = c.PostForm("username")
+	req.Email = c.PostForm("email")
+	req.Password = c.PostForm("password")
+	req.DisplayName = c.PostForm("display_name")
+	req.Bio = c.PostForm("bio")
+	req.Gender = c.PostForm("gender")
+
+	// 2. Validasi DTO yang sudah kita isi
+	if err := binding.Validator.ValidateStruct(req); err != nil {
+		errs, ok := err.(validator.ValidationErrors)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": errs.Error()})
 		return
 	}
 
+	// 3. Ambil file secara terpisah
+	file, err := c.FormFile("avatar_url")
+	if err != nil && err != http.ErrMissingFile {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file upload"})
+		return
+	}	
 
-	response, err := h.authService.Register(&req)
+
+	response, err := h.authService.Register(&req, file)
 	if err != nil {
-		// --- MULAI PERUBAHAN DI SINI ---
-
-		// Gunakan switch case agar lebih rapi saat error bertambah
 		switch {
 		case errors.Is(err, services.ErrUserAlreadyExists):
-			// Kasus: User sudah ada
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()}) // 409
-
 		case errors.Is(err, services.ErrInvalidPassword):
-			// Kasus: Format password tidak valid
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) // 400
-
 		default:
-			// Kasus: Error lain yang tidak terduga
-			// Sebaiknya log error ini untuk debugging
-			// log.Printf("Unhandled error during registration: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "An unexpected error occurred"}) // 500
 		}
-		
-		return // Pastikan untuk return setelah menangani error
-
-		// --- AKHIR PERUBAHAN ---
+		return
 	}
 	// 3. Kirim response sukses dengan Gin
 	c.JSON(http.StatusCreated, gin.H{

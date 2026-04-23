@@ -18,7 +18,12 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService)
 
     r := gin.Default()
-    r.Use(cors.Default())
+    r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"}, // frontend kamu
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+	}))
 
     SetupRoutes(r, authHandler)
 
