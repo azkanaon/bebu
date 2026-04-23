@@ -20,6 +20,7 @@ type BookSubmission struct {
 	Authors []BookSubmissionAuthor   `gorm:"foreignKey:BookSubmissionID"`
 }
 
+// Junction Table
 type BookSubmissionAuthor struct {
 	BookSubmissionID uint      `gorm:"column:book_submission_id;primaryKey"`
 	AuthorID         uint      `gorm:"column:author_id;primaryKey"`
