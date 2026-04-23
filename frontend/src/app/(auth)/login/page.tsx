@@ -1,86 +1,145 @@
-"use client";
+'use client'
 
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
+import { useState } from 'react'
+import Link from 'next/link'
+import { Eye, EyeOff } from 'lucide-react'
+import { useAuthActions } from '@/hooks/useAuthActions'
 
 export default function LoginPage() {
+  const [showPassword, setShowPassword] = useState(false)
+  const [identifier, setIdentifier] = useState('') // Email or Username
+  const [password, setPassword] = useState('')
+  const { login, isLoading, error } = useAuthActions() // Pakai hook buatan kita
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await login({ email_or_username: identifier, password })
+  }
+
   return (
-    <Card className="w-full border-none bg-[#0f1117] p-4 text-white shadow-2xl ring-1 ring-white/5 sm:p-6">
-      <Tabs defaultValue="login" className="mb-6 w-full lg:mb-8">
-        <TabsList className="grid h-12 w-full grid-cols-2 rounded-none border-b border-white/10 bg-transparent p-0">
-          <TabsTrigger 
-            value="login" 
-            className="rounded-none text-gray-400 data-[state=active]:border-b-2 data-[state=active]:border-blue-500 data-[state=active]:bg-transparent data-[state=active]:text-blue-500"
-          >
-            Login
-          </TabsTrigger>
-          <TabsTrigger 
-            value="register" 
-            asChild
-            className="rounded-none text-gray-400 hover:text-white"
-          >
-            <Link href="/register">Sign Up</Link>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+    <div className="w-full rounded-2xl bg-auth-form p-6 shadow-2xl ring-1 ring-white/5 sm:p-8 lg:my-10">
+      {/* Tabs Custom */}
+      <div className="mb-8 flex w-fit items-center gap-1 rounded-xl bg-[#161922] p-1.5">
+        <button className="rounded-lg bg-[#040c18] px-8 py-2.5 text-sm font-medium text-font-button transition-all shadow-sm">
+          Login
+        </button>
+        <Link
+          href="/register"
+          className="rounded-lg px-8 py-2.5 text-sm font-medium text-gray-400 transition-all hover:text-white"
+        >
+          Sign Up
+        </Link>
+      </div>
 
-      <CardContent className="space-y-4 p-0">
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-medium">
+            {error}
+          </div>
+        )}
+        {/* Input Groups */}
+        <div className="space-y-1.5">
+          <input
+            type="text"
+            placeholder="Email / Username"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            required
+            className="h-12 w-full rounded-xl border border-white/5 bg-[#161922] px-4 text-sm text-white/80 font-medium outline-none transition-all focus:border-blue-500/50 focus:ring-1 focus:ring-brand-dark placeholder:text-gray-500 placeholder:font-medium"
+          />
+        </div>
+
+        {/* Password Group */}
         <div className="space-y-2">
-          <Input 
-            placeholder="Email / Username" 
-            className="h-12 border-white/10 bg-[#161922] focus:ring-blue-500" 
-          />
-        </div>
-        <div className="relative space-y-2">
-          <Input 
-            type="password" 
-            placeholder="Password" 
-            className="h-12 border-white/10 bg-[#161922] focus:ring-blue-500" 
-          />
-          <Link href="/reset-password" title="Lupa password" className="absolute right-3 top-3 text-xs text-blue-500 hover:underline sm:text-sm">
-            Forgot password?
-          </Link>
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="h-12 w-full rounded-xl border border-white/5 bg-[#161922] pl-4 pr-12 text-sm text-white/80 font-medium outline-none transition-all focus:border-blue-500/50 focus:ring-1 focus:ring-brand-dark placeholder:text-gray-500 placeholder:font-medium"
+            />
+            {/* Tombol Show/Hide Password */}
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
+          {/* Forgot Password di luar/bawah input */}
+          <div className="flex justify-end">
+            <Link
+              href="/reset-password"
+              className="text-xs font-medium text-font-button hover:text-blue-400 transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </div>
 
-        <Button className="h-12 w-full bg-blue-700 font-semibold transition-all hover:bg-blue-600">
-          Log in
-        </Button>
+        <button
+          type="submit"
+          className="h-12 w-full rounded-xl bg-my text-sm font-semibold text-font-button transition-all cursor-pointer hover:bg-ym hover:scale-[1.01] active:scale-[0.98]"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Authenticating...' : 'Log in'}
+        </button>
 
-        <div className="relative my-6">
+        {/* Divider */}
+        <div className="relative py-4">
           <div className="absolute inset-0 flex items-center">
-            <Separator className="w-full bg-white/10" />
+            <div className="w-full border-t border-white/5"></div>
           </div>
-          <div className="relative flex justify-center text-[10px] uppercase sm:text-xs">
-            <span className="bg-[#0f1117] px-2 text-gray-500">Or, continue with</span>
+          <div className="relative flex justify-center">
+            <span className="bg-[#0f1117] px-3 text-[10px] uppercase tracking-wider text-gray-500">
+              Or, continue with
+            </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <Button variant="outline" className="h-12 border-white/10 bg-[#161922] hover:bg-white/5">
-             G <span className="hidden ml-1 sm:inline">Google</span>
-          </Button>
-          <Button variant="outline" className="h-12 border-white/10 bg-[#161922] hover:bg-white/5">
-             f <span className="hidden ml-1 sm:inline">Facebook</span>
-          </Button>
+        {/* Social Buttons */}
+        <div className="grid grid-cols-2 gap-4">
+          <button
+            type="button"
+            className="flex h-12 items-center justify-center gap-2 rounded-xl border border-white/5 cursor-pointer bg-[#161922] text-sm font-medium transition-all hover:bg-white/[0.05]"
+          >
+            <span className="text-lg">G</span> Google
+          </button>
+          <button
+            type="button"
+            className="flex h-12 items-center justify-center gap-2 rounded-xl border border-white/5 cursor-pointer bg-[#161922] text-sm font-medium transition-all hover:bg-white/[0.05]"
+          >
+            <span className="font-bold">f</span> Facebook
+          </button>
         </div>
 
-        <div className="mt-6 text-center text-sm text-gray-400">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-semibold text-blue-500 hover:underline">
+        <div className="mt-8 text-center text-sm text-gray-400">
+          Don&apos;t have an account?{' '}
+          <Link
+            href="/register"
+            className="font-bold text-font-button hover:underline"
+          >
             Sign up
           </Link>
         </div>
-      </CardContent>
+      </form>
 
-      <CardFooter className="mt-8 flex justify-center gap-4 p-0 pt-6 text-[10px] text-gray-500 border-t border-white/5 sm:text-xs">
-        <Link href="#" className="hover:text-white">Privacy</Link>
-        <Link href="#" className="hover:text-white">Terms</Link>
-        <Link href="#" className="hover:text-white">Help</Link>
-      </CardFooter>
-    </Card>
-  );
+      {/* Footer Links */}
+      <footer className="mt-10 flex justify-center gap-8 border-t border-white/5 pt-6 text-[10px] font-medium text-gray-500 uppercase tracking-widest">
+        <Link href="#" className="hover:text-white transition-colors">
+          Privacy
+        </Link>
+        <Link href="#" className="hover:text-white transition-colors">
+          Terms
+        </Link>
+        <Link href="#" className="hover:text-white transition-colors">
+          Help
+        </Link>
+      </footer>
+    </div>
+  )
 }
