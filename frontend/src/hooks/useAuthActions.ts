@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { authService } from '@/services/authService'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { LoginRequest } from '@/types/auth'
+import { LoginRequest, RegisterRequest } from '@/types/auth'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 
@@ -34,5 +34,23 @@ export const useAuthActions = () => {
     }
   }
 
-  return { login, isLoading, error }
+  const register = async (payload: RegisterRequest) => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      await authService.register(payload)
+      alert('Registration Successful! Please Login.')
+      router.push('/login')
+    } catch (err: any) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.message || 'Registration failed.')
+      } else {
+        setError('An unexpected error occurred.')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return { login, register, isLoading, error }
 }
