@@ -18,3 +18,13 @@ export interface LoginRequest {
   email_or_username: string
   password: string
 }
+
+export interface RegisterRequest {
+  username: string
+  email: string
+  password: string
+  display_name: string
+  bio: string
+  gender: string
+  avatar: File | Blob // Kita kirim filenya
+}

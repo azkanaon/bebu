@@ -1,13 +1,18 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import Link from 'next/link'
-import { Eye, EyeOff, Camera, AlertCircle, X, Check } from 'lucide-react'
-import Image from 'next/image'
-import { getCroppedImg } from '@/lib/cropImage'
 import Cropper from 'react-easy-crop'
+import Link from 'next/link'
+import Image from 'next/image'
+import { Eye, EyeOff, Camera, AlertCircle, X, Check } from 'lucide-react'
+
+import { getCroppedImg } from '@/lib/cropImage'
+import { useAuthActions } from '@/hooks/useAuthActions'
+import { base64ToBlob } from '@/lib/utils'
 
 export default function RegisterPage() {
+  const { register, isLoading, error } = useAuthActions()
+
   // States untuk visibilitas password
   const [showPass, setShowPass] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -17,15 +22,15 @@ export default function RegisterPage() {
     username: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    displayName: '',
+    confirm_password: '',
+    display_name: '',
     bio: '',
     gender: '',
   })
 
-  const checkPasswordMatch = (confirmPassword: string, password: string) => {
-    if (confirmPassword.length > 0) {
-      if (confirmPassword !== password) {
+  const checkPasswordMatch = (confirm_password: string, password: string) => {
+    if (confirm_password.length > 0) {
+      if (confirm_password !== password) {
         return 'Passwords do not match.'
       } else {
         return ''
@@ -36,7 +41,7 @@ export default function RegisterPage() {
   }
 
   const confirmError = checkPasswordMatch(
-    formData.confirmPassword,
+    formData.confirm_password,
     formData.password,
   )
 
@@ -93,6 +98,28 @@ export default function RegisterPage() {
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // 1. Validasi Password Match
+    if (formData.password !== formData.confirm_password) {
+      alert('Passwords do not match!')
+      return
+    }
+
+    // 2. Konversi Image (Jika ada)
+    let avatarBlob: Blob | null = null
+    if (imagePreview) {
+      avatarBlob = base64ToBlob(imagePreview)
+    }
+
+    // 3. Kirim ke Hook Register
+    await register({
+      ...formData,
+      avatar: avatarBlob as Blob, // Kirim biner ke service
+    })
+  }
+
   return (
     <div className="w-full rounded-2xl bg-auth-form p-6 shadow-2xl ring-1 ring-white/5 sm:p-8 h-[calc(100vh-5rem)] overflow-y-auto custom-scrollbar">
       {/* Tabs Custom */}
@@ -108,7 +135,8 @@ export default function RegisterPage() {
         </button>
       </div>
 
-      <form className="space-y-4">
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        {error && <div className="text-red-500 text-xs mb-4">{error}</div>}
         {/* Profile Picture Upload */}
         <div className="flex flex-col items-center gap-4 mb-6">
           <div className="relative group">
@@ -215,7 +243,7 @@ export default function RegisterPage() {
             onChange={(e) =>
               setFormData({
                 ...formData,
-                displayName: e.target.value,
+                display_name: e.target.value,
               })
             }
           />
@@ -268,7 +296,7 @@ export default function RegisterPage() {
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  confirmPassword: e.target.value,
+                  confirm_password: e.target.value,
                 })
               }
             />
@@ -294,7 +322,7 @@ export default function RegisterPage() {
             onChange={(e) =>
               setFormData({ ...formData, gender: e.target.value })
             }
-            value={''}
+            value={formData.gender}
           >
             <option value="" disabled className="text-gray-500">
               Select Gender
@@ -318,7 +346,7 @@ export default function RegisterPage() {
           disabled={!!passError || !!confirmError}
           className="h-12 w-full rounded-xl bg-my text-sm font-semibold text-font-button transition-all cursor-pointer hover:bg-ym hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Create Account
+          {isLoading ? 'Creating Account...' : 'Create Account'}
         </button>
 
         <div className="mt-6 text-center text-sm text-gray-400">
