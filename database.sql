@@ -116,7 +116,7 @@ CREATE TABLE password_resets (
 -- GAMIFICATION: XP, LEVELS, BADGES, ACHIEVEMENTS
 -- ============================================================
 
-CREATE TABLE level_master (
+CREATE TABLE level_masters (
     level_master_id SERIAL      PRIMARY KEY,
     level_number    INT         NOT NULL UNIQUE,
     min_total_exp   INT         NOT NULL,
@@ -125,7 +125,7 @@ CREATE TABLE level_master (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE user_level (
+CREATE TABLE user_levels (
     user_id           INT         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     level_master_id   INT         NOT NULL REFERENCES level_master(level_master_id),
     total_exp         INT         NOT NULL DEFAULT 0,
@@ -188,7 +188,7 @@ CREATE TABLE user_achievements (
     PRIMARY KEY (user_id, achievement_id)
 );
 
-CREATE TABLE user_ranking (
+CREATE TABLE user_rankings (
     user_id     INT         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     global_rank INT,
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
