@@ -6,13 +6,13 @@ import "github.com/google/uuid"
 
 // RegisterRequest adalah struktur data yang diharapkan dari body request pendaftaran
 type RegisterRequest struct {
-	Username    	string `json:"username" binding:"required,min=4,max=50"`
-	Email       	string `json:"email" binding:"required"`
-	Password    	string `json:"password" binding:"required,min=8"`
-	DisplayName 	string `json:"display_name,omitempty"`
-	Bio 			string `json:"bio,omitempty"`
-	Gender 			string `json:"gender,omitempty"`
-	AvatarUrl 		string `json:"avatar_url,omitempty"`
+	Username    	string `form:"username" binding:"required,min=4,max=50"`
+	Email       	string `form:"email" binding:"required"`
+	Password    	string `form:"password" binding:"required,min=8"`
+	DisplayName 	string `form:"display_name"`
+	Bio 			string `form:"bio"`
+	Gender 			string `form:"gender"`
+	AvatarUrl 		string `form:"avatar_url"`
 }
 
 // RegisterResponse adalah struktur data yang dikirim kembali setelah pendaftaran berhasil

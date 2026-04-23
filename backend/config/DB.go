@@ -13,6 +13,9 @@ var DB *gorm.DB
 var JWTSecretKey string 
 var JWTExpirationInMinutes int 
 
+var CloudinaryURL string
+var CloudinaryUploadPreset string
+
 func LoadAndConnectDB() {
     // Load .env
     err := godotenv.Load()
@@ -20,6 +23,18 @@ func LoadAndConnectDB() {
         log.Println("No .env file found")
     }
 
+    // Muat variabel Cloudinary
+    CloudinaryURL = os.Getenv("CLOUDINARY_URL")
+    CloudinaryUploadPreset = os.Getenv("CLOUDINARY_UPLOAD_PRESET")
+
+    if CloudinaryURL == "" {
+        log.Fatal("CLOUDINARY_URL must be set in .env file")
+    }
+    if CloudinaryUploadPreset == "" {
+        log.Fatal("CLOUDINARY_UPLOAD_PRESET must be set in .env file")
+    }
+
+    // Muat variabel JWT
     JWTSecretKey = os.Getenv("JWT_SECRET_KEY") 
 	JWTExpirationInMinutes, _ = strconv.Atoi(os.Getenv("JWT_EXPIRATION_IN_MINUTES"))
 
