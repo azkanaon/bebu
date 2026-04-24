@@ -4,11 +4,14 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuthActions } from '@/hooks/useAuthActions'
+import ResetPasswordModal from '@/components/auth/ResetPasswordModal'
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [identifier, setIdentifier] = useState('') // Email or Username
   const [password, setPassword] = useState('')
+  const [isResetOpen, setIsResetOpen] = useState(false)
+
   const { login, isLoading, error } = useAuthActions() // Pakai hook buatan kita
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,12 +75,13 @@ export default function LoginPage() {
 
           {/* Forgot Password di luar/bawah input */}
           <div className="flex justify-end">
-            <Link
-              href="/reset-password"
-              className="text-xs font-medium text-font-button hover:text-blue-400 transition-colors"
+            <button
+              type="button"
+              onClick={() => setIsResetOpen(true)}
+              className="text-xs font-medium text-font-button hover:text-blue-400 transition-colors cursor-pointer"
             >
               Forgot password?
-            </Link>
+            </button>
           </div>
         </div>
 
@@ -127,6 +131,11 @@ export default function LoginPage() {
           </Link>
         </div>
       </form>
+
+      <ResetPasswordModal
+        isOpen={isResetOpen}
+        onClose={() => setIsResetOpen(false)}
+      />
 
       {/* Footer Links */}
       <footer className="mt-10 flex justify-center gap-8 border-t border-white/5 pt-6 text-[10px] font-medium text-gray-500 uppercase tracking-widest">

@@ -3,25 +3,26 @@
 package services
 
 import (
+	"time"
 	"errors"
 	"regexp"
-	"backend-bebu/internal/models"
-	"backend-bebu/internal/repositories"
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 	"crypto/sha256"
 	"encoding/hex"
 	"crypto/rand"
 	"encoding/base64"
+	"mime/multipart"
+	"context"
+	"math/big"
 
-	"time"
+	"backend-bebu/internal/models"
+	"backend-bebu/internal/repositories"
+	"backend-bebu/pkg/utils"
 	"backend-bebu/config"
+
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-
-	"mime/multipart"
-
-	"context" // Import ini
     "github.com/cloudinary/cloudinary-go/v2"
     "github.com/cloudinary/cloudinary-go/v2/api/uploader"
 )
@@ -31,11 +32,14 @@ var ErrUserAlreadyExists = errors.New("user with this email or username already 
 var ErrInvalidPassword = errors.New("must be at least 8 characters and contain both letters and numbers")
 var ErrInvalidCredentials = errors.New("invalid email/username or password")
 var ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
+var ErrInvalidResetToken = errors.New("invalid or expired reset token")
 
 type AuthService interface {
 	Register(req *models.RegisterRequest, file *multipart.FileHeader) (*models.RegisterResponse, error)
 	Login(req *models.LoginRequest, ipAddress, userAgent string) (string, string, *models.LoginResponse, error)
 	RefreshToken(refreshToken string) (string, error)
+	RequestPasswordReset(req *models.ForgotPasswordRequest) error
+	ResetPassword(req *models.ResetPasswordRequest) error
 }
 
 
@@ -272,4 +276,92 @@ func (s *authService) RefreshToken(refreshToken string) (string, error) {
 	if err != nil { return "", err }
 
 	return newAccessToken, nil
+}
+
+func (s *authService) RequestPasswordReset(req *models.ForgotPasswordRequest) error {
+    // 1. Cari user berdasarkan email
+    user, err := s.userRepo.FindByEmailOrUsername(req.Email)
+    if err != nil {
+        // PENTING: Jika user tidak ditemukan, jangan kembalikan error.
+        // Cukup return nil agar tidak ada yang tahu email tersebut terdaftar atau tidak.
+        // Ini mencegah serangan "user enumeration".
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil 
+        }
+        return err // Untuk error database lainnya
+    }
+
+    // 2. Generate kode numerik 6 digit yang aman
+    code, err := generateSecureSixDigitCode()
+    if err != nil {
+        return err
+    }
+
+    // 3. Hash kode tersebut (gunakan SHA256, sama seperti refresh token)
+    hasher := sha256.New()
+    hasher.Write([]byte(code))
+    tokenHash := hex.EncodeToString(hasher.Sum(nil))
+
+    // 4. Siapkan record untuk disimpan
+    passwordReset := &models.PasswordReset{
+        UserID:    user.UserID,
+        TokenHash: tokenHash,
+        ExpiresAt: time.Now().Add(15 * time.Minute), // Berlaku 15 menit
+    }
+    
+    // 5. Simpan ke database
+    if err := s.userRepo.CreatePasswordReset(passwordReset); err != nil {
+        return err
+    }
+
+    // 6. Kirim email ke pengguna (dengan kode yang asli, bukan hash)
+    go utils.SendResetPasswordEmail(user.Email, code) // Gunakan goroutine agar tidak memblokir response
+
+    return nil
+}
+
+// Fungsi helper untuk generate kode
+func generateSecureSixDigitCode() (string, error) {
+    const codeLength = 6
+    const max = 10
+    var code string
+    for i := 0; i < codeLength; i++ {
+        num, err := rand.Int(rand.Reader, big.NewInt(max))
+        if err != nil {
+            return "", err
+        }
+        code += num.String()
+    }
+    return code, nil
+}
+
+func (s *authService) ResetPassword(req *models.ResetPasswordRequest) error {
+	// 1. Validasi format password baru (bisa dibuat fungsi terpisah)
+    if len(req.NewPassword) < 8 { return ErrInvalidPassword } // Dsb.
+
+	// 2. Hash token yang masuk dari user
+	hasher := sha256.New()
+	hasher.Write([]byte(req.Token))
+	tokenHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// 3. Cari token di database
+	reset, err := s.userRepo.FindPasswordResetByTokenHash(tokenHash)
+	if err != nil { return ErrInvalidResetToken }
+
+	// 4. Validasi token
+	if reset.UsedAt != nil || time.Now().After(reset.ExpiresAt) {
+		return ErrInvalidResetToken
+	}
+
+	// 5. Hash password baru
+	newPasswordHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil { return err }
+
+	// 6. Panggil satu method repository yang akan menangani semuanya dalam satu transaksi
+	err = s.userRepo.ResetPasswordTransaction(reset.UserID, string(newPasswordHash), reset.PasswordResetID)
+	if err != nil {
+		return err
+	}
+
+    return err
 }

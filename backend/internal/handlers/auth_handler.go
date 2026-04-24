@@ -133,3 +133,43 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	c.SetCookie("token", newAccessToken, accessTokenMaxAge, "/", "localhost", false, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Token refreshed successfully"})
 }
+
+// internal/handlers/auth_handler.go
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req models.ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if err := h.authService.RequestPasswordReset(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process request"})
+		return
+	}
+
+	// Selalu kembalikan response sukses yang generik untuk keamanan
+	c.JSON(http.StatusOK, gin.H{
+		"message": "If an account with that email exists, a password reset code has been sent.",
+	})
+}
+
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req models.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	err := h.authService.ResetPassword(&req)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidResetToken) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
+}

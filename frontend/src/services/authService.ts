@@ -2,6 +2,11 @@
 import api from '@/lib/axios'
 import { LoginRequest, LoginResponse, RegisterRequest } from '@/types/auth'
 
+export interface ResetPasswordPayload {
+  token: string // Kode 6 digit
+  new_password: string // Password baru
+}
+
 export const authService = {
   login: async (payload: LoginRequest): Promise<LoginResponse> => {
     // Axios otomatis throw error jika status code bukan 2xx
@@ -33,6 +38,16 @@ export const authService = {
       },
     })
 
+    return response.data
+  },
+
+  forgotPassword: async (email: string) => {
+    const response = await api.post('/v1/password/forgot', { email })
+    return response.data
+  },
+
+  resetPassword: async (payload: ResetPasswordPayload) => {
+    const response = await api.post('/v1/password/reset', payload)
     return response.data
   },
 }

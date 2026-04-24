@@ -5,6 +5,7 @@ package repositories
 import (
 	"backend-bebu/internal/models"
 	"gorm.io/gorm"
+	"time"
 )
 
 type UserRepository interface {
@@ -13,6 +14,9 @@ type UserRepository interface {
 	CreateSession(session *models.UserSession) error
 	FindSessionByRefreshTokenHash(hash string) (*models.UserSession, error)
 	FindUserByID(id uint) (*models.User, error)
+	CreatePasswordReset(reset *models.PasswordReset) error
+	FindPasswordResetByTokenHash(hash string) (*models.PasswordReset, error)
+	ResetPasswordTransaction(userID uint, newPasswordHash string, resetID uint) error
 }
 
 type userRepository struct {
@@ -70,4 +74,41 @@ func (r *userRepository) FindUserByID(id uint) (*models.User, error) {
     var user models.User
     err := r.db.First(&user, id).Error
     return &user, err
+}
+
+func (r *userRepository) CreatePasswordReset(reset *models.PasswordReset) error {
+    return r.db.Create(reset).Error
+}
+
+func (r *userRepository) FindPasswordResetByTokenHash(hash string) (*models.PasswordReset, error) {
+	var reset models.PasswordReset
+	err := r.db.Where("token_hash = ?", hash).First(&reset).Error
+	return &reset, err
+}
+
+func (r *userRepository) updateUserPassword(userID uint, newPasswordHash string) error {
+	return r.db.Model(&models.User{}).Where("user_id = ?", userID).Update("password_hash", newPasswordHash).Error
+}
+
+func (r *userRepository) markPasswordResetAsUsed(resetID uint) error {
+	return r.db.Model(&models.PasswordReset{}).Where("password_reset_id = ?", resetID).Update("used_at", time.Now()).Error
+}
+
+func (r *userRepository) ResetPasswordTransaction(userID uint, newPasswordHash string, resetID uint) error {
+	// r.db adalah *gorm.DB dari struct userRepository
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Update password hash di tabel users
+		if err := tx.Model(&models.User{}).Where("user_id = ?", userID).Update("password_hash", newPasswordHash).Error; err != nil {
+			// Jika error, transaksi akan di-rollback secara otomatis
+			return err
+		}
+
+		// 2. Update used_at di tabel password_resets
+		if err := tx.Model(&models.PasswordReset{}).Where("password_reset_id = ?", resetID).Update("used_at", time.Now()).Error; err != nil {
+			return err
+		}
+
+		// Jika tidak ada error, kembalikan nil untuk meng-commit transaksi
+		return nil
+	})
 }
