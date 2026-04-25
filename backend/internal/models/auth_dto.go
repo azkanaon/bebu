@@ -41,3 +41,12 @@ type LoginResponse struct {
 	Bio          string    `json:"bio"`
 	Gender       string    `json:"gender"`
 }
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}

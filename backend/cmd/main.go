@@ -42,6 +42,12 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
 		}
+		
+		password := v1.Group("/password")
+        {
+            password.POST("/forgot", authHandler.ForgotPassword)
+            password.POST("/reset", authHandler.ResetPassword)
+        }
 
 		users := v1.Group("/users")
 		{
