@@ -3,8 +3,6 @@ package models
 
 import (
 	"time"
-
-	"gorm.io/gorm"
 )
 
 type Platform struct {
@@ -34,7 +32,6 @@ type UserCategory struct {
 	UserID     uint           `gorm:"column:user_id;primaryKey;uniqueIndex:idx_user_categories_active"`
 	CategoryID uint           `gorm:"column:category_id;primaryKey"`
 	CreatedAt  time.Time      `gorm:"column:created_at;autoCreateTime"`
-	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at;uniqueIndex:idx_user_categories_active"`
 
 	// Relations
 	User     User     `gorm:"foreignKey:UserID;references:UserID"`
