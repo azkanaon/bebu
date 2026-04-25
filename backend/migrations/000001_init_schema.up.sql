@@ -179,7 +179,6 @@ CREATE TABLE user_categories (
     user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     category_id INT NOT NULL REFERENCES categories(category_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ,
     PRIMARY KEY (user_id, category_id)
 );
 CREATE TABLE authors (
@@ -440,5 +439,3 @@ CREATE INDEX idx_notifications_unread ON notifications(user_receiver_id)
 WHERE is_read = FALSE;
 CREATE INDEX idx_search_logs_normalized ON search_logs(query_normalized);
 CREATE INDEX idx_reading_activity_user_date ON reading_activity_logs(user_id, date);
-CREATE INDEX idx_user_categories_active ON user_categories(user_id)
-WHERE deleted_at IS NULL;

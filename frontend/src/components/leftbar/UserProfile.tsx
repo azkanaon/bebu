@@ -74,11 +74,11 @@ export function UserProfile({ user }: Props) {
 						</div>
 
 						{/* Name */}
-						<div className="leading-tight">
-							<div className="text-[13px] font-semibold text-white">
+						<div className="leading-normal">
+							<div className="text-sm font-semibold text-white">
 								{user.name}
 							</div>
-							<div className="text-[11px] text-gray-400">
+							<div className="text-xs text-gray-400">
 								@{user.username}
 							</div>
 						</div>

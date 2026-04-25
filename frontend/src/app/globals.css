@@ -25,6 +25,7 @@
   --background-image-my: linear-gradient(to right, #1d4480, #15335f);
   --background-image-ym: linear-gradient(to left, #1d4480, #15335f);
   --background-image-auth-form: linear-gradient(to right, #101522, #090c17);
+  --background-image-right-bar: linear-gradient(to bottom, #0f172a, #020617);
 
   --background-image-desktop-bg: url('/images/bg_desktop.png');
   --background-image-tablet-bg: url('/images/bg_tablet.png');
@@ -38,13 +39,25 @@
   }
 }
 
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
+/* .custom-scrollbar::-webkit-scrollbar {
   width: 2px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -53,4 +66,32 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: #161922;
   border-radius: 10px;
+} */
+
+/* 🔥 MODERN SCROLLBAR */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 🔥 fully hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
