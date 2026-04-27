@@ -4,11 +4,14 @@ package handlers
 
 import (
 	// "encoding/json"
-	"errors"
-	"net/http"
+	"backend-bebu/config"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/services"
-	"backend-bebu/config"
+	"crypto/rand"
+	"encoding/base64"
+	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -92,12 +95,33 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	if err != nil {
 		if errors.Is(err, services.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()}) // 401 Unauthorized
-			return
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		} else if errors.Is(err, services.ErrTooManyRequests) {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()}) // Status 429
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "An unexpected error occurred"})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "An unexpected error occurred"})
 		return
 	}
+
+	// 1. Generate CSRF token yang aman
+	csrfSecretBytes := make([]byte, 32)
+	if _, err := rand.Read(csrfSecretBytes); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate CSRF token"})
+		return
+	}
+	csrfToken := base64.StdEncoding.EncodeToString(csrfSecretBytes)
+
+	// 2. Set HttpOnly cookies untuk sesi (seperti sebelumnya)
+	accessTokenMaxAge := config.JWTExpirationInMinutes * 60
+	c.SetCookie("token", accessToken, accessTokenMaxAge, "/", "localhost", false, true) // HttpOnly: true
+
+	// 3. Set cookie untuk CSRF token (TIDAK HttpOnly)
+	// MaxAge sama dengan refresh token agar berlaku selama sesi
+	
+	refreshTokenMaxAge := 3600 * 24 * 30
+	c.SetCookie("refresh_token", refreshToken, refreshTokenMaxAge, "/api/v1/auth", "localhost", false, true) // HttpOnly: true
+	c.SetCookie("csrf-token", csrfToken, refreshTokenMaxAge, "/", "localhost", false, false) // HttpOnly: false
 
 	// Set DUA cookie
     // Access Token Cookie (pendek)
@@ -106,6 +130,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
     // Refresh Token Cookie (panjang)
     // Path-nya spesifik agar hanya dikirim ke endpoint refresh
     c.SetCookie("refresh_token", refreshToken, 3600*24*30, "/api/v1/auth", "localhost", false, true)
+	
 
     c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
@@ -133,8 +158,6 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	c.SetCookie("token", newAccessToken, accessTokenMaxAge, "/", "localhost", false, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Token refreshed successfully"})
 }
-
-// internal/handlers/auth_handler.go
 
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	var req models.ForgotPasswordRequest
@@ -172,4 +195,30 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password has been reset successfully."})
+}
+
+func (h *AuthHandler) Logout(c *gin.Context) {
+	// 1. Ambil refresh token dari cookie.
+	refreshToken, err := c.Cookie("refresh_token")
+	if err != nil {
+		// Jika cookie tidak ada, anggap pengguna sudah logout.
+		// Kirim instruksi untuk menghapus cookie lain untuk berjaga-jaga.
+		c.SetCookie("token", "", -1, "/", "localhost", false, true)
+		c.JSON(http.StatusOK, gin.H{"message": "Already logged out"})
+		return
+	}
+
+	// 2. Panggil service untuk membatalkan token di database.
+	if err := h.authService.Logout(refreshToken); err != nil {
+		// Bahkan jika ada error di DB, kita tetap harus mencoba menghapus cookie.
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to logout"})
+		return
+	}
+
+	// 3. Kirim instruksi ke browser untuk MENGHAPUS cookie.
+	// Caranya adalah dengan men-set ulang cookie dengan MaxAge negatif.
+	c.SetCookie("token", "", -1, "/", "localhost", false, true)
+	c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "localhost", false, true)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }

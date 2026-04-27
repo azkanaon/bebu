@@ -1,10 +1,13 @@
 package main
 
 import (
+	"time"
+
 	"backend-bebu/config"
 	"backend-bebu/internal/handlers"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/internal/services"
+	"backend-bebu/pkg/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -15,8 +18,10 @@ func main() {
 	db := config.GetDB()
 	config.InitCloudinary()
 
+	loginLimiter := utils.NewLoginRateLimiter(5, 5*time.Minute, 15*time.Minute)
+
 	userRepo := repositories.NewUserRepository(db)
-	authService := services.NewAuthService(userRepo)
+	authService := services.NewAuthService(userRepo, loginLimiter)
 	authHandler := handlers.NewAuthHandler(authService)
 
 	postRepo := repositories.NewPostRepository(db)
@@ -55,6 +60,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
+			auth.POST("/logout", authHandler.Logout)
 		}
 
 		password := v1.Group("/password")

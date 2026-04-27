@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"mime/multipart"
 	"context"
+	"fmt"
 	"math/big"
 
 	"backend-bebu/internal/models"
@@ -33,6 +34,7 @@ var ErrInvalidPassword = errors.New("must be at least 8 characters and contain b
 var ErrInvalidCredentials = errors.New("invalid email/username or password")
 var ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
 var ErrInvalidResetToken = errors.New("invalid or expired reset token")
+var ErrTooManyRequests = errors.New("too many failed login attempts, please try again later")
 
 type AuthService interface {
 	Register(req *models.RegisterRequest, file *multipart.FileHeader) (*models.RegisterResponse, error)
@@ -40,16 +42,21 @@ type AuthService interface {
 	RefreshToken(refreshToken string) (string, error)
 	RequestPasswordReset(req *models.ForgotPasswordRequest) error
 	ResetPassword(req *models.ResetPasswordRequest) error
+	Logout(refreshToken string) error
 }
 
 
 type authService struct {
 	userRepo repositories.UserRepository
+	rateLimiter *utils.LoginRateLimiter
 }
 
 // NewAuthService adalah constructor
-func NewAuthService(userRepo repositories.UserRepository) AuthService {
-	return &authService{userRepo: userRepo}
+func NewAuthService(userRepo repositories.UserRepository, limiter *utils.LoginRateLimiter) AuthService {
+	return &authService{
+		userRepo:   userRepo,
+		rateLimiter: limiter,
+	}
 }
 
 func (s *authService) Register(req *models.RegisterRequest, file *multipart.FileHeader) (*models.RegisterResponse, error){
@@ -164,9 +171,19 @@ func (s *authService) Register(req *models.RegisterRequest, file *multipart.File
 }
 
 func (s *authService) Login(req *models.LoginRequest, ipAddress, userAgent string) (string, string, *models.LoginResponse, error) {
+
+	// Buat kunci untuk rate limiter berdasarkan email/username dan IP address
+	rateLimitKey := fmt.Sprintf("%s|%s", req.EmailOrUsername, ipAddress)
+
+	if s.rateLimiter.IsBlocked(rateLimitKey) {
+		return "", "", nil, ErrTooManyRequests
+	}
 	// 1. Cari user di database (sudah termasuk Preload("Profile"))
 	user, err := s.userRepo.FindByEmailOrUsername(req.EmailOrUsername)
 	if err != nil {
+		ipKey := fmt.Sprintf("ip|%s", ipAddress)
+		s.rateLimiter.RecordFailure(ipKey)
+
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", "", nil, ErrInvalidCredentials
 		}
@@ -176,8 +193,14 @@ func (s *authService) Login(req *models.LoginRequest, ipAddress, userAgent strin
 	// 2. Bandingkan password
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
+		s.rateLimiter.RecordFailure(rateLimitKey) // Catat kegagalan berdasarkan email/username + IP
 		return "", "", nil, ErrInvalidCredentials
 	}
+
+	// JIKA LOGIN BERHASIL, bersihkan catatan kegagalan
+	s.rateLimiter.ClearFailures(rateLimitKey)
+	ipKey := fmt.Sprintf("ip|%s", ipAddress) // Juga bersihkan untuk IP-only
+	s.rateLimiter.ClearFailures(ipKey)
 
 	// 3. Generate Access Token (JWT) - seperti sebelumnya
 	accessToken, err := generateJWT(user.PublicID)
@@ -364,4 +387,19 @@ func (s *authService) ResetPassword(req *models.ResetPasswordRequest) error {
 	}
 
     return err
+}
+
+func (s *authService) Logout(refreshToken string) error {
+	if refreshToken == "" {
+		// Jika tidak ada token, tidak ada yang perlu dilakukan.
+		return nil
+	}
+
+	// 1. Hash refresh token yang masuk, sama seperti saat refresh.
+	hasher := sha256.New()
+	hasher.Write([]byte(refreshToken))
+	refreshTokenHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// 2. Panggil repository untuk membatalkan sesi.
+	return s.userRepo.RevokeSessionByRefreshTokenHash(refreshTokenHash)
 }

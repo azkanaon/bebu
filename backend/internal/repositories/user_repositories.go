@@ -17,6 +17,7 @@ type UserRepository interface {
 	CreatePasswordReset(reset *models.PasswordReset) error
 	FindPasswordResetByTokenHash(hash string) (*models.PasswordReset, error)
 	ResetPasswordTransaction(userID uint, newPasswordHash string, resetID uint) error
+	RevokeSessionByRefreshTokenHash(hash string) error
 }
 
 type userRepository struct {
@@ -111,4 +112,24 @@ func (r *userRepository) ResetPasswordTransaction(userID uint, newPasswordHash s
 		// Jika tidak ada error, kembalikan nil untuk meng-commit transaksi
 		return nil
 	})
+}
+
+// RevokeSessionByRefreshTokenHash menandai sebuah sesi sebagai tidak valid/dicabut.
+func (r *userRepository) RevokeSessionByRefreshTokenHash(hash string) error {
+	// Kita update kolom 'revoked_at' dengan waktu saat ini.
+	// Kita hanya update sesi yang hash-nya cocok DAN belum pernah dicabut.
+	result := r.db.Model(&models.UserSession{}).
+		Where("refresh_token_hash = ? AND revoked_at IS NULL", hash).
+		Update("revoked_at", time.Now())
+
+	if result.Error != nil {
+		return result.Error
+	}
+	
+	// Jika RowsAffected adalah 0, berarti tidak ada sesi yang cocok ditemukan untuk dicabut.
+	if result.RowsAffected == 0 {
+		return nil 
+	}
+
+	return nil
 }
