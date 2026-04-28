@@ -22,10 +22,11 @@ type User struct {
     DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index:idx_users_deleted_at"`
     
     Profile        *UserProfile    `gorm:"foreignKey:UserID;references:UserID"`
-    Settings       *UserSettings   `gorm:"foreignKey:UserID;references:UserID"`
+    Settings       *UserSettings   `gorm:"foreignKey:UserID;"`
     PasswordResets []PasswordReset `gorm:"foreignKey:UserID"`
     Sessions       []UserSession   `gorm:"foreignKey:UserID"`
     SocialLinks    []UserSocialLink  `gorm:"foreignKey:UserID"`
+    Posts          []Post            `gorm:"foreignKey:UserID"`
 }
 
 type UserProfile struct {

@@ -6,14 +6,24 @@ import (
 	"github.com/gin-gonic/gin"
 	"backend-bebu/config"
 	"backend-bebu/internal/models"
+	"backend-bebu/internal/services"
 
 	"strconv"
+	"fmt"
 )
 
 type CategoryResponse struct {
 	ID    uint   `json:"id"`
 	Name  string `json:"name"`
 	Count int    `json:"count"`
+}
+
+type CategoryHandler struct {
+	service *services.CategoryService
+}
+
+func NewCategoryHandler(s *services.CategoryService) *CategoryHandler {
+	return &CategoryHandler{s}
 }
 
 func GetUserCategories(c *gin.Context) {
@@ -127,4 +137,18 @@ func UnfavoriteCategory(c *gin.Context) {
 		Delete(&models.UserCategory{})
 
 	c.Status(http.StatusOK)
+}
+
+func (h *CategoryHandler) Search(c *gin.Context) {
+	query := c.Query("search")
+
+	fmt.Println("🔥 SEARCH HIT:", query)
+	
+	data, err := h.service.Search(query)
+	if err != nil {
+		c.JSON(500, gin.H{"message": "error"})
+		return
+	}
+
+	c.JSON(200, gin.H{"data": data})
 }

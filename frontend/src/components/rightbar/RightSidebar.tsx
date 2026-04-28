@@ -11,7 +11,7 @@ export default function RightSidebar() {
 	const [refresh, setRefresh] = useState(false);
 
 	return (
-		<div className="space-y-4 p-4">
+		<div className="space-y-4 pr-8 my-4">
 			<FriendRecommendation />
 
 			<CategoryBubble
