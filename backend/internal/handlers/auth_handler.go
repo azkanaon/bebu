@@ -5,6 +5,7 @@ package handlers
 import (
 	// "encoding/json"
 	"backend-bebu/config"
+	"backend-bebu/internal/dto"
 	"backend-bebu/internal/services"
 	"crypto/rand"
 	"encoding/base64"
@@ -28,7 +29,7 @@ func NewAuthHandler(authService services.AuthService) *AuthHandler {
 // Register adalah handler untuk endpoint pendaftaran yang disesuaikan untuk Gin
 func (h *AuthHandler) Register(c *gin.Context) {
 	// 1. Bind data form (non-file)
-	var req services.RegisterRequest
+	var req dto.RegisterRequest
 	// if err := c.ShouldBind(&req); err != nil { 
 	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	// 	return
@@ -80,7 +81,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
-	var req services.LoginRequest
+	var req dto.LoginRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
@@ -159,7 +160,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 }
 
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
-	var req services.ForgotPasswordRequest
+	var req dto.ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
@@ -177,7 +178,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 }
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
-	var req services.ResetPasswordRequest
+	var req dto.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return

@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"backend-bebu/internal/services" // Handler butuh service
-	"encoding/json"                  // <-- Tambahkan import ini untuk unmarshal socialLinks
+	"backend-bebu/internal/dto"
+	"backend-bebu/internal/services"
+	"encoding/json"
 	"errors"
-	"mime/multipart" // <-- Tambahkan import ini untuk file
+	"mime/multipart"
 	"net/http"
 	"strconv"
 
@@ -65,19 +66,15 @@ func (h *UserHandler) GetUserProfile(c *gin.Context) {
 
 // FollowUser adalah handler untuk endpoint POST /users/:username/follow
 func (h *UserHandler) FollowUser(c *gin.Context) {
-	// 1. Ambil username target dari URL
+	// ... (langkah 1 & 2: ambil targetUsername dan sourceUserIDUint, tetap sama) ...
 	targetUsername := c.Param("username")
-
-	// 2. Ambil ID user yang melakukan aksi (source) dari context.
-	// Ini adalah rute yang dilindungi, jadi kita 100% yakin "userID" ada.
-	sourceUserID, exists := c.Get("userID")
+    sourceUserID, exists := c.Get("userID")
 	if !exists {
-		// Seharusnya tidak akan pernah terjadi jika middleware RequiredAuth bekerja
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user from context"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
-	// Lakukan type assertion
+	// Lakukan type assertion dengan aman
 	sourceUserIDUint, ok := sourceUserID.(uint)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "User ID in context is not of expected type"})
@@ -85,12 +82,13 @@ func (h *UserHandler) FollowUser(c *gin.Context) {
 	}
 
 	// 3. Panggil service untuk menjalankan logika
-	err := h.userService.FollowUser(sourceUserIDUint, targetUsername)
+	// Service sekarang mengembalikan string status
+	status, err := h.userService.FollowUser(sourceUserIDUint, targetUsername)
 
 	// 4. Handle response berdasarkan hasil dari service
 	if err != nil {
-		// Cek jenis error spesifik yang kita definisikan di service
-		if err.Error() == "user to follow not found" {
+		// ... (penanganan error tetap sama) ...
+        if err.Error() == "user to follow not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
@@ -98,15 +96,16 @@ func (h *UserHandler) FollowUser(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		// Untuk error lainnya
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow user"})
 		return
 	}
 
-	// 5. Jika sukses
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully followed " + targetUsername})
+	// 5. Jika sukses, kirim response yang berisi status
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Follow request processed successfully",
+		"status":  status, // "accepted" atau "pending"
+	})
 }
-
 
 // UnfollowUser adalah handler untuk endpoint DELETE /users/:username/follow
 func (h *UserHandler) UnfollowUser(c *gin.Context) {
@@ -155,7 +154,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	// 2. Siapkan DTO untuk menampung data dari request
-	var req services.UpdateProfileRequestDTO
+	var req dto.UpdateProfileRequestDTO
 
 	// 3. Parsing data dari multipart/form-data
 	
@@ -191,7 +190,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 
 	// Data Social Links (dikirim sebagai string JSON)
 	if socialLinksJSON, ok := c.GetPostForm("social_links"); ok {
-		var socialLinks []services.SocialLinkInputDTO
+		var socialLinks []dto.SocialLinkInputDTO
 		if err := json.Unmarshal([]byte(socialLinksJSON), &socialLinks); err == nil {
 			req.SocialLinks = socialLinks
 		} else {
@@ -228,7 +227,139 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	})
 }
 
+func (h *UserHandler) GetFollowRequests(c *gin.Context) {
+	// 1. Ambil ID user yang sedang login dari context
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	currentUserID, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in context"})
+		return
+	}
 
+	// 2. Panggil service untuk mendapatkan daftar permintaan
+	requests, err := h.userService.GetFollowRequests(currentUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch follow requests"})
+		return
+	}
+
+	// Jika tidak ada permintaan, kembalikan array kosong, bukan error
+	if requests == nil {
+		requests = make([]dto.FollowRequestDTO, 0)
+	}
+
+	// 3. Kirim response
+	c.JSON(http.StatusOK, gin.H{"data": requests})
+}
+
+
+// AcceptFollowRequest adalah handler untuk POST /follow-requests/:username/accept
+func (h *UserHandler) AcceptFollowRequest(c *gin.Context) {
+	// 1. Ambil username user yang permintaannya akan diterima (dari URL)
+	requesterUsername := c.Param("username")
+
+	// 2. Ambil ID user yang sedang login (yang menerima/menolak)
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	currentUserID, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in context"})
+		return
+	}
+
+	// 3. Panggil service untuk memproses penerimaan
+	err := h.userService.AcceptFollowRequest(currentUserID, requesterUsername)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Follow request not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept follow request"})
+		return
+	}
+
+	// 4. Kirim response sukses
+	c.JSON(http.StatusOK, gin.H{"message": "Follow request accepted successfully"})
+}
+
+
+// DeclineFollowRequest adalah handler untuk DELETE /follow-requests/:username/decline
+func (h *UserHandler) DeclineFollowRequest(c *gin.Context) {
+	// Langkah 1 & 2 sama seperti Accept
+	requesterUsername := c.Param("username")
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	currentUserID, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in context"})
+		return
+	}
+
+	// 3. Panggil service untuk memproses penolakan
+	err := h.userService.DeclineFollowRequest(currentUserID, requesterUsername)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Follow request not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decline follow request"})
+		return
+	}
+
+	// 4. Kirim response sukses
+	c.JSON(http.StatusOK, gin.H{"message": "Follow request declined successfully"})
+}
+
+func (h *UserHandler) BlockUser(c *gin.Context) {
+	targetUsername := c.Param("username")
+
+	sourceUserID, exists := c.Get("userID")
+	if !exists { /* ... handle error ... */ }
+	sourceUserIDUint, ok := sourceUserID.(uint)
+	if !ok { /* ... handle error ... */ }
+
+	err := h.userService.BlockUser(sourceUserIDUint, targetUsername)
+	if err != nil {
+		// ... (handle error 'user not found' dan 'cannot block yourself') ...
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to block user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully blocked " + targetUsername})
+}
+
+// UnblockUser adalah handler untuk DELETE /users/:username/block
+func (h *UserHandler) UnblockUser(c *gin.Context) {
+	targetUsername := c.Param("username")
+
+	sourceUserID, exists := c.Get("userID")
+	if !exists { /* ... handle error ... */ }
+	sourceUserIDUint, ok := sourceUserID.(uint)
+	if !ok { /* ... handle error ... */ }
+
+	err := h.userService.UnblockUser(sourceUserIDUint, targetUsername)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "You are not blocking this user"})
+			return
+		}
+		// ... (handle error lain) ...
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unblock user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Successfully unblocked " + targetUsername})
+}
 
 
 

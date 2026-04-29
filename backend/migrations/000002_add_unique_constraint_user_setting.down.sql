@@ -1,0 +1,2 @@
+ALTER TABLE user_settings
+DROP CONSTRAINT user_settings_user_id_unique;

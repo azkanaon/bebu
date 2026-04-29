@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"backend-bebu/config"
+	"backend-bebu/internal/dto"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/pkg/utils"
@@ -34,11 +35,11 @@ var ErrInvalidResetToken = errors.New("invalid or expired reset token")
 var ErrTooManyRequests = errors.New("too many failed login attempts, please try again later")
 
 type AuthService interface {
-	Register(req *RegisterRequest, file *multipart.FileHeader) (*RegisterResponse, error)
-	Login(req *LoginRequest, ipAddress, userAgent string) (string, string, *LoginResponse, error)
+	Register(req *dto.RegisterRequest, file *multipart.FileHeader) (*dto.RegisterResponse, error)
+	Login(req *dto.LoginRequest, ipAddress, userAgent string) (string, string, *dto.LoginResponse, error)
 	RefreshToken(refreshToken string) (string, error)
-	RequestPasswordReset(req *ForgotPasswordRequest) error
-	ResetPassword(req *ResetPasswordRequest) error
+	RequestPasswordReset(req *dto.ForgotPasswordRequest) error
+	ResetPassword(req *dto.ResetPasswordRequest) error
 	Logout(refreshToken string) error
 }
 
@@ -56,7 +57,7 @@ func NewAuthService(userRepo repositories.UserRepository, limiter *utils.LoginRa
 	}
 }
 
-func (s *authService) Register(req *RegisterRequest, file *multipart.FileHeader) (*RegisterResponse, error){
+func (s *authService) Register(req *dto.RegisterRequest, file *multipart.FileHeader) (*dto.RegisterResponse, error){
 	// 1. Validasi (bisa ditambahkan validator library di sini)
 
 	// 2. Cek apakah user sudah ada
@@ -129,7 +130,7 @@ func (s *authService) Register(req *RegisterRequest, file *multipart.FileHeader)
 	}
 
 	// 6. Buat response DTO
-	response := &RegisterResponse{
+	response := &dto.RegisterResponse{
 		UserPublicID: createdUser.PublicID,
 		Username:     createdUser.Username,
 		Email:        createdUser.Email,
@@ -142,7 +143,7 @@ func (s *authService) Register(req *RegisterRequest, file *multipart.FileHeader)
 	return response, nil
 }
 
-func (s *authService) Login(req *LoginRequest, ipAddress, userAgent string) (string, string, *LoginResponse, error) {
+func (s *authService) Login(req *dto.LoginRequest, ipAddress, userAgent string) (string, string, *dto.LoginResponse, error) {
 
 	// Buat kunci untuk rate limiter berdasarkan email/username dan IP address
 	rateLimitKey := fmt.Sprintf("%s|%s", req.EmailOrUsername, ipAddress)
@@ -207,7 +208,7 @@ func (s *authService) Login(req *LoginRequest, ipAddress, userAgent string) (str
     }
 
 	// 7. Siapkan response data (tidak berubah)
-	loginResponse := &LoginResponse{
+	loginResponse := &dto.LoginResponse{
 		UserPublicID: user.PublicID,
 		Username:     user.Username,
 		DisplayName:  user.Profile.DisplayName,
@@ -273,7 +274,7 @@ func (s *authService) RefreshToken(refreshToken string) (string, error) {
 	return newAccessToken, nil
 }
 
-func (s *authService) RequestPasswordReset(req *ForgotPasswordRequest) error {
+func (s *authService) RequestPasswordReset(req *dto.ForgotPasswordRequest) error {
     // 1. Cari user berdasarkan email
     user, err := s.userRepo.FindByEmailOrUsername(req.Email)
     if err != nil {
@@ -330,7 +331,7 @@ func generateSecureSixDigitCode() (string, error) {
     return code, nil
 }
 
-func (s *authService) ResetPassword(req *ResetPasswordRequest) error {
+func (s *authService) ResetPassword(req *dto.ResetPasswordRequest) error {
 	// 1. Validasi format password baru (bisa dibuat fungsi terpisah)
     if len(req.NewPassword) < 8 { return ErrInvalidPassword } // Dsb.
 

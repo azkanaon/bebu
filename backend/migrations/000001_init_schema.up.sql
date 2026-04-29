@@ -98,7 +98,7 @@ CREATE TABLE level_masters (
 );
 CREATE TABLE user_levels (
     user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    level_master_id INT NOT NULL REFERENCES level_master(level_master_id),
+    level_master_id INT NOT NULL REFERENCES level_masters(level_master_id),
     total_exp INT NOT NULL DEFAULT 0,
     current_level_exp INT NOT NULL DEFAULT 0,
     next_level_exp INT NOT NULL DEFAULT 0,
@@ -349,16 +349,6 @@ CREATE TABLE conversations (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE conversation_members (
-    conversation_id INT NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
-    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    last_read_message_id INT REFERENCES messages(message_id) ON DELETE
-    SET NULL,
-        role VARCHAR(50) NOT NULL DEFAULT 'member',
-        joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        left_at TIMESTAMPTZ,
-        PRIMARY KEY (conversation_id, user_id)
-);
 CREATE TABLE messages (
     message_id SERIAL PRIMARY KEY,
     conversation_id INT NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
@@ -370,6 +360,17 @@ CREATE TABLE messages (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
 );
+CREATE TABLE conversation_members (
+    conversation_id INT NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    last_read_message_id INT REFERENCES messages(message_id) ON DELETE
+    SET NULL,
+        role VARCHAR(50) NOT NULL DEFAULT 'member',
+        joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        left_at TIMESTAMPTZ,
+        PRIMARY KEY (conversation_id, user_id)
+);
+
 CREATE TABLE message_reads (
     message_id INT NOT NULL REFERENCES messages(message_id) ON DELETE CASCADE,
     user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
