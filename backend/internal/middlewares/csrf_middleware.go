@@ -1,5 +1,5 @@
-// internal/handlers/middleware.go
-package handlers
+// internal/middlewares/csrf_middleware.go
+package middlewares
 
 import (
 	"net/http"

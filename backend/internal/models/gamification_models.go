@@ -49,6 +49,7 @@ type Badge struct {
 	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime"`
 
 	Achievements []Achievement `gorm:"foreignKey:BadgeID"`
+	Users       []User  `gorm:"many2many:user_badges;foreignKey:BadgeID;joinForeignKey:BadgeID;References:UserID;joinReferences:UserID"`
 }
 
 type Achievement struct {

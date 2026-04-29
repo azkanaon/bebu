@@ -3,29 +3,26 @@
 package services
 
 import (
-	"time"
-	"errors"
-	"regexp"
-	"crypto/sha256"
-	"encoding/hex"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
-	"mime/multipart"
-	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
+	"mime/multipart"
+	"regexp"
+	"time"
 
+	"backend-bebu/config"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/pkg/utils"
-	"backend-bebu/config"
 
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-    "github.com/cloudinary/cloudinary-go/v2"
-    "github.com/cloudinary/cloudinary-go/v2/api/uploader"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // Definisikan error custom agar bisa dicek di handler
@@ -37,11 +34,11 @@ var ErrInvalidResetToken = errors.New("invalid or expired reset token")
 var ErrTooManyRequests = errors.New("too many failed login attempts, please try again later")
 
 type AuthService interface {
-	Register(req *models.RegisterRequest, file *multipart.FileHeader) (*models.RegisterResponse, error)
-	Login(req *models.LoginRequest, ipAddress, userAgent string) (string, string, *models.LoginResponse, error)
+	Register(req *RegisterRequest, file *multipart.FileHeader) (*RegisterResponse, error)
+	Login(req *LoginRequest, ipAddress, userAgent string) (string, string, *LoginResponse, error)
 	RefreshToken(refreshToken string) (string, error)
-	RequestPasswordReset(req *models.ForgotPasswordRequest) error
-	ResetPassword(req *models.ResetPasswordRequest) error
+	RequestPasswordReset(req *ForgotPasswordRequest) error
+	ResetPassword(req *ResetPasswordRequest) error
 	Logout(refreshToken string) error
 }
 
@@ -59,7 +56,7 @@ func NewAuthService(userRepo repositories.UserRepository, limiter *utils.LoginRa
 	}
 }
 
-func (s *authService) Register(req *models.RegisterRequest, file *multipart.FileHeader) (*models.RegisterResponse, error){
+func (s *authService) Register(req *RegisterRequest, file *multipart.FileHeader) (*RegisterResponse, error){
 	// 1. Validasi (bisa ditambahkan validator library di sini)
 
 	// 2. Cek apakah user sudah ada
@@ -103,34 +100,9 @@ func (s *authService) Register(req *models.RegisterRequest, file *multipart.File
 	}
 
 	// 4. Proses upload file jika ada
-	var avatarURL string
-	if file != nil {
-		// Buka file stream
-		src, err := file.Open()
-		if err != nil {
-			return nil, err
-		}
-		defer src.Close()
-
-		// Inisialisasi instance Cloudinary
-		cld, err := cloudinary.NewFromURL(config.CloudinaryURL)
-		if err != nil {
-			return nil, err
-		}
-
-		// Upload ke Cloudinary
-		uploadParams := uploader.UploadParams{
-			UploadPreset: config.CloudinaryUploadPreset,
-			Folder:       "bebu/avatars", // Opsional: untuk mengorganisir file di Cloudinary
-		}
-		
-		uploadResult, err := cld.Upload.Upload(context.Background(), src, uploadParams)
-		if err != nil {
-			return nil, err
-		}
-
-		// Ambil URL yang aman (HTTPS)
-		avatarURL = uploadResult.SecureURL
+	avatarURL, err := utils.UploadToCloudinary(file, "bebu/avatars")
+	if err != nil {
+		return nil, err
 	}
 
 	// 4. Siapkan model User dan UserProfile
@@ -157,7 +129,7 @@ func (s *authService) Register(req *models.RegisterRequest, file *multipart.File
 	}
 
 	// 6. Buat response DTO
-	response := &models.RegisterResponse{
+	response := &RegisterResponse{
 		UserPublicID: createdUser.PublicID,
 		Username:     createdUser.Username,
 		Email:        createdUser.Email,
@@ -170,7 +142,7 @@ func (s *authService) Register(req *models.RegisterRequest, file *multipart.File
 	return response, nil
 }
 
-func (s *authService) Login(req *models.LoginRequest, ipAddress, userAgent string) (string, string, *models.LoginResponse, error) {
+func (s *authService) Login(req *LoginRequest, ipAddress, userAgent string) (string, string, *LoginResponse, error) {
 
 	// Buat kunci untuk rate limiter berdasarkan email/username dan IP address
 	rateLimitKey := fmt.Sprintf("%s|%s", req.EmailOrUsername, ipAddress)
@@ -235,7 +207,7 @@ func (s *authService) Login(req *models.LoginRequest, ipAddress, userAgent strin
     }
 
 	// 7. Siapkan response data (tidak berubah)
-	loginResponse := &models.LoginResponse{
+	loginResponse := &LoginResponse{
 		UserPublicID: user.PublicID,
 		Username:     user.Username,
 		DisplayName:  user.Profile.DisplayName,
@@ -301,7 +273,7 @@ func (s *authService) RefreshToken(refreshToken string) (string, error) {
 	return newAccessToken, nil
 }
 
-func (s *authService) RequestPasswordReset(req *models.ForgotPasswordRequest) error {
+func (s *authService) RequestPasswordReset(req *ForgotPasswordRequest) error {
     // 1. Cari user berdasarkan email
     user, err := s.userRepo.FindByEmailOrUsername(req.Email)
     if err != nil {
@@ -358,7 +330,7 @@ func generateSecureSixDigitCode() (string, error) {
     return code, nil
 }
 
-func (s *authService) ResetPassword(req *models.ResetPasswordRequest) error {
+func (s *authService) ResetPassword(req *ResetPasswordRequest) error {
 	// 1. Validasi format password baru (bisa dibuat fungsi terpisah)
     if len(req.NewPassword) < 8 { return ErrInvalidPassword } // Dsb.
 

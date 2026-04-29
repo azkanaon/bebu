@@ -5,6 +5,7 @@ import (
 
 	"backend-bebu/config"
 	"backend-bebu/internal/handlers"
+	"backend-bebu/internal/middlewares"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/internal/services"
 	"backend-bebu/pkg/utils"
@@ -36,6 +37,11 @@ func main() {
 	categoryService := services.NewCategoryService(categoryRepo)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
+	userService := services.NewUserService(db, userRepo)
+    userHandler := handlers.NewUserHandler(userService)
+
+	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
+
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"}, // frontend kamu
@@ -44,13 +50,13 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	SetupRoutes(r, authHandler, postHandler, bookHandler, categoryHandler)
+	SetupRoutes(r, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler) {
+func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 	{
@@ -71,8 +77,12 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *
 
 		users := v1.Group("/users")
 		{
-			users.GET("/me", handlers.GetCurrentUser)
+			// users.GET("/me", handlers.GetCurrentUser)
 			users.GET("/recommendation", handlers.GetUserRecommendations)
+			users.GET("/:username", authMiddleware.OptionalAuth(), userHandler.GetUserProfile)
+			users.POST("/:username/follow", authMiddleware.RequiredAuth(), userHandler.FollowUser)
+			users.DELETE("/:username/follow", authMiddleware.RequiredAuth(), userHandler.UnfollowUser)
+			users.PUT("/me/profile", authMiddleware.RequiredAuth(), userHandler.UpdateProfile)
 		}
 
 		books := v1.Group("/books")

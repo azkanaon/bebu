@@ -1,9 +1,10 @@
 package models
 
 import (
-    "time"
-    "github.com/google/uuid"
-    "gorm.io/gorm"
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -27,6 +28,9 @@ type User struct {
     Sessions       []UserSession   `gorm:"foreignKey:UserID"`
     SocialLinks    []UserSocialLink  `gorm:"foreignKey:UserID"`
     Posts          []Post            `gorm:"foreignKey:UserID"`
+
+    UserAchievements []UserAchievement `gorm:"foreignKey:UserID"`
+    Badges           []Badge           `gorm:"many2many:user_badges;foreignKey:UserID;joinForeignKey:UserID;References:BadgeID;joinReferences:BadgeID"`
 }
 
 type UserProfile struct {
@@ -46,16 +50,16 @@ type UserProfile struct {
 }
 
 type UserSettings struct {
-	ID                  uint      `gorm:"column:user_setting_id;primaryKey;autoIncrement"`
-	PublicID            string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
-    UserID              uint      `gorm:"column:user_id;not null;uniqueIndex"`
-	IsPrivate           bool      `gorm:"column:is_profile_public;not null;default:true"`
-    ShowActivityHeatmap bool      `gorm:"column:show_activity_heatmap;not null;default:true"`
-	AllowDMFromPublic   bool      `gorm:"column:allow_dm_from_public;not null;default:true"`
-	CreatedAt           time.Time `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt           time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	UserSettingID      uint      `gorm:"primaryKey"`
+	PublicID           uuid.UUID `gorm:"type:uuid;unique;not null;default:gen_random_uuid()"`
+	UserID             uint      `gorm:"not null;unique"` // UserID harus unik, 1 user 1 setting
+	IsProfilePublic    bool      `gorm:"not null;default:true"`
+	ShowActivityHeatmap bool      `gorm:"not null;default:true"`
+	AllowDmFromPublic  bool      `gorm:"not null;default:true"`
+	CreatedAt          time.Time `gorm:"not null;default:now()"`
+	UpdatedAt          time.Time `gorm:"not null;default:now()"`
 
-	// Relations
+    // Relations
 	User User `gorm:"foreignKey:UserID;references:UserID"`
 }
 
