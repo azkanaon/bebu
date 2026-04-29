@@ -1,8 +1,9 @@
 package user
 
 import (
-    "backend-bebu/internal/models"
-    "gorm.io/gorm"
+	"backend-bebu/internal/models"
+
+	"gorm.io/gorm"
 )
 
 func SeedUserSettings(db *gorm.DB) {
@@ -12,9 +13,9 @@ func SeedUserSettings(db *gorm.DB) {
     for i, user := range users {
         setting := models.UserSettings{
             UserID:              user.UserID,
-            IsPrivate:           i%5 == 0, // beberapa private
+            IsProfilePublic:           i%5 == 0, // beberapa private
             ShowActivityHeatmap: true,
-            AllowDMFromPublic:   i%3 != 0,
+            AllowDmFromPublic:   i%3 != 0,
         }
 
         db.FirstOrCreate(&setting, models.UserSettings{UserID: user.UserID})

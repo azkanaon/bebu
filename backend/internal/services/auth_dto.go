@@ -1,6 +1,4 @@
-// auth_dto.go
-
-package models
+package services
 
 import "github.com/google/uuid"
 

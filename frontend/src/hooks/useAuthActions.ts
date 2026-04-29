@@ -22,10 +22,13 @@ export const useAuthActions = () => {
     } catch (err: any) {
       // Penanganan error spesifik Axios
       if (axios.isAxiosError(err)) {
-        setError(
-          err.response?.data?.message ||
-            'Login failed. Please check your credentials.',
-        )
+        if (err.response?.status === 429) {
+          setError(
+            'Terlalu banyak percobaan login. Silakan tunggu beberapa saat lagi.',
+          )
+        } else {
+          setError(err.response?.data?.message || 'Login failed.')
+        }
       } else {
         setError('An unexpected error occurred.')
       }
