@@ -1,6 +1,7 @@
 package services
 
 import (
+	"backend-bebu/internal/dto"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/pkg/utils"
@@ -15,10 +16,15 @@ import (
 
 
 type UserService interface {
-	GetProfileByUsername(username string, viewerID *uint) (*ProfileResponseDTO, error)
-	FollowUser(sourceUserID uint, targetUsername string) error
+	GetProfileByUsername(username string, viewerID *uint) (*dto.ProfileResponseDTO, error)
+	FollowUser(sourceUserID uint, targetUsername string) (string, error)
 	UnfollowUser(sourceUserID uint, targetUsername string) error
-	UpdateProfile(userID uint, req *UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*ProfileInfoDTO, error)
+	UpdateProfile(userID uint, req *dto.UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*dto.ProfileInfoDTO, error)
+	GetFollowRequests(userID uint) ([]dto.FollowRequestDTO, error)
+	AcceptFollowRequest(currentUserID uint, requesterUsername string) error
+	DeclineFollowRequest(currentUserID uint, requesterUsername string) error
+	BlockUser(sourceUserID uint, targetUsername string) error
+	UnblockUser(sourceUserID uint, targetUsername string) error
 }
 
 type userService struct {
@@ -34,94 +40,126 @@ func NewUserService(db *gorm.DB, userRepo repositories.UserRepository) UserServi
 	}
 }
 
-func (s *userService) GetProfileByUsername(username string, viewerID *uint) (*ProfileResponseDTO, error) {
+func (s *userService) GetProfileByUsername(username string, viewerID *uint) (*dto.ProfileResponseDTO, error) {
 	// 1. Dapatkan data user utama
 	user, err := s.userRepo.FindByUsername(username)
 	if err != nil {
-		// Handle error, misal: not found
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 		return nil, err
 	}
 
-	// Tentukan apakah ini profil milik viewer
-	isOwnProfile := viewerID != nil && *viewerID == user.UserID
-
-	// 2. LOGIKA BISNIS: Cek apakah profil ini privat dan harus disembunyikan
-	// user.Setting mungkin nil jika user belum punya setting, jadi kita perlu cek.
-	isProfilePrivate := user.Settings != nil && !user.Settings.IsProfilePublic
-
-	if isProfilePrivate && !isOwnProfile {
-		// Jika profilnya privat DAN bukan pemilik yang lihat, kembalikan data terbatas.
-		return s.mapToPrivateProfileDTO(user), nil
+	// --- LOGIKA BLOKIR ASIMETRIS BARU ---
+	var isBlockedByTarget, isBlockedByViewer, isOwnProfile bool
+	if viewerID != nil {
+		isOwnProfile = (*viewerID == user.UserID)
+		if !isOwnProfile {
+			// Cek blokir hanya jika bukan profil sendiri
+			g, _ := errgroup.WithContext(context.Background())
+			g.Go(func() error {
+				var errCheck error; isBlockedByTarget, errCheck = s.userRepo.IsBlocked(user.UserID, *viewerID); return errCheck
+			})
+			g.Go(func() error {
+				var errCheck error; isBlockedByViewer, errCheck = s.userRepo.IsBlocked(*viewerID, user.UserID); return errCheck
+			})
+			if err := g.Wait(); err != nil { return nil, err }
+		}
 	}
+
+	// 3. Terapkan aturan akses utama
+	if isBlockedByTarget {
+		return nil, gorm.ErrRecordNotFound // Jika saya diblokir, akses ditolak sepenuhnya.
+	}
+
 	
-	// 2. Dapatkan data agregat (count) secara concurrent untuk performa
 	var followerCount, followingCount int64
-	// var postCount int64
 	
 	g, _ := errgroup.WithContext(context.Background())
 
+	// Hitung jumlah follower (yang statusnya 'accepted')
 	g.Go(func() error {
-		var err error
-		followerCount, err = s.userRepo.GetFollowerCount(user.UserID)
-		return err
+		var errCount error
+		// Note: Kita mungkin perlu memodifikasi GetFollowerCount agar hanya menghitung yg 'accepted'
+		followerCount, errCount = s.userRepo.GetFollowerCount(user.UserID)
+		return errCount
 	})
+
+	// Hitung jumlah following (yang statusnya 'accepted')
 	g.Go(func() error {
-		var err error
-		followingCount, err = s.userRepo.GetFollowingCount(user.UserID)
-		return err
+		var errCount error
+		followingCount, errCount = s.userRepo.GetFollowingCount(user.UserID)
+		return errCount
 	})
-	// g.Go(func() error { ... get postCount from postRepo ... })
+	
+	// (Jika sudah ada, hitung jumlah post)
+	// g.Go(func() error { ... })
 
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-	
-	// 3. Jika ada viewer (user login), cek konteksnya
-	var viewerContext *ViewerContextDTO
-	if viewerID != nil && *viewerID != user.UserID {
-		var isFollowing, isBlocked bool
-		
+
+
+	// 2. Siapkan viewerContext jika ada viewer.
+	var viewerContext *dto.ViewerContextDTO
+	var followStatus string = "not_following"
+	if viewerID != nil {
+		isOwnProfile := (*viewerID == user.UserID)
 		g, _ := errgroup.WithContext(context.Background())
+		// Ambil status follow
 		g.Go(func() error {
-			var err error
-			isFollowing, err = s.userRepo.IsFollowing(*viewerID, user.UserID)
-			return err
-		})
-		g.Go(func() error {
-			var err error
-			isBlocked, err = s.userRepo.IsBlocked(*viewerID, user.UserID)
-			return err
+			var errStatus error
+			// Kita tidak perlu memanggil repo lagi jika sudah punya status dari pengecekan akses di atas
+			// Tapi untuk membuat blok ini mandiri, kita panggil lagi. Ini lebih bersih.
+			followStatus, errStatus = s.userRepo.GetFollowStatus(*viewerID, user.UserID)
+			return errStatus
 		})
 
 		if err := g.Wait(); err != nil {
 			return nil, err
 		}
-		
-		viewerContext = &ViewerContextDTO{
-			IsFollowing: isFollowing,
-			IsBlocked:   isBlocked,
-			IsOwnProfile: false,
+
+		// Buat DTO viewerContext dengan semua data yang sudah terkumpul.
+		// Pastikan DTO ViewerContextDTO sudah diupdate dengan field IsPending.
+		viewerContext = &dto.ViewerContextDTO{
+			IsFollowing:  (followStatus == "accepted"),
+			IsPending:    (followStatus == "pending"),
+			IsBlocked:      isBlockedByTarget, // Sudah kita hitung di atas
+			IsBlockedByYou: isBlockedByViewer, // Sudah kita hitung di atas
+			IsOwnProfile: isOwnProfile,
 		}
-	} else if viewerID != nil && *viewerID == user.UserID {
-		viewerContext = &ViewerContextDTO{ IsOwnProfile: true }
 	}
 
-	// 4. Transformasi/Mapping dari Model ke DTO
-	response := s.mapToPublicProfileDTO(user, followerCount, followingCount, viewerContext)
+	// 5. Tentukan apakah viewer punya akses ke konten LENGKAP
+	var hasFullAccess bool
+	isProfilePublic := (user.Settings == nil || user.Settings.IsProfilePublic)
 
+	if isProfilePublic || isOwnProfile || (followStatus == "accepted") {
+		hasFullAccess = true
+	}
+
+	// 6. Buat response berdasarkan akses
+	if !hasFullAccess {
+		// Jika tidak punya akses penuh (karena profil privat dan belum di-follow),
+		// kembalikan data terbatas TAPI DENGAN viewerContext.
+		return s.mapToPrivateProfileDTO(user, viewerContext), nil
+	}
+	
+	// 3. Panggil mapper untuk merakit response akhir.
+	response := s.mapToPublicProfileDTO(user, followerCount, followingCount, viewerContext)
 	return response, nil
 }
 
 func (s *userService) mapToPublicProfileDTO(
 	user *models.User,
 	followerCount, followingCount int64,
-	ctx *ViewerContextDTO,
-) *ProfileResponseDTO {
+	ctx *dto.ViewerContextDTO,
+) *dto.ProfileResponseDTO {
 
 	// 1. Mapping Social Links
-	socialLinks := make([]SocialLinkDTO, len(user.SocialLinks))
+	socialLinks := make([]dto.SocialLinkDTO, len(user.SocialLinks))
 	for i, link := range user.SocialLinks {
-		dto := SocialLinkDTO{
+		dto := dto.SocialLinkDTO{
 			PlatformName: link.Platform.PlatformName,
 			URL:          link.SocialURL,
 		}
@@ -133,9 +171,9 @@ func (s *userService) mapToPublicProfileDTO(
 	}
 
 	// 2. Mapping Badges
-	badges := make([]BadgeDTO, len(user.Badges))
+	badges := make([]dto.BadgeDTO, len(user.Badges))
 	for i, badge := range user.Badges {
-		dto := BadgeDTO{
+		dto := dto.BadgeDTO{
 			BadgeName: badge.BadgeName,
 		}
         // PERBAIKAN DI SINI: Cek pointer nil
@@ -149,9 +187,9 @@ func (s *userService) mapToPublicProfileDTO(
 	}
 
 	// 3. Mapping Achievements
-	achievements := make([]AchievementDTO, len(user.UserAchievements))
+	achievements := make([]dto.AchievementDTO, len(user.UserAchievements))
     for i, ua := range user.UserAchievements {
-		dto := AchievementDTO{
+		dto := dto.AchievementDTO{
 			AchievementName: ua.Achievement.AchievementName,
 			EarnedAt:        ua.EarnedAt,
 		}
@@ -166,17 +204,17 @@ func (s *userService) mapToPublicProfileDTO(
 	}
 
 	// 4. Merakit DTO utama
-	dto := &ProfileResponseDTO{
+	dto := &dto.ProfileResponseDTO{
 		PublicID: user.PublicID.String(),
 		Username: user.Username,
-		Profile: ProfileInfoDTO{
+		Profile: dto.ProfileInfoDTO{
 			DisplayName: user.Profile.DisplayName,
 			AvatarURL:   user.Profile.AvatarUrl,
 			Bio:         user.Profile.Bio,
 			Location:    user.Profile.Location,
 			JoinedAt:    user.CreatedAt,
 		},
-		Stats: StatsDTO{
+		Stats: dto.StatsDTO{
 			PostCount:      0,
 			FollowerCount:  followerCount,
 			FollowingCount: followingCount,
@@ -191,44 +229,81 @@ func (s *userService) mapToPublicProfileDTO(
 }
 
 // mapToPrivateProfileDTO adalah mapper BARU untuk profil privat
-func (s *userService) mapToPrivateProfileDTO(user *models.User) *ProfileResponseDTO {
+func (s *userService) mapToPrivateProfileDTO(user *models.User,  viewerContext *dto.ViewerContextDTO) *dto.ProfileResponseDTO {
 	// Hanya kembalikan data minimal yang aman untuk ditampilkan
-	return &ProfileResponseDTO{
+	return &dto.ProfileResponseDTO{
 		PublicID: user.PublicID.String(),
 		Username: user.Username,
         IsPrivate: true, // Beri tahu frontend ini profil privat
-		Profile: ProfileInfoDTO{
+		Profile: dto.ProfileInfoDTO{
 			DisplayName: user.Profile.DisplayName,
 			AvatarURL:   user.Profile.AvatarUrl,
 			Bio:         user.Profile.Bio,
             // Sembunyikan Gender dan Location
 		},
 		// Kosongkan stats, social links, badges, dan achievements
-		Stats:        StatsDTO{},
-		SocialLinks:  make([]SocialLinkDTO, 0),
-		Badges:       make([]BadgeDTO, 0),
-		Achievements: make([]AchievementDTO, 0),
-        // Tidak ada viewerContext karena data utama sudah disembunyikan
+		Stats:        dto.StatsDTO{},
+		SocialLinks:  make([]dto.SocialLinkDTO, 0),
+		Badges:       make([]dto.BadgeDTO, 0),
+		Achievements: make([]dto.AchievementDTO, 0),
+		ViewerContext: viewerContext,
 	}
 }
 
-func (s *userService) FollowUser(sourceUserID uint, targetUsername string) error {
-	// 1. Cari user target berdasarkan username
+func (s *userService) FollowUser(sourceUserID uint, targetUsername string) (string, error) {
+	// 1. Cari user target
 	targetUser, err := s.userRepo.FindByUsername(targetUsername)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("user to follow not found") // Error yang lebih deskriptif
+	if err != nil { /* ... */ }
+
+	// 2. Validasi
+	if sourceUserID == targetUser.UserID { /* ... */ }
+
+	// Cek blokir dari target (di luar transaksi)
+	isBlockedByTarget, err := s.userRepo.IsBlocked(targetUser.UserID, sourceUserID)
+	if err != nil { return "", err }
+	if isBlockedByTarget { return "", errors.New("user to follow not found") }
+
+	// 3. Mulai Transaksi
+	tx := s.db.Begin()
+	if tx.Error != nil { return "", tx.Error }
+	defer tx.Rollback()
+
+	// Buat repo yang terikat transaksi
+	txRepo := s.userRepo.WithTx(tx)
+
+	// 4. Lakukan SEMUA operasi tulis menggunakan txRepo
+	isBlockedBySource, err := txRepo.IsBlocked(sourceUserID, targetUser.UserID)
+	if err != nil { return "", err }
+
+	if isBlockedBySource {
+		if err := txRepo.UnblockUser(sourceUserID, targetUser.UserID); err != nil {
+			return "", err
 		}
-		return err // Error database lainnya
 	}
 
-	// 2. Validasi Logika Bisnis
-	if sourceUserID == targetUser.UserID {
-		return errors.New("cannot follow yourself")
+	// 5. Tentukan status follow
+	var followStatus string
+    isPrivate := targetUser.Settings != nil && !targetUser.Settings.IsProfilePublic
+	if isPrivate {
+		followStatus = "pending"
+	} else {
+		followStatus = "accepted"
 	}
 
-	// 3. Panggil repository untuk melakukan aksi
-	return s.userRepo.FollowUser(sourceUserID, targetUser.UserID)
+	// --- PERBAIKAN KRUSIAL DI SINI ---
+	// Gunakan txRepo, bukan s.userRepo
+	finalStatus, err := txRepo.FollowUser(sourceUserID, targetUser.UserID, followStatus)
+    if err != nil {
+        return "", err
+    }
+
+	// 6. Jika semua berhasil, COMMIT transaksinya
+	if err := tx.Commit().Error; err != nil {
+		return "", err
+	}
+
+	// 7. Kembalikan status akhir
+	return finalStatus, nil
 }
 
 func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) error {
@@ -254,7 +329,7 @@ func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) err
 	return err
 }
 
-func (s *userService) UpdateProfile(userID uint, req *UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*ProfileInfoDTO, error) {
+func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*dto.ProfileInfoDTO, error) {
 	// 1. Upload avatar baru jika ada, di luar transaksi.
 	// Kita lakukan ini di awal agar jika upload gagal, kita tidak perlu memulai transaksi DB.
 	var avatarURL string
@@ -348,11 +423,106 @@ func (s *userService) UpdateProfile(userID uint, req *UpdateProfileRequestDTO, a
 	}
 	
 	// Mapping ke DTO
-	return &ProfileInfoDTO{
+	return &dto.ProfileInfoDTO{
 		DisplayName: updatedUser.Profile.DisplayName,
 		AvatarURL:   updatedUser.Profile.AvatarUrl,
 		Bio:         updatedUser.Profile.Bio,
 		Location:    updatedUser.Profile.Location,
 		JoinedAt:    updatedUser.CreatedAt, // JoinedAt tidak berubah
 	}, nil
+}
+
+func (s *userService) GetFollowRequests(userID uint) ([]dto.FollowRequestDTO, error) {
+	requests, err := s.userRepo.GetPendingFollowRequests(userID)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Mapping dari model ke DTO
+	var responseDTOs []dto.FollowRequestDTO
+	for _, req := range requests {
+		responseDTOs = append(responseDTOs, dto.FollowRequestDTO{
+			Username:    req.UserFollowing.Username,
+			DisplayName: req.UserFollowing.Profile.DisplayName,
+			AvatarURL:   req.UserFollowing.Profile.AvatarUrl,
+		})
+	}
+	
+	return responseDTOs, nil
+}
+
+func (s *userService) AcceptFollowRequest(currentUserID uint, requesterUsername string) error {
+	// 1. Cari user yang mengirim request
+	requester, err := s.userRepo.FindByUsername(requesterUsername)
+	if err != nil {
+		return errors.New("requester not found")
+	}
+	
+	// 2. Panggil repo untuk update status dari 'pending' ke 'accepted'
+	// source = requester, target = currentUser
+	return s.userRepo.UpdateFollowStatus(requester.UserID, currentUserID, "accepted")
+}
+
+func (s *userService) DeclineFollowRequest(currentUserID uint, requesterUsername string) error {
+	// 1. Cari user yang mengirim request
+	requester, err := s.userRepo.FindByUsername(requesterUsername)
+	if err != nil {
+		return errors.New("requester not found")
+	}
+
+	// 2. Panggil repo untuk menghapus baris permintaan
+	// source = requester, target = currentUser
+	return s.userRepo.DeleteFollowRequest(requester.UserID, currentUserID)
+}
+
+func (s *userService) BlockUser(sourceUserID uint, targetUsername string) error {
+	// 1. Cari user target
+	targetUser, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil {
+		return errors.New("user to block not found")
+	}
+
+	// 2. Validasi: tidak bisa blokir diri sendiri
+	if sourceUserID == targetUser.UserID {
+		return errors.New("cannot block yourself")
+	}
+
+	// 3. Mulai Transaksi
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	defer tx.Rollback() // Rollback jika ada panic atau error
+
+	// Buat instance repo yang menggunakan transaksi
+	txRepo := s.userRepo.WithTx(tx)
+
+	// 4. Hapus semua relasi follow antara kedua user (dua arah)
+	// A unfollow B
+	if err := txRepo.UnfollowUser(sourceUserID, targetUser.UserID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	// B unfollow A
+	if err := txRepo.UnfollowUser(targetUser.UserID, sourceUserID); err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	// 5. Buat entri blokir
+	if err := txRepo.BlockUser(sourceUserID, targetUser.UserID); err != nil {
+		return err
+	}
+	
+	// 6. Jika semua berhasil, commit transaksi
+	return tx.Commit().Error
+}
+
+func (s *userService) UnblockUser(sourceUserID uint, targetUsername string) error {
+	// 1. Cari user target
+	targetUser, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil {
+		return errors.New("user to unblock not found")
+	}
+
+	// 2. Panggil repo untuk menghapus relasi blokir
+	return s.userRepo.UnblockUser(sourceUserID, targetUser.UserID)
 }

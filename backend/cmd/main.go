@@ -83,6 +83,15 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *
 			users.POST("/:username/follow", authMiddleware.RequiredAuth(), userHandler.FollowUser)
 			users.DELETE("/:username/follow", authMiddleware.RequiredAuth(), userHandler.UnfollowUser)
 			users.PUT("/me/profile", authMiddleware.RequiredAuth(), userHandler.UpdateProfile)
+			users.POST("/:username/block", authMiddleware.RequiredAuth(), userHandler.BlockUser)
+			users.DELETE("/:username/block", authMiddleware.RequiredAuth(), userHandler.UnblockUser)
+		}
+
+		followRequests := v1.Group("/follow-requests").Use(authMiddleware.RequiredAuth())
+		{
+			followRequests.GET("", userHandler.GetFollowRequests)
+			followRequests.POST("/:username/accept", userHandler.AcceptFollowRequest)
+			followRequests.DELETE("/:username/decline", userHandler.DeclineFollowRequest)
 		}
 
 		books := v1.Group("/books")

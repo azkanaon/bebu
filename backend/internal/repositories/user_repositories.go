@@ -4,6 +4,7 @@ package repositories
 
 import (
 	"backend-bebu/internal/models"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,12 +31,18 @@ type UserRepository interface {
 	GetFollowingCount(userID uint) (int64, error)
 	IsFollowing(viewerID, targetID uint) (bool, error)
 	IsBlocked(viewerID, targetID uint) (bool, error)
-	FollowUser(followerID, followingID uint) error
+	FollowUser(sourceUserID, targetUserID uint, status string) (string, error)
 	UnfollowUser(followerID, followingID uint) error
 	UpdateProfile(userID uint, updates map[string]interface{}) error
 	UpdateSettings(userID uint, updates map[string]interface{}) error
 	UpdateSocialLinks(userID uint, links []models.UserSocialLink) error
 	WithTx(tx *gorm.DB) UserRepository
+	GetFollowStatus(sourceUserID, targetUserID uint) (string, error)
+	GetPendingFollowRequests(userID uint) ([]models.UserFollow, error)
+	UpdateFollowStatus(sourceUserID, targetUserID uint, newStatus string) error
+	DeleteFollowRequest(sourceUserID, targetUserID uint) error
+	BlockUser(blockingUserID, blockedUserID uint) error
+	UnblockUser(blockingUserID, blockedUserID uint) error
 }
 
 type userRepository struct {
@@ -135,8 +142,6 @@ func (r *userRepository) ResetPasswordTransaction(userID uint, newPasswordHash s
 
 // RevokeSessionByRefreshTokenHash menandai sebuah sesi sebagai tidak valid/dicabut.
 func (r *userRepository) RevokeSessionByRefreshTokenHash(hash string) error {
-	// Kita update kolom 'revoked_at' dengan waktu saat ini.
-	// Kita hanya update sesi yang hash-nya cocok DAN belum pernah dicabut.
 	result := r.db.Model(&models.UserSession{}).
 		Where("refresh_token_hash = ? AND revoked_at IS NULL", hash).
 		Update("revoked_at", time.Now())
@@ -195,16 +200,6 @@ func (r *userRepository) IsFollowing(viewerID, targetID uint) (bool, error) {
 	return count > 0, err
 }
 
-// IsBlocked memeriksa apakah viewerID memblokir targetID
-func (r *userRepository) IsBlocked(viewerID, targetID uint) (bool, error) {
-	var count int64
-	// Asumsi nama kolom di user_blocks adalah user_blocking_id (yang memblokir) dan user_blocked_id (yang diblokir)
-	err := r.db.Model(&models.UserBlock{}).
-		Where("user_blocking_id = ? AND user_blocked_id = ?", viewerID, targetID).
-		Count(&count).Error
-	return count > 0, err
-}
-
 func (r *userRepository) FindUserByPublicID(publicID uuid.UUID) (*models.User, error) {
     var user models.User
     err := r.db.Where("public_id = ?", publicID).First(&user).Error
@@ -212,13 +207,35 @@ func (r *userRepository) FindUserByPublicID(publicID uuid.UUID) (*models.User, e
 }
 
 // FollowUser membuat entri baru di tabel user_follows.
-func (r *userRepository) FollowUser(sourceUserID, targetUserID uint) error {
-	follow := map[string]interface{}{
-		"user_following_id": sourceUserID, // Yang me-follow
-		"user_followed_id":  targetUserID, // Yang di-follow
+func (r *userRepository) FollowUser(sourceUserID, targetUserID uint, status string) (string, error) {
+	follow := models.UserFollow{
+		UserFollowingID: sourceUserID,
+		UserFollowedID:  targetUserID,
+		FollowingStatus: status, // Gunakan status yang di-passing dari service
 	}
-	result := r.db.Model(&models.UserFollow{}).Clauses(clause.OnConflict{DoNothing: true}).Create(follow)
-	return result.Error
+
+	// Kita gunakan OnConflict untuk menangani kasus re-follow atau re-request.
+	// Jika sudah ada (misal: sudah 'pending' atau 'accepted'), tidak akan melakukan apa-apa.
+	// Jika belum ada, akan INSERT.
+	result := r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_following_id"}, {Name: "user_followed_id"}},
+		DoNothing: true,
+	}).Create(&follow)
+
+	if result.Error != nil {
+		return "", result.Error
+	}
+    
+    // Jika tidak ada baris yang terpengaruh (karena konflik), artinya relasi sudah ada.
+    // Kita perlu mengambil status yang sudah ada tersebut.
+    if result.RowsAffected == 0 {
+        var existingFollow models.UserFollow
+        r.db.First(&existingFollow, "user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID)
+        return existingFollow.FollowingStatus, nil
+    }
+
+	// Jika berhasil INSERT, kembalikan status yang baru saja dimasukkan.
+	return status, nil
 }
 
 // UnfollowUser menghapus entri dari tabel user_follows.
@@ -308,4 +325,111 @@ func (r *userRepository) UpdateSocialLinks(userID uint, links []models.UserSocia
 	}
 	
 	return nil
+}
+
+func (r *userRepository) GetFollowStatus(sourceUserID, targetUserID uint) (string, error) {
+	var follow models.UserFollow
+	
+	// Cari relasi follow antara dua user ini
+	err := r.db.Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).First(&follow).Error
+	
+	if err != nil {
+		// Jika tidak ada baris sama sekali, GORM akan mengembalikan ErrRecordNotFound.
+		// Ini bukan error, artinya statusnya adalah "not_following".
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "not_following", nil
+		}
+		// Untuk error database lainnya, kembalikan error
+		return "", err
+	}
+	
+	// Jika baris ditemukan, kembalikan statusnya
+	return follow.FollowingStatus, nil
+}
+
+func (r *userRepository) GetPendingFollowRequests(userID uint) ([]models.UserFollow, error) {
+	var requests []models.UserFollow
+	
+	// Kita cari semua baris di mana userID adalah 'user_followed_id' (target)
+	// dan statusnya 'pending'.
+	// Kita juga Preload data 'UserFollowing' agar bisa menampilkan info user yang me-request.
+	err := r.db.
+		Preload("UserFollowing.Profile"). // Preload data user yang me-request + profilnya
+		Where("user_followed_id = ? AND following_status = ?", userID, "pending").
+		Find(&requests).Error
+		
+	return requests, err
+}
+
+// UpdateFollowStatus mengubah status sebuah relasi follow.
+func (r *userRepository) UpdateFollowStatus(sourceUserID, targetUserID uint, newStatus string) error {
+	result := r.db.Model(&models.UserFollow{}).
+		Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).
+		Update("following_status", newStatus)
+		
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound // Tidak ada relasi untuk diupdate
+	}
+	return nil
+}
+
+// DeleteFollowRequest menghapus sebuah relasi follow. Ini sama persis dengan UnfollowUser.
+// Kita bisa membuat alias atau panggil UnfollowUser dari service, tapi membuat ini eksplisit juga bagus.
+func (r *userRepository) DeleteFollowRequest(sourceUserID, targetUserID uint) error {
+	follow := models.UserFollow{
+		UserFollowingID: sourceUserID,
+		UserFollowedID:  targetUserID,
+	}
+	result := r.db.Delete(&follow)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// BlockUser membuat entri baru di tabel user_blocks.
+func (r *userRepository) BlockUser(blockingUserID, blockedUserID uint) error {
+	block := models.UserBlock{
+		UserBlockingID: blockingUserID, // Yang memblokir
+		UserBlockedID:  blockedUserID,  // Yang diblokir
+	}
+
+	// Gunakan OnConflict agar tidak error jika mencoba memblokir user yang sama dua kali.
+	result := r.db.Clauses(clause.OnConflict{
+		DoNothing: true,
+	}).Create(&block)
+
+	return result.Error
+}
+
+// UnblockUser menghapus entri dari tabel user_blocks.
+func (r *userRepository) UnblockUser(blockingUserID, blockedUserID uint) error {
+	block := models.UserBlock{
+		UserBlockingID: blockingUserID,
+		UserBlockedID:  blockedUserID,
+	}
+	
+	result := r.db.Delete(&block)
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound // Tidak ada relasi blokir untuk dihapus
+	}
+	return nil
+}
+
+func (r *userRepository) IsBlocked(blockingUserID, blockedUserID uint) (bool, error) {
+	var count int64
+	err := r.db.Model(&models.UserBlock{}).
+		Where("user_blocking_id = ? AND user_blocked_id = ?", blockingUserID, blockedUserID).
+		Count(&count).Error
+	return count > 0, err
 }

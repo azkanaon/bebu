@@ -1,4 +1,4 @@
-package services
+package dto
 
 import (
 	"time"
@@ -65,7 +65,9 @@ type AchievementDTO struct {
 // Ini membantu frontend untuk menampilkan tombol yang tepat (e.g., "Follow" vs "Unfollow", "Edit Profile").
 type ViewerContextDTO struct {
 	IsFollowing  bool `json:"isFollowing"`  // Apakah viewer mengikuti user profil ini?
-	IsBlocked    bool `json:"isBlocked"`    // Apakah viewer memblokir user profil ini?
+	IsPending    bool `json:"isPending"`
+	IsBlocked     bool `json:"isBlocked"` // Ini berarti: Apakah target memblokir SAYA?
+    IsBlockedByYou bool `json:"isBlockedByYou"` // Ini berarti: Apakah SAYA memblokir target?
 	IsOwnProfile bool `json:"isOwnProfile"` // Apakah ini profil milik viewer sendiri?
 }
 
@@ -82,4 +84,10 @@ type UpdateProfileRequestDTO struct {
 type SocialLinkInputDTO struct {
 	PlatformID uint   `json:"platformId"` // Kita pakai ID integer platform
 	URL        string `json:"url"`
+}
+
+type FollowRequestDTO struct {
+    Username    string `json:"username"`
+    DisplayName string `json:"displayName"`
+    AvatarURL   string `json:"avatarUrl"`
 }
