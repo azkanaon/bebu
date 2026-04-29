@@ -26,23 +26,38 @@ type TrendingBookResponse struct {
 // 🧠 HELPER: Format Genres
 // ==============================
 
-func formatGenres(genres []models.Genre) string {
-	if len(genres) == 0 {
+func formatGenres(bookGenres []models.BookGenre) string {
+	if len(bookGenres) == 0 {
 		return "-"
 	}
 
 	max := 3
-	if len(genres) < 3 {
-		max = len(genres)
+	if len(bookGenres) < 3 {
+		max = len(bookGenres)
 	}
 
-	result := genres[0].GenreName
-	for i := 1; i < max; i++ {
-		result += ", " + genres[i].GenreName
+	result := ""
+
+	for i := 0; i < max; i++ {
+		name := bookGenres[i].Genre.GenreName
+
+		if name == "" {
+			continue
+		}
+
+		if result == "" {
+			result = name
+		} else {
+			result += ", " + name
+		}
 	}
 
-	if len(genres) > 3 {
+	if len(bookGenres) > 3 {
 		result += ", ..."
+	}
+
+	if result == "" {
+		return "-"
 	}
 
 	return result
@@ -61,7 +76,7 @@ func GetTrendingBooks(c *gin.Context) {
 	var books []models.Book
 
 	err := config.DB.
-		Preload("Genres").
+		Preload("BookGenres.Genre").
 		Order("book_id").
 		Limit(3).
 		Find(&books).Error
@@ -124,7 +139,7 @@ func GetTrendingBooks(c *gin.Context) {
 		response = append(response, TrendingBookResponse{
 			ID:     b.BookID,
 			Title:  b.Title,
-			Genre:  formatGenres(b.Genres),
+			Genre:  formatGenres(b.BookGenres),
 			Rating: rating,
 			Cover:  b.CoverImgURL,
 		})

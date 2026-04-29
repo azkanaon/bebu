@@ -13,10 +13,23 @@ import (
 func main() {
 	config.LoadAndConnectDB()
 	db := config.GetDB()
+	config.InitCloudinary()
 
 	userRepo := repositories.NewUserRepository(db)
 	authService := services.NewAuthService(userRepo)
 	authHandler := handlers.NewAuthHandler(authService)
+
+	postRepo := repositories.NewPostRepository(db)
+	postService := services.NewPostService(postRepo, db)
+	postHandler := handlers.NewPostHandler(postService)
+
+	bookRepo := repositories.NewBookRepository(db)
+	bookService := services.NewBookService(bookRepo)
+	bookHandler := handlers.NewBookHandler(bookService)
+
+	categoryRepo := repositories.NewCategoryRepository(db)
+	categoryService := services.NewCategoryService(categoryRepo)
+	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
@@ -26,13 +39,13 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	SetupRoutes(r, authHandler)
+	SetupRoutes(r, authHandler, postHandler, bookHandler, categoryHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
+func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 	{
@@ -59,6 +72,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 		books := v1.Group("/books")
 		{
 			books.GET("/trending", handlers.GetTrendingBooks)
+			books.GET("", bookHandler.GetBooks)
 		}
 
 		categories := v1.Group("/categories")
@@ -69,6 +83,13 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler) {
 			categories.GET("", handlers.GetAllCategories)
 			categories.POST("/:id/favorite", handlers.FavoriteCategory)
 			categories.DELETE("/:id/favorite", handlers.UnfavoriteCategory)
+			categories.GET("/search", categoryHandler.Search)
+		}
+
+		posts := v1.Group("/posts")
+		{
+			posts.POST("", postHandler.CreatePost)
+			posts.GET("", postHandler.GetPosts)
 		}
 
 		v1.GET("/leaderboard", handlers.GetLeaderboard)

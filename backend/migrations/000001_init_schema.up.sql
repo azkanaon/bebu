@@ -205,13 +205,13 @@ CREATE TABLE books (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
 );
-CREATE TABLE books_authors (
+CREATE TABLE book_authors (
     book_id INT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
     author_id INT NOT NULL REFERENCES authors(author_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (book_id, author_id)
 );
-CREATE TABLE books_genres (
+CREATE TABLE book_genres (
     book_id INT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
     genre_id INT NOT NULL REFERENCES genres(genre_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

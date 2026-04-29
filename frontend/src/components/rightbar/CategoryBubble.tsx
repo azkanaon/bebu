@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-
-type Category = {
-	id: number;
-	name: string;
-};
+import { Category } from "@/types/category";
 
 export function CategoryBubble({
 	onAddClick,
@@ -115,7 +111,7 @@ export function CategoryBubble({
 									text-[10px]
 									rounded-full
 
-									bg-red-500 text-white
+									bg-red-400 text-white
 									hover:bg-red-600
 
 									opacity-0 scale-75

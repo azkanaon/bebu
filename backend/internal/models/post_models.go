@@ -7,9 +7,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// =====================
-// Post Model
-// =====================
 type Post struct {
 	PostID        uint           `gorm:"column:post_id;primaryKey;autoIncrement"`
 	PublicID      string         `gorm:"column:public_id"`
@@ -26,9 +23,9 @@ type Post struct {
 	DeletedAt     gorm.DeletedAt `gorm:"column:deleted_at"`
 
 	// Relations
-	User       *User          `gorm:"foreignKey:UserID"`
-	Book       *Book          `gorm:"foreignKey:BookID"`
-	Stat       *PostStat      `gorm:"foreignKey:PostID"`
+	User       *User          `gorm:"foreignKey:UserID;references:UserID"`
+	Book       *Book          `gorm:"foreignKey:BookID;references:BookID"`
+	Stat       *PostStat      `gorm:"foreignKey:PostID;references:PostID"`
 	Categories []Category 	  `gorm:"many2many:post_categories;joinForeignKey:PostID;joinReferences:CategoryID"`
 	Comments   []PostComment  `gorm:"foreignKey:PostID"`
 	Likes      []PostLike     `gorm:"foreignKey:PostID"`
@@ -36,16 +33,13 @@ type Post struct {
 	Shares     []PostShare    `gorm:"foreignKey:PostID"`
 }
 
-// =====================
-// PostCategory Model
-// =====================
 type PostCategory struct {
 	PostID      uint      `gorm:"column:post_id;primaryKey"`
 	CategoryID  uint      `gorm:"column:category_id;primaryKey"`
 	CreatedAt   time.Time `gorm:"column:created_at;autoCreateTime"`
 
-	Post     Post     `gorm:"foreignKey:PostID;references:PostID"`
-	Category Category `gorm:"foreignKey:CategoryID;references:CategoryID"`
+	Post     Post     `gorm:"foreignKey:PostID"`
+	Category Category `gorm:"foreignKey:CategoryID"`
 }
 
 type PostStat struct {

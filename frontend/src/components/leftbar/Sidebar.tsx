@@ -24,7 +24,7 @@ type SidebarProps = {
 
 export default function Sidebar({ user }: SidebarProps) {
 	return (
-		<div className="h-screen w-68 bg-auth-form text-white flex flex-col justify-between py-5 ml-16">
+		<div className="h-screen w-68 bg-right-bar text-white flex flex-col justify-between py-5 ml-16">
 			{/* TOP SECTION */}
 			<div className="px-4">
 				{/* LOGO */}
