@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import Sidebar from "@/components/leftbar/Sidebar";
 import RightSidebar from "@/components/rightbar/RightSidebar";
 import CreatePostModal from "@/components/feed/CreatePostModal";
@@ -21,7 +22,83 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 	// Zustand state
 	const isOpen = usePostModal((s) => s.isOpen);
-	const close = usePostModal((s) => s.close);
+
+	// INI PERUBAHAN TERAKHIR
+	const searchParams = useSearchParams();
+	const currentTab = searchParams.get("tab");
+	const disableSidebarScroll = useRef(false);
+	const [offset, setOffset] = useState(0);
+	const [isResetting, setIsResetting] = useState(false);
+
+	useEffect(() => {
+		let lastScrollY = window.scrollY;
+
+		const handleScroll = () => {
+			if (disableSidebarScroll.current) return;
+
+			const sidebar = document.getElementById("right-sidebar");
+			if (!sidebar) return;
+
+			const sidebarHeight = sidebar.offsetHeight;
+			const viewportHeight = window.innerHeight;
+			const currentScrollY = window.scrollY;
+
+			const padding = 16;
+
+			if (sidebarHeight + padding * 2 <= viewportHeight) {
+				setOffset(0);
+				lastScrollY = currentScrollY;
+				return;
+			}
+
+			const delta = currentScrollY - lastScrollY;
+
+			const maxScrollTop =
+				sidebarHeight + padding - (viewportHeight - padding);
+
+			setOffset((prev) => {
+				let next = prev + delta;
+
+				if (next < 0) next = 0;
+				if (next > maxScrollTop) next = maxScrollTop;
+
+				return next;
+			});
+
+			lastScrollY = currentScrollY;
+		};
+
+		window.addEventListener("scroll", handleScroll, { passive: true });
+
+		return () => {
+			window.removeEventListener("scroll", handleScroll);
+		};
+	}, [disableSidebarScroll]);
+
+	useEffect(() => {
+		let timer: NodeJS.Timeout;
+
+		disableSidebarScroll.current = true;
+
+		requestAnimationFrame(() => {
+			setIsResetting(true);
+			setOffset(0);
+
+			timer = setTimeout(() => {
+				setIsResetting(false);
+				disableSidebarScroll.current = false;
+			}, 300);
+		});
+
+		return () => clearTimeout(timer);
+	}, [currentTab]);
+
+	// RESET RIGHT SIDEBAR SAAT TAB BERPINDAH
+	useEffect(() => {
+		requestAnimationFrame(() => {
+			setOffset(0);
+		});
+	}, [currentTab]);
 
 	// Fetch user
 	useEffect(() => {
@@ -30,20 +107,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 			.then((data) => setUser(data))
 			.catch(() => setUser(null));
 	}, []);
-
-	// Lock scroll saat modal kebuka
-	useEffect(() => {
-		if (isOpen) {
-			document.body.style.overflow = "hidden";
-		} else {
-			document.body.style.overflow = "auto";
-		}
-
-		// cleanup (important)
-		return () => {
-			document.body.style.overflow = "auto";
-		};
-	}, [isOpen]);
 
 	if (!user) return <div>Loading...</div>;
 
@@ -64,11 +127,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 				</aside>
 
 				{/* Main Content */}
-				<main className="flex-1 max-w-[600px] z-10">{children}</main>
+				<main className="flex-1 max-w-[600px] z-0">{children}</main>
 
 				{/* Right Sidebar */}
-				<aside className="w-84 hidden xl:block">
-					<div className="sticky top-0">
+				<aside className="w-84 hidden xl:block relative">
+					<div
+						id="right-sidebar"
+						className="sticky top-4" // Kunci agar tetap di viewport
+						style={{
+							transform: `translateY(-${offset}px)`,
+							transition: isResetting
+								? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
+								: "none",
+						}}
+					>
 						<RightSidebar />
 					</div>
 				</aside>

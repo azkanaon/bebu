@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
 type Props = {
 	tab: "recommended" | "following";
@@ -8,6 +9,14 @@ type Props = {
 };
 
 export default function FeedTabs({ tab, setTab }: Props) {
+	const router = useRouter();
+	
+	const handleTabChange = (newTab: "recommended" | "following") => {
+		setTab(newTab);
+		// Ini akan mengubah URL menjadi ?tab=recommended atau ?tab=following
+		router.push(`?tab=${newTab}`, { scroll: false });
+	};
+
 	return (
 		<div className="sticky top-0 z-50 backdrop-blur-md bg-gray-900/70 border-b border-gray-800">
 			<div className="relative grid grid-cols-2">
@@ -25,7 +34,7 @@ export default function FeedTabs({ tab, setTab }: Props) {
 
 				{/* 🔥 Tabs */}
 				<button
-					onClick={() => setTab("recommended")}
+					onClick={() => handleTabChange("recommended")}
 					className={`relative py-3 text-sm font-medium transition-colors duration-200
 						${tab === "recommended" ? "text-white" : "text-gray-400 hover:text-gray-200"}
 					`}
@@ -34,7 +43,7 @@ export default function FeedTabs({ tab, setTab }: Props) {
 				</button>
 
 				<button
-					onClick={() => setTab("following")}
+					onClick={() => handleTabChange("following")}
 					className={`relative py-3 text-sm font-medium transition-colors duration-200
 						${tab === "following" ? "text-white" : "text-gray-400 hover:text-gray-200"}
 					`}

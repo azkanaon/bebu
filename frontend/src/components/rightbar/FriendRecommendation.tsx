@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toggleFollowAPI } from "@/lib/api";
 
 type User = {
 	id: number;
@@ -35,11 +36,25 @@ export function FriendRecommendation() {
 			);
 	}, []);
 
-	const toggleFollow = (id: number) => {
-		setFollowing((prev) =>
-			prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id],
-		);
+	const toggleFollow = async (id: number) => {
+		try {
+			const res = await toggleFollowAPI(id);
+
+			setFollowing((prev) => {
+				if (res.following) {
+					return [...prev, id];
+				} else {
+					return prev.filter((f) => f !== id);
+				}
+			});
+		} catch (err) {
+			console.error(err);
+		}
 	};
+
+	const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(
+		null,
+	);
 
 	return (
 		<div className="bg-gradient-to-br from-[#0f172a] to-[#020617] p-4 rounded-2xl border border-white/10 shadow-lg">
@@ -58,14 +73,20 @@ export function FriendRecommendation() {
 						(u.mutualUsers?.length || 0) - MAX_VISIBLE;
 
 					return (
-						<div
-							key={u.id}
-							className="relative"
-							onMouseEnter={() => setHovered(u.id)}
-							onMouseLeave={() => setHovered(null)}
-						>
+						<div key={u.id} className="relative">
 							{/* CARD */}
 							<motion.div
+								onMouseEnter={() => {
+									if (hoverTimeout)
+										clearTimeout(hoverTimeout);
+									setHovered(u.id);
+								}}
+								onMouseLeave={() => {
+									const t = setTimeout(() => {
+										setHovered(null);
+									}, 80); // kecil aja biar smooth
+									setHoverTimeout(t);
+								}}
 								whileHover={{ y: -3 }}
 								className="group flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition"
 							>
@@ -150,7 +171,7 @@ export function FriendRecommendation() {
 										initial={{ opacity: 0, y: 10 }}
 										animate={{ opacity: 1, y: 0 }}
 										exit={{ opacity: 0, y: 10 }}
-										className="absolute left-0 top-full mt-2 w-64 p-4 rounded-xl bg-[#020617] border border-white/10 shadow-xl z-50"
+										className="absolute left-0 top-full mt-2 w-64 p-4 rounded-xl bg-[#020617] border border-white/10 shadow-xl z-50 pointer-events-none"
 									>
 										<div className="flex items-center gap-3">
 											<Image

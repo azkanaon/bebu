@@ -47,18 +47,19 @@ export function Leaderboard() {
 			<div className="relative flex w-full bg-white/5 rounded-lg p-1 mb-4">
 				{/* sliding indicator */}
 				<motion.div
-					layout
-					className="absolute top-1 bottom-1 w-1/2 bg-white rounded-md"
+					// 1. HAPUS prop layout di sini karena konflik dengan scroll sidebar
+					className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-md" // Tambahkan calc sedikit agar pas di dalam padding
 					initial={false}
 					animate={{
-						x: activeTab === "all-time" ? "0%" : "100%",
+						// 2. Gunakan nilai x yang lebih presisi
+						x: activeTab === "all-time" ? 0 : "100%",
 					}}
 					transition={{ type: "spring", stiffness: 300, damping: 30 }}
 				/>
 
 				<button
 					onClick={() => setActiveTab("all-time")}
-					className={`relative z-10 w-1/2 text-sm py-1.5 transition ${
+					className={`relative z-10 w-1/2 text-sm py-1.5 transition-colors duration-200 ${
 						activeTab === "all-time"
 							? "text-black font-medium"
 							: "text-gray-400"
@@ -69,7 +70,7 @@ export function Leaderboard() {
 
 				<button
 					onClick={() => setActiveTab("monthly")}
-					className={`relative z-10 w-1/2 text-sm py-1.5 transition ${
+					className={`relative z-10 w-1/2 text-sm py-1.5 transition-colors duration-200 ${
 						activeTab === "monthly"
 							? "text-black font-medium"
 							: "text-gray-400"
