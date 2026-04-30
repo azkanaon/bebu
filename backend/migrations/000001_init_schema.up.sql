@@ -243,7 +243,7 @@ CREATE TABLE posts (
     post_type VARCHAR(50) NOT NULL,
     rating NUMERIC(3, 1),
     img_url TEXT,
-    publish_status VARCHAR(50) NOT NULL DEFAULT 'draft',
+    publish_status VARCHAR(50) NOT NULL DEFAULT 'published',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     published_at TIMESTAMPTZ,

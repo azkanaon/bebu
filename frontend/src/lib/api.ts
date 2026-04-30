@@ -38,3 +38,14 @@ export async function createPost(payload: CreatePostPayload) {
 
 	return data;
 }
+
+export async function toggleFollowAPI(userId: number) {
+	const res = await fetch(`http://localhost:8080/api/v1/users/${userId}/follow`, {
+		method: "POST",
+		credentials: "include",
+	});
+
+	if (!res.ok) throw new Error("Failed");
+
+	return res.json(); // { following: true/false }
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { usePostModal } from "@/stores/postModal";
@@ -44,11 +45,11 @@ export default function CreatePostModal() {
 		return () => window.removeEventListener("keydown", handleEsc);
 	}, [close]);
 
-	return (
+	return createPortal(
 		<AnimatePresence>
 			{isOpen && (
 				<motion.div
-					className="fixed inset-0 z-50 flex items-center justify-center"
+					className="fixed inset-0 z-[9999] flex items-center justify-center"
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
@@ -487,6 +488,7 @@ ${isDisabled ? "bg-gray-700 text-gray-400 cursor-not-allowed" : "text-white"}
 					</motion.div>
 				</motion.div>
 			)}
-		</AnimatePresence>
+		</AnimatePresence>,
+		document.body
 	);
 }

@@ -41,6 +41,9 @@ func main() {
     userHandler := handlers.NewUserHandler(userService)
 
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
+	followRepo := repositories.NewFollowRepository(db)
+	followService := services.NewFollowService(followRepo)
+	followHandler := handlers.NewFollowHandler(followService)
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
@@ -50,13 +53,13 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	SetupRoutes(r, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware)
+	SetupRoutes(r, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, followHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware) {
+func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, followHandler *handlers.FollowHandler,) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 	{
@@ -85,6 +88,7 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *
 			users.PUT("/me/profile", authMiddleware.RequiredAuth(), userHandler.UpdateProfile)
 			users.POST("/:username/block", authMiddleware.RequiredAuth(), userHandler.BlockUser)
 			users.DELETE("/:username/block", authMiddleware.RequiredAuth(), userHandler.UnblockUser)
+			users.POST("/:id/follow", followHandler.ToggleFollow)
 		}
 
 		followRequests := v1.Group("/follow-requests").Use(authMiddleware.RequiredAuth())
