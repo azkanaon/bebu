@@ -6,7 +6,7 @@ import Sidebar from "@/components/leftbar/Sidebar";
 import RightSidebar from "@/components/rightbar/RightSidebar";
 import CreatePostModal from "@/components/feed/CreatePostModal";
 import { Toaster } from "react-hot-toast";
-import { usePostModal } from "@/stores/postModal";
+import api from "@/lib/axios";
 
 type User = {
 	id: number;
@@ -19,9 +19,6 @@ type User = {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
-
-	// Zustand state
-	const isOpen = usePostModal((s) => s.isOpen);
 
 	// INI PERUBAHAN TERAKHIR
 	const searchParams = useSearchParams();
@@ -102,11 +99,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
 	// Fetch user
 	useEffect(() => {
-		fetch("http://localhost:8080/api/v1/users/me")
-			.then((res) => res.json())
-			.then((data) => setUser(data))
-			.catch(() => setUser(null));
+		api.get("/v1/users/me")
+			.then((res) => {
+				const d = res.data;
+				console.log("1. Data Mentah API:", d); // Pastikan ini muncul di console
+
+				const mappedUser: User = {
+					id: d.UserID,
+					email: d.Email,
+					role: d.Role,
+					username: d.Username,
+					name: d.Profile?.DisplayName,
+					avatar: d.Profile?.AvatarUrl,
+				};
+
+				console.log("2. Hasil Mapping:", mappedUser);
+				setUser(mappedUser);
+			})
+			.catch((err) => {
+				console.error("Fetch Error:", err);
+				setUser(null);
+			});
 	}, []);
+
+	console.log("State user saat ini:", user);
 
 	if (!user) return <div>Loading...</div>;
 
