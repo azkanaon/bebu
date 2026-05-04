@@ -4,20 +4,21 @@ package models
 import "time"
 
 type UserBookshelf struct {
-	UserBookshelfID uint      `gorm:"column:user_bookshelf_id;primaryKey;autoIncrement"`
+	UserBookshelfID uint      `gorm:"column:user_bookshelf_id;primaryKey"`
 	PublicID        string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
-	UserID          uint      `gorm:"column:user_id;not null;index:idx_bookshelves_user_id"`
-	BookID          uint      `gorm:"column:book_id;not null;index:idx_bookshelves_book_id"`
+	UserID          uint      `gorm:"column:user_id;not null;index"`
+	BookID          uint      `gorm:"column:book_id;not null"`
 	ShelfStatus     string    `gorm:"column:shelf_status;size:50;not null;default:want_to_read"`
 	ProgressPercent *int      `gorm:"column:progress_percent"`
 	StartedAt       *time.Time `gorm:"column:started_at"`
 	FinishedAt      *time.Time `gorm:"column:finished_at"`
-	Notes           *string   `gorm:"column:notes;type:text"`
 	UpdatedAt       time.Time `gorm:"column:updated_at;autoUpdateTime"`
 
-	// Relations
+	// --- RELASI KELUAR ---
 	User User `gorm:"foreignKey:UserID;references:UserID"`
 	Book Book `gorm:"foreignKey:BookID;references:BookID"`
+
+	Notes []Note `gorm:"foreignKey:UserBookshelfID;references:UserBookshelfID"`
 }
 
 type ReadingWrap struct {
@@ -43,11 +44,29 @@ type ReadingWrap struct {
 }
 
 type ReadingActivityLog struct {
-	ReadingActivityLogID uint      `gorm:"column:reading_activity_log_id;primaryKey;autoIncrement"`
-	UserID               uint      `gorm:"column:user_id;not null;uniqueIndex:idx_reading_activity_user_date"`
-	TotalValue           int       `gorm:"column:total_value;not null;default:0"`
-	Date                 time.Time `gorm:"column:date;type:date;not null;uniqueIndex:idx_reading_activity_user_date"`
+	ReadingActivityLogID uint      `gorm:"primaryKey"`
+	UserID               uint      `gorm:"not null;uniqueIndex:idx_user_date"` // Bagian dari composite unique index
+	TotalValue           int       `gorm:"not null;default:0"`
+	TotalLikes           int       `gorm:"not null;default:0"`
+	TotalComments        int       `gorm:"not null;default:0"`
+	TotalPosts           int       `gorm:"not null;default:0"`
+	TotalNotes           int       `gorm:"not null;default:0"`
 
-	// Relations
-	User User `gorm:"foreignKey:UserID;references:UserID"`
+	Date                 time.Time `gorm:"type:date;not null;uniqueIndex:idx_user_date"`
+
+	User User `gorm:"foreignKey:UserID"`
+}
+
+// Note merepresentasikan tabel 'notes' di database.
+type Note struct {
+	NoteID           uint      `gorm:"primaryKey"`
+	UserBookshelfID uint      `gorm:"not null;index"` // Foreign key ke user_bookshelves
+	PageStart        *int      // Pointer ke int agar bisa NULL
+	PageEnd          *int      // Pointer ke int agar bisa NULL
+	Description      string    `gorm:"type:text;not null"`
+	CreatedAt        time.Time `gorm:"autoCreateTime"`
+	UpdatedAt        time.Time `gorm:"autoUpdateTime"`
+
+	// Relasi: Sebuah catatan dimiliki oleh satu entri di rak buku.
+	UserBookshelf UserBookshelf `gorm:"foreignKey:UserBookshelfID;references:UserBookshelfID"`
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 
 	"golang.org/x/sync/errgroup" // Untuk menjalankan query concurrent
@@ -297,12 +298,27 @@ func (s *userService) FollowUser(sourceUserID uint, targetUsername string) (stri
         return "", err
     }
 
-	// 6. Jika semua berhasil, COMMIT transaksinya
-	if err := tx.Commit().Error; err != nil {
-		return "", err
-	}
+	 if finalStatus == "accepted" {
+        // Gunakan errgroup untuk update stats kedua user secara concurrent.
+        g, _ := errgroup.WithContext(context.Background())
 
-	// 7. Kembalikan status akhir
+        // Tambah +1 ke 'total_following' untuk user yang me-follow (source).
+        g.Go(func() error {
+            return s.userRepo.UpdateUserStat(sourceUserID, "total_following", 1)
+        })
+
+        // Tambah +1 ke 'total_followers' untuk user yang di-follow (target).
+        g.Go(func() error {
+            return s.userRepo.UpdateUserStat(targetUser.UserID, "total_followers", 1)
+        })
+        
+        if err := g.Wait(); err != nil {
+            // Log error ini, tapi jangan gagalkan seluruh operasi follow.
+            // Update stats adalah optimasi, bukan bagian krusial dari aksi.
+            log.Printf("WARNING: Failed to update user stats after follow: %v", err)
+        }
+    }
+
 	return finalStatus, nil
 }
 
@@ -317,16 +333,38 @@ func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) err
 	}
 
 	// 2. Validasi (tidak perlu cek unfollow diri sendiri, karena follow diri sendiri sudah dicegah)
-
-	// 3. Panggil repository
-	err = s.userRepo.UnfollowUser(sourceUserID, targetUser.UserID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		// Jika repo mengembalikan not found, artinya relasinya memang tidak ada.
-		// Ini bukan error, jadi kita return nil.
-		return nil
+	currentStatus, err := s.userRepo.GetFollowStatus(sourceUserID, targetUser.UserID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 	
-	return err
+	// Lakukan aksi unfollow (menghapus baris)
+	if err := s.userRepo.UnfollowUser(sourceUserID, targetUser.UserID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil // Bukan error jika memang tidak follow
+		}
+		return err
+	}
+	
+	 if currentStatus == "accepted" {
+        g, _ := errgroup.WithContext(context.Background())
+
+        // Kurangi -1 dari 'total_following' untuk user yang unfollow (source).
+        g.Go(func() error {
+            return s.userRepo.UpdateUserStat(sourceUserID, "total_following", -1)
+        })
+
+        // Kurangi -1 dari 'total_followers' untuk user yang di-unfollow (target).
+        g.Go(func() error {
+            return s.userRepo.UpdateUserStat(targetUser.UserID, "total_followers", -1)
+        })
+
+        if err := g.Wait(); err != nil {
+            log.Printf("WARNING: Failed to update user stats after unfollow: %v", err)
+        }
+    }
+	
+	return nil
 }
 
 func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*dto.ProfileInfoDTO, error) {
@@ -460,7 +498,24 @@ func (s *userService) AcceptFollowRequest(currentUserID uint, requesterUsername 
 	
 	// 2. Panggil repo untuk update status dari 'pending' ke 'accepted'
 	// source = requester, target = currentUser
-	return s.userRepo.UpdateFollowStatus(requester.UserID, currentUserID, "accepted")
+	err = s.userRepo.UpdateFollowStatus(requester.UserID, currentUserID, "accepted")
+    if err != nil { /* ... */ }
+
+    // --- UPDATE STATS DI SINI ---
+    g, _ := errgroup.WithContext(context.Background())
+    // Tambah +1 ke 'total_following' untuk requester.
+    g.Go(func() error {
+        return s.userRepo.UpdateUserStat(requester.UserID, "total_following", 1)
+    })
+    // Tambah +1 ke 'total_followers' untuk user saat ini.
+    g.Go(func() error {
+        return s.userRepo.UpdateUserStat(currentUserID, "total_followers", 1)
+    })
+    if err := g.Wait(); err != nil {
+        log.Printf("WARNING: Failed to update user stats after accepting follow: %v", err)
+    }
+
+    return nil
 }
 
 func (s *userService) DeclineFollowRequest(currentUserID uint, requesterUsername string) error {

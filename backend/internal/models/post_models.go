@@ -25,7 +25,7 @@ type Post struct {
 	// Relations
 	User       *User          `gorm:"foreignKey:UserID;references:UserID"`
 	Book       *Book          `gorm:"foreignKey:BookID;references:BookID"`
-	Stat       *PostStat      `gorm:"foreignKey:PostID;references:PostID"`
+	Stats       *PostStat      `gorm:"foreignKey:PostID;references:PostID"`
 	Categories []Category 	  `gorm:"many2many:post_categories;joinForeignKey:PostID;joinReferences:CategoryID"`
 	Comments   []PostComment  `gorm:"foreignKey:PostID"`
 	Likes      []PostLike     `gorm:"foreignKey:PostID"`

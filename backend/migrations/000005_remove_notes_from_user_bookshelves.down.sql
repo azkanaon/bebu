@@ -1,0 +1,1 @@
+ALTER TABLE user_bookshelves ADD COLUMN notes TEXT;

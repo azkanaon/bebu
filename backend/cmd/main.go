@@ -26,8 +26,8 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService)
 
 	postRepo := repositories.NewPostRepository(db)
-	postService := services.NewPostService(postRepo, db)
-	postHandler := handlers.NewPostHandler(postService)
+	postService := services.NewPostService(postRepo, userRepo, db) 
+	postHandler := handlers.NewPostHandler(postService) 
 
 	bookRepo := repositories.NewBookRepository(db)
 	bookService := services.NewBookService(bookRepo)
@@ -39,11 +39,12 @@ func main() {
 
 	userService := services.NewUserService(db, userRepo)
     userHandler := handlers.NewUserHandler(userService)
+	
+	bookshelfRepo := repositories.NewBookshelfRepository(db)
+	bookshelfService := services.NewBookshelfService(db, bookshelfRepo, userRepo)
+	bookshelfHandler := handlers.NewBookshelfHandler(bookshelfService)
 
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
-	followRepo := repositories.NewFollowRepository(db)
-	followService := services.NewFollowService(followRepo)
-	followHandler := handlers.NewFollowHandler(followService)
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
@@ -53,13 +54,13 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	SetupRoutes(r, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, followHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, followHandler *handlers.FollowHandler,) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 	{
@@ -88,7 +89,11 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *
 			users.PUT("/me/profile", authMiddleware.RequiredAuth(), userHandler.UpdateProfile)
 			users.POST("/:username/block", authMiddleware.RequiredAuth(), userHandler.BlockUser)
 			users.DELETE("/:username/block", authMiddleware.RequiredAuth(), userHandler.UnblockUser)
-			users.POST("/:id/follow", followHandler.ToggleFollow)
+			users.GET("/:username/bookshelves", authMiddleware.OptionalAuth(), bookshelfHandler.GetUserBookshelves)
+
+			users.GET("/:username/posts", authMiddleware.OptionalAuth(), postHandler.GetUserPosts)
+			users.GET("/:username/likes", authMiddleware.OptionalAuth(), postHandler.GetUserLikedPosts)
+			users.GET("/:username/saves", authMiddleware.OptionalAuth(), postHandler.GetUserSavedPosts)
 		}
 
 		followRequests := v1.Group("/follow-requests").Use(authMiddleware.RequiredAuth())
@@ -104,6 +109,23 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *
 			books.GET("", bookHandler.GetBooks)
 		}
 
+		bookshelves := v1.Group("/bookshelves")
+		{
+			bookshelves.POST("", authMiddleware.RequiredAuth(), bookshelfHandler.AddToBookshelf)
+			bookshelves.PUT("/:id", authMiddleware.RequiredAuth(), bookshelfHandler.UpdateBookshelfEntry)
+			bookshelves.DELETE("/:id", authMiddleware.RequiredAuth(), bookshelfHandler.DeleteFromBookshelf)
+			bookshelves.GET("/:id", authMiddleware.OptionalAuth(), bookshelfHandler.GetBookshelfEntryDetail)
+			bookshelves.POST("/:id/notes", authMiddleware.RequiredAuth(), bookshelfHandler.AddNote)
+		}
+
+		notes := v1.Group("/notes").Use(authMiddleware.RequiredAuth())
+		{
+			notes.PUT("/:id", bookshelfHandler.UpdateNote)
+			notes.DELETE("/:id", bookshelfHandler.DeleteNote)
+		}
+
+
+
 		categories := v1.Group("/categories")
 		{
 			categories.GET("/user", handlers.GetUserCategories)
@@ -117,8 +139,8 @@ func SetupRoutes(r *gin.Engine, authHandler *handlers.AuthHandler, postHandler *
 
 		posts := v1.Group("/posts")
 		{
-			posts.POST("", postHandler.CreatePost)
-			posts.GET("", postHandler.GetPosts)
+			posts.POST("", authMiddleware.RequiredAuth(), postHandler.CreatePost)
+			posts.GET("",authMiddleware.OptionalAuth(), postHandler.GetPosts)
 		}
 
 		v1.GET("/leaderboard", handlers.GetLeaderboard)

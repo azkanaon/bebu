@@ -43,6 +43,8 @@ type UserRepository interface {
 	DeleteFollowRequest(sourceUserID, targetUserID uint) error
 	BlockUser(blockingUserID, blockedUserID uint) error
 	UnblockUser(blockingUserID, blockedUserID uint) error
+	UpdateUserStat(userID uint, columnName string, amount int) error
+    GetUserStats(userID uint) (*models.UserStat, error)
 }
 
 type userRepository struct {
@@ -140,7 +142,6 @@ func (r *userRepository) ResetPasswordTransaction(userID uint, newPasswordHash s
 	})
 }
 
-// RevokeSessionByRefreshTokenHash menandai sebuah sesi sebagai tidak valid/dicabut.
 func (r *userRepository) RevokeSessionByRefreshTokenHash(hash string) error {
 	result := r.db.Model(&models.UserSession{}).
 		Where("refresh_token_hash = ? AND revoked_at IS NULL", hash).
@@ -158,7 +159,6 @@ func (r *userRepository) RevokeSessionByRefreshTokenHash(hash string) error {
 	return nil
 }
 
-// FindByUsername menemukan user beserta relasi yang dibutuhkan untuk halaman profil
 func (r *userRepository) FindByUsername(username string) (*models.User, error) {
 	var user models.User
 	err := r.db.
@@ -177,18 +177,21 @@ func (r *userRepository) FindByUsername(username string) (*models.User, error) {
 	return &user, nil
 }
 
-// GetFollowerCount menghitung jumlah follower seorang user
 func (r *userRepository) GetFollowerCount(userID uint) (int64, error) {
-	var count int64
-	err := r.db.Model(&models.UserFollow{}).Where("user_followed_id = ?", userID).Count(&count).Error
-	return count, err
+	stats, err := r.GetUserStats(userID)
+	if err != nil {
+		return 0, err
+	}
+	return int64(stats.TotalFollowers), nil
 }
 
-// GetFollowingCount menghitung jumlah user yang di-follow oleh seorang user
+// GetFollowingCount sekarang membaca dari tabel user_stats
 func (r *userRepository) GetFollowingCount(userID uint) (int64, error) {
-	var count int64
-	err := r.db.Model(&models.UserFollow{}).Where("user_following_id = ?", userID).Count(&count).Error
-	return count, err
+	stats, err := r.GetUserStats(userID)
+	if err != nil {
+		return 0, err
+	}
+	return int64(stats.TotalFollowing), nil
 }
 
 // IsFollowing memeriksa apakah viewerID mengikuti targetID
@@ -296,7 +299,7 @@ func (r *userRepository) UpdateSettings(userID uint, updates map[string]interfac
 		return nil
 	}
 	
-	result := r.db.Model(&models.UserSettings{}).Clauses(clause.OnConflict{
+	result := r.db.Model(&models.UserSetting{}).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}}, // Kunci konflik
 		DoUpdates: clause.AssignmentColumns(updateColumns), // Kolom yang diupdate
 	}).Create(fullData)
@@ -433,3 +436,30 @@ func (r *userRepository) IsBlocked(blockingUserID, blockedUserID uint) (bool, er
 		Count(&count).Error
 	return count > 0, err
 }
+
+// amount bisa positif (untuk increment) atau negatif (untuk decrement).
+func (r *userRepository) UpdateUserStat(userID uint, columnName string, amount int) error {
+	// Kita gunakan GORM's Clauses(clause.OnConflict) untuk melakukan UPSERT.
+	// Ini akan membuat baris baru jika user belum punya stats, atau mengupdate jika sudah ada.
+	// `gorm.Expr` digunakan untuk melakukan operasi aritmatika di level database.
+	return r.db.Model(&models.UserStat{}).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			columnName: gorm.Expr(columnName + " + ?", amount),
+		}),
+	}).Create(map[string]interface{}{
+		"user_id":  userID,
+		columnName: amount,
+	}).Error
+}
+
+// GetUserStats mengambil data statistik untuk seorang user.
+func (r *userRepository) GetUserStats(userID uint) (*models.UserStat, error) {
+    var stats models.UserStat
+    // Kita gunakan FirstOrInit untuk mengembalikan struct kosong (dengan nilai default 0)
+    // jika user belum punya entri di user_stats, daripada mengembalikan error not found.
+    // Ini membuat logika di service lebih sederhana.
+    result := r.db.Where("user_id = ?", userID).FirstOrInit(&stats)
+    return &stats, result.Error
+}
+
