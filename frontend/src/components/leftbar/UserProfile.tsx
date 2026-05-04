@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 type Props = {
 	user: {
@@ -22,6 +23,45 @@ export function UserProfile({ user }: Props) {
 	const [open, setOpen] = useState(false);
 	const [expand, setExpand] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
+
+	const router = useRouter();
+	const [isLoggingOut, setIsLoggingOut] = useState(false);
+	
+	const handleLogout = async () => {
+		if (isLoggingOut) return;
+
+		setIsLoggingOut(true);
+		try {
+			const response = await fetch(
+				"http://localhost:8080/api/v1/auth/logout",
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					// WAJIB: Agar browser mengirimkan cookie refresh_token ke Go
+					credentials: "include",
+				},
+			);
+
+			if (response.ok) {
+				// Opsional: hapus sisa-sisa state di client side jika ada
+				// localStorage.clear();
+
+				// Redirect ke login dan refresh state aplikasi
+				router.push("/login");
+				router.refresh();
+			} else {
+				const errorData = await response.json();
+				console.error("Logout failed:", errorData.error);
+				alert("Gagal logout, silakan coba lagi.");
+			}
+		} catch (error) {
+			console.error("Network error during logout:", error);
+		} finally {
+			setIsLoggingOut(false);
+		}
+	};
 
 	useEffect(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -43,7 +83,6 @@ export function UserProfile({ user }: Props) {
 
 	return (
 		<div className="mt-4 relative">
-
 			<div ref={ref} className="relative z-10">
 				{/* PROFILE ROW */}
 				<div
@@ -59,11 +98,15 @@ export function UserProfile({ user }: Props) {
 					<div className="flex items-center gap-3">
 						<div className="relative">
 							<Image
-								src={user.avatar}
-								alt="avatar"
+								src={
+									user.avatar ||
+									`https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`
+								}
+								alt={user.name}
 								width={40}
 								height={40}
-								className="rounded-full object-cover border-2 border-white/30   /* ✅ thicker border */"
+								className="rounded-full object-cover border-2 border-white/30"
+								unoptimized
 							/>
 
 							{/* Presence */}
@@ -120,9 +163,13 @@ export function UserProfile({ user }: Props) {
 
 						<div className="border-t border-white/10" />
 
-						<button className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10">
+						<button
+							onClick={handleLogout}
+							disabled={isLoggingOut}
+							className={`flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}`}
+						>
 							<LogOut size={16} />
-							Logout
+							{isLoggingOut ? "Logging out..." : "Logout"}
 						</button>
 					</div>
 				)}

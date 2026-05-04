@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // 1. Tentukan route mana saja yang diproteksi dan mana yang untuk publik
-const protectedRoutes = ['/profile', '/settings', '/dashboard'] // Tambah sesuai kebutuhan
+const protectedRoutes = ['/profile', '/settings', '/dashboard', '/chat'] // Tambah sesuai kebutuhan
 const authRoutes = ['/login', '/register', '/reset-password']
 
 export function middleware(request: NextRequest) {
@@ -30,8 +30,12 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value
   const { pathname } = request.nextUrl
 
+  // Redirect untuk path route
+  const isRootPath = pathname === '/'
+  const isProtectedRoute = isRootPath || protectedRoutes.some((route) => pathname.startsWith(route))
+
   // 3. LOGIKA A: Jika user BELUM login tapi mencoba akses halaman TERPROTEKSI
-  if (!token && protectedRoutes.some((route) => pathname.startsWith(route))) {
+  if (!token && (isProtectedRoute || protectedRoutes.some((route) => pathname.startsWith(route)))) {
     // Redirect ke halaman login
     const loginUrl = new URL('/login', request.url)
     // (Opsional) Simpan halaman asal agar setelah login bisa kembali ke sini
@@ -42,7 +46,7 @@ export function middleware(request: NextRequest) {
   // 4. LOGIKA B: Jika user SUDAH login tapi mencoba akses halaman AUTH (login/register)
   if (token && authRoutes.some((route) => pathname.startsWith(route))) {
     // Tendang ke halaman profile atau home
-    return NextResponse.redirect(new URL('/profile', request.url))
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // 5. Jika semua aman, izinkan request berlanjut

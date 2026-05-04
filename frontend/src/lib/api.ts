@@ -1,4 +1,5 @@
 import { CreatePostPayload } from "@/types/post";
+import api from "@/lib/axios";
 
 export async function getBooks() {
 	const res = await fetch("http://localhost:8080/api/v1/books", {
@@ -39,13 +40,12 @@ export async function createPost(payload: CreatePostPayload) {
 	return data;
 }
 
-export async function toggleFollowAPI(userId: number) {
-	const res = await fetch(`http://localhost:8080/api/v1/users/${userId}/follow`, {
-		method: "POST",
-		credentials: "include",
-	});
+export async function followUserAPI(username: string) {
+    const res = await api.post(`/v1/users/${username}/follow`);
+    return res.data; 
+}
 
-	if (!res.ok) throw new Error("Failed");
-
-	return res.json(); // { following: true/false }
+export async function unfollowUserAPI(username: string) {
+    const res = await api.delete(`/v1/users/${username}/follow`);
+    return res.data;
 }

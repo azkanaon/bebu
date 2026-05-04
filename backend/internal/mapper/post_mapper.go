@@ -44,16 +44,16 @@ func ToReviewPostResponse(p models.Post) dto.ReviewPostResponse {
 	res.Book.Genres = []string{}
 
 	if len(p.Book.BookGenres) > 0 {
-	for _, bg := range p.Book.BookGenres {
-		if bg.Genre.GenreID != 0 {
-			res.Book.Genres = append(res.Book.Genres, bg.Genre.GenreName)
+		for _, bg := range p.Book.BookGenres {
+			if bg.Genre.GenreID != 0 {
+				res.Book.Genres = append(res.Book.Genres, bg.Genre.GenreName)
+			}
 		}
 	}
-}
 
-	res.Likes = p.Stat.LikeCount
-	res.Comments = p.Stat.CommentCount
-	res.Saved = p.Stat.SaveCount
+	res.Likes = p.Stats.LikeCount
+	res.Comments = p.Stats.CommentCount
+	res.Saved = p.Stats.SaveCount
 
 	return res
 }
@@ -77,10 +77,10 @@ func ToAnalysisPostResponse(p models.Post) dto.AnalysisPostResponse {
 		res.Book.Cover = p.Book.CoverImgURL
 	}
 
-	if p.Stat != nil {
-		res.Likes = p.Stat.LikeCount
-		res.Comments = p.Stat.CommentCount
-		res.Shares = p.Stat.SaveCount
+	if p.Stats != nil {
+		res.Likes = p.Stats.LikeCount
+		res.Comments = p.Stats.CommentCount
+		res.Shares = p.Stats.SaveCount
 	}
 
 	return res

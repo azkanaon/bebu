@@ -50,8 +50,9 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"}, // frontend kamu
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "X-CSRF-Token"},
 		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
 	}))
 
 	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware)
@@ -63,6 +64,8 @@ func main() {
 func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
+
+	v1.Use(middlewares.CSRFMiddleware())
 	{
 		auth := v1.Group("/auth")
 		{
@@ -81,12 +84,15 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 
 		users := v1.Group("/users")
 		{
-			// users.GET("/me", handlers.GetCurrentUser)
 			users.GET("/recommendation", handlers.GetUserRecommendations)
+			me := users.Group("/me")
+			{
+				me.PUT("/profile", authMiddleware.RequiredAuth(), userHandler.UpdateProfile)
+				me.GET("", authMiddleware.RequiredAuth(), userHandler.GetMyProfile)
+			}
 			users.GET("/:username", authMiddleware.OptionalAuth(), userHandler.GetUserProfile)
 			users.POST("/:username/follow", authMiddleware.RequiredAuth(), userHandler.FollowUser)
 			users.DELETE("/:username/follow", authMiddleware.RequiredAuth(), userHandler.UnfollowUser)
-			users.PUT("/me/profile", authMiddleware.RequiredAuth(), userHandler.UpdateProfile)
 			users.POST("/:username/block", authMiddleware.RequiredAuth(), userHandler.BlockUser)
 			users.DELETE("/:username/block", authMiddleware.RequiredAuth(), userHandler.UnblockUser)
 			users.GET("/:username/bookshelves", authMiddleware.OptionalAuth(), bookshelfHandler.GetUserBookshelves)

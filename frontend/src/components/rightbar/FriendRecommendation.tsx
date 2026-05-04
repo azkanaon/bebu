@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { toggleFollowAPI } from "@/lib/api";
+import { followUserAPI, unfollowUserAPI } from "@/lib/api";
 
 type User = {
 	id: number;
@@ -16,8 +16,10 @@ type User = {
 
 export function FriendRecommendation() {
 	const [users, setUsers] = useState<User[]>([]);
-	const [following, setFollowing] = useState<number[]>([]);
 	const [hovered, setHovered] = useState<number | null>(null);
+	const [followStatus, setFollowStatus] = useState<Record<number, string>>(
+		{},
+	);
 
 	useEffect(() => {
 		fetch("http://localhost:8080/api/v1/users/recommendation")
@@ -36,22 +38,35 @@ export function FriendRecommendation() {
 			);
 	}, []);
 
-	const toggleFollow = async (id: number) => {
-		try {
-			const res = await toggleFollowAPI(id);
+	const toggleFollow = async (user: User) => {
+		const currentStatus = followStatus[user.id];
 
-			setFollowing((prev) => {
-				if (res.following) {
-					return [...prev, id];
-				} else {
-					return prev.filter((f) => f !== id);
-				}
-			});
+		try {
+			// Jika sudah follow atau sedang pending, maka UNFOLLOW
+			if (currentStatus === "accepted" || currentStatus === "pending") {
+				await unfollowUserAPI(user.username);
+
+				// Hapus status dari state agar tombol kembali jadi "Follow"
+				setFollowStatus((prev) => {
+					const newState = { ...prev };
+					delete newState[user.id];
+					return newState;
+				});
+				console.log(`Berhasil unfollow ${user.username}`);
+			}
+			// Jika belum follow, maka FOLLOW
+			else {
+				const res = await followUserAPI(user.username);
+
+				setFollowStatus((prev) => ({
+					...prev,
+					[user.id]: res.status, // "accepted" atau "pending"
+				}));
+			}
 		} catch (err) {
-			console.error(err);
+			console.error("Follow error:", err);
 		}
 	};
-
 	const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(
 		null,
 	);
@@ -64,8 +79,8 @@ export function FriendRecommendation() {
 
 			<div className="space-y-3">
 				{users.map((u) => {
-					const isFollowing = following.includes(u.id);
 					const MAX_VISIBLE = 2;
+					const currentStatus = followStatus[u.id];
 
 					const visibleMutuals =
 						u.mutualUsers?.slice(0, MAX_VISIBLE) || [];
@@ -142,24 +157,22 @@ export function FriendRecommendation() {
 
 								{/* FOLLOW BUTTON */}
 								<motion.button
-									onClick={() => toggleFollow(u.id)}
-									whileTap={{ scale: 0.9 }}
-									className={`relative overflow-hidden px-3 py-1.5 text-xs rounded-full font-medium ${
-										isFollowing
+									key={u.id}
+									onClick={() => toggleFollow(u)}
+									className={`px-3 py-1.5 text-xs rounded-full font-medium transition-all ${
+										currentStatus === "accepted"
 											? "bg-white/10 text-white border border-white/20"
-											: "bg-white text-black"
+											: currentStatus === "pending"
+												? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"
+												: "bg-white text-black"
 									}`}
 								>
-									{/* ripple */}
-									<motion.span
-										initial={{ scale: 0, opacity: 0.5 }}
-										animate={{ scale: 2, opacity: 0 }}
-										transition={{ duration: 0.6 }}
-										className="absolute inset-0 bg-white rounded-full"
-									/>
-
 									<span className="relative z-10">
-										{isFollowing ? "Following" : "Follow"}
+										{currentStatus === "accepted"
+											? "Following"
+											: currentStatus === "pending"
+												? "Pending"
+												: "Follow"}
 									</span>
 								</motion.button>
 							</motion.div>

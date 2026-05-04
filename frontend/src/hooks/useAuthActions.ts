@@ -18,7 +18,7 @@ export const useAuthActions = () => {
     try {
       const data = await authService.login(payload)
       setAuth(data)
-      router.push('/profile')
+      router.push('/')
     } catch (err: any) {
       // Penanganan error spesifik Axios
       if (axios.isAxiosError(err)) {

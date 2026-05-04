@@ -11,7 +11,12 @@ func CSRFMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Abaikan pengecekan untuk metode yang aman (tidak mengubah data)
 		method := c.Request.Method
-		if method == "GET" || method == "HEAD" || method == "OPTIONS" {
+		path := c.Request.URL.Path
+
+		// Abaikan pengecekan untuk metode aman ATAU rute Auth awal
+		if method == "GET" || method == "OPTIONS" ||
+			path == "/api/v1/auth/login" || path == "/api/v1/auth/register" ||
+           path == "/api/v1/auth/logout" {
 			c.Next()
 			return
 		}

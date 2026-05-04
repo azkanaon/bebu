@@ -26,6 +26,7 @@ type UserService interface {
 	DeclineFollowRequest(currentUserID uint, requesterUsername string) error
 	BlockUser(sourceUserID uint, targetUsername string) error
 	UnblockUser(sourceUserID uint, targetUsername string) error
+	GetMyProfile(id uint) (*models.User, error)
 }
 
 type userService struct {
@@ -580,4 +581,15 @@ func (s *userService) UnblockUser(sourceUserID uint, targetUsername string) erro
 
 	// 2. Panggil repo untuk menghapus relasi blokir
 	return s.userRepo.UnblockUser(sourceUserID, targetUser.UserID)
+}
+
+func (s *userService) GetMyProfile(id uint) (*models.User, error) {
+    user, err := s.userRepo.FindUserByID(id)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Kamu bisa mengosongkan password sebelum dikirim ke handler
+    user.PasswordHash = "" 
+    return user, nil
 }

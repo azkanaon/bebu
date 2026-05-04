@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "picsum.photos", // ✅ tambahin ini
       },
+      {
+        protocol: "https",
+        hostname: "api.dicebear.com", // ✅ Tambahkan ini
+        pathname: "/7.x/**",          // Opsional: agar lebih spesifik
+      },
     ],
   },
 };
