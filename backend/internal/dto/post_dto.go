@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type ReviewPostResponse struct {
 	ID   string `json:"id"`
 	Type string `json:"type"`
@@ -58,4 +60,22 @@ type CreatePostRequest struct {
 	Rating      float64  `json:"rating"`
 	ImgURL      string   `json:"img_url"`
 	Categories  []string `json:"categories"` // 🔥 nama kategori
+}
+
+type PostSummaryDTO struct {
+	PublicID    string          `json:"publicId"`
+	Description string          `json:"description,omitempty"`
+	ImgURL      string          `json:"imgUrl,omitempty"`
+	PostType    string          `json:"postType"`
+	Rating      *float32        `json:"rating,omitempty"`
+	PublishedAt *time.Time      `json:"publishedAt,omitempty"`
+	Stats       PostStatsDTO    `json:"stats"`
+	Book        *BookSummaryDTO `json:"book,omitempty"` // Buku bisa jadi opsional
+}
+
+// PostStatsDTO merepresentasikan statistik sebuah post.
+type PostStatsDTO struct {
+	LikeCount    int `json:"likeCount"`
+	CommentCount int `json:"commentCount"`
+	SaveCount    int `json:"saveCount"`
 }

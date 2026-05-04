@@ -1,0 +1,1 @@
+ALTER TABLE user_bookshelves DROP COLUMN IF EXISTS notes;

@@ -23,7 +23,7 @@ type User struct {
     DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index:idx_users_deleted_at"`
     
     Profile        *UserProfile    `gorm:"foreignKey:UserID;references:UserID"`
-    Settings       *UserSettings   `gorm:"foreignKey:UserID;"`
+    Settings       *UserSetting   `gorm:"foreignKey:UserID;references:UserID"`
     PasswordResets []PasswordReset `gorm:"foreignKey:UserID"`
     Sessions       []UserSession   `gorm:"foreignKey:UserID"`
     SocialLinks    []UserSocialLink  `gorm:"foreignKey:UserID"`
@@ -49,7 +49,7 @@ type UserProfile struct {
 	User User `gorm:"foreignKey:UserID;references:UserID"`
 }
 
-type UserSettings struct {
+type UserSetting struct {
 	UserSettingID      uint      `gorm:"primaryKey"`
 	PublicID           uuid.UUID `gorm:"type:uuid;unique;not null;default:gen_random_uuid()"`
 	UserID             uint      `gorm:"not null;unique"` // UserID harus unik, 1 user 1 setting
@@ -88,4 +88,17 @@ type PasswordReset struct {
 
     // Relations
 	User User `gorm:"foreignKey:UserID;references:UserID"`
+}
+
+
+// UserStat merepresentasikan tabel 'user_stats' di database.
+type UserStat struct {
+	UserID         uint      `gorm:"primaryKey"` // UserID adalah primary key, memastikan 1 baris per user
+	TotalFollowers int       `gorm:"not null;default:0"`
+	TotalFollowing int       `gorm:"not null;default:0"`
+	TotalPosts     int       `gorm:"not null;default:0"`
+	UpdatedAt      time.Time `gorm:"autoUpdateTime"`
+
+	// Relasi: Statistik ini dimiliki oleh satu user.
+	User User `gorm:"foreignKey:UserID"`
 }

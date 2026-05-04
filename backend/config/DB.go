@@ -1,12 +1,16 @@
 package config
 
-import(
+import (
 	"log"
-    "os"
-    "strconv"
-    "github.com/joho/godotenv"
-    "gorm.io/driver/postgres"
-    "gorm.io/gorm"
+	"os"
+	"strconv"
+	"time"
+
+	"gorm.io/gorm/logger"
+
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
@@ -47,11 +51,22 @@ func LoadAndConnectDB() {
     }
 
     dsn := os.Getenv("DB_URL")
+    newLogger := logger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // Menggunakan logger standar Go untuk output
+		logger.Config{
+			SlowThreshold:             200 * time.Millisecond, // Query yang lebih lambat dari 200ms akan dicatat sebagai 'slow'
+			LogLevel:                  logger.Info,          // Log SEMUA query SQL
+			IgnoreRecordNotFoundError: true,                 // Jangan log error 'record not found' sebagai error
+			Colorful:                  true,                 // Aktifkan output berwarna agar mudah dibaca
+		},
+	)
     if dsn == "" {
         log.Fatal("DB_URL must be set in .env file")
     }
     
-    DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+    DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+        Logger: newLogger, // Gunakan logger yang sudah dikonfigurasi
+    })
     if err != nil {
         panic("Failed to connect database")
     }

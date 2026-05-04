@@ -8,7 +8,7 @@ import (
 )
 
 type Book struct {
-	BookID          uint           `gorm:"column:book_id;primaryKey;autoIncrement"`
+	BookID          uint           `gorm:"column:book_id;primaryKey"`
 	PublicID        string         `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	Title           string         `gorm:"column:title;size:255;not null"`
 	Synopsis        string         `gorm:"column:synopsis;type:text"`
@@ -16,19 +16,21 @@ type Book struct {
 	PublicationYear int16          `gorm:"column:publication_year"`
 	Language        string         `gorm:"column:language;size:50"`
 	TotalPages      int            `gorm:"column:total_pages"`
-	Slug            string         `gorm:"column:slug;size:255"`
+	Slug            string         `gorm:"column:slug;size:255"` 
 	CreatedAt       time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt       time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;index"`
 
-	// Relations
-	BookGenres  []BookGenre  `gorm:"foreignKey:BookID;references:BookID"`
-	BookAuthors []BookAuthor `gorm:"foreignKey:BookID;references:BookID"`
-	Posts       []Post       `gorm:"foreignKey:BookID;references:BookID"`
+	// Relasi: Buku ini ada di banyak entri BookAuthor
+	BookAuthors []BookAuthor `gorm:"foreignKey:BookID"`
+	
+    // Relasi lain bisa ditambahkan di sini jika perlu
+	BookGenres  []BookGenre  `gorm:"foreignKey:BookID"`
+	Posts       []Post       `gorm:"foreignKey:BookID"`
 }
 
 type Author struct {
-	AuthorID   uint           `gorm:"column:author_id;primaryKey;autoIncrement"`
+	AuthorID   uint           `gorm:"column:author_id;primaryKey"`
 	PublicID   string         `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	AuthorName string         `gorm:"column:author_name;size:200;not null"`
 	Slug       string         `gorm:"column:slug;size:220;unique;not null"`
@@ -36,7 +38,7 @@ type Author struct {
 	UpdatedAt  time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at;index"`
 
-	// Relations
+	// Relasi: Penulis ini ada di banyak entri BookAuthor
 	BookAuthors []BookAuthor `gorm:"foreignKey:AuthorID"`
 }
 
@@ -57,8 +59,9 @@ type BookAuthor struct {
 	AuthorID  uint      `gorm:"column:author_id;primaryKey"`
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
 
-	Book   Book   `gorm:"foreignKey:BookID;references:BookID"`
-	Author Author `gorm:"foreignKey:AuthorID;references:AuthorID"`
+	// --- RELASI KELUAR (UNTUK PRELOAD BERTINGKAT) ---
+	Author Author `gorm:"foreignKey:AuthorID"`
+    Book   Book   `gorm:"foreignKey:BookID"`
 }
 
 type BookGenre struct {
