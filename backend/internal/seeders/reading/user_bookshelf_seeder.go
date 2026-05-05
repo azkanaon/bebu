@@ -1,11 +1,12 @@
 package reading
 
 import (
-    "math/rand"
-    "time"
+	"math/rand"
+	"time"
 
-    "backend-bebu/internal/models"
-    "gorm.io/gorm"
+	"backend-bebu/internal/models"
+
+	"gorm.io/gorm"
 )
 
 func randomPastTime() time.Time {
@@ -68,12 +69,6 @@ func SeedUserBookshelves(db *gorm.DB) {
 
             case "want_to_read":
                 // kosong (sesuai real case)
-            }
-
-            // notes optional
-            if rand.Intn(3) == 0 {
-                note := "Menarik, mau dibaca nanti."
-                shelf.Notes = &note
             }
 
             db.Create(&shelf)
