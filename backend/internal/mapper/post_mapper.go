@@ -6,10 +6,10 @@ import (
 	"strings"
 )
 
-func ToReviewPostResponse(p models.Post) dto.ReviewPostResponse {
+func ToReviewPostResponse(p models.Post, currentUserID uint) dto.ReviewPostResponse {
 	var res dto.ReviewPostResponse
 
-	res.ID = p.PublicID
+	res.ID = p.PostID
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
 	res.CreatedAt = p.CreatedAt.Format("2006-01-02")
@@ -51,17 +51,26 @@ func ToReviewPostResponse(p models.Post) dto.ReviewPostResponse {
 		}
 	}
 
+	res.IsLiked = p.IsLiked
+	res.IsSaved = p.IsSaved
+
 	res.Likes = p.Stats.LikeCount
 	res.Comments = p.Stats.CommentCount
 	res.Saved = p.Stats.SaveCount
 
+	res.CommentList = []dto.CommentResponse{}
+	for _, commentModel := range p.Comments {
+		commentDTO := ToCommentResponse(commentModel, currentUserID)
+		res.CommentList = append(res.CommentList, commentDTO)
+	}
+
 	return res
 }
 
-func ToAnalysisPostResponse(p models.Post) dto.AnalysisPostResponse {
+func ToAnalysisPostResponse(p models.Post, currentUserID uint) dto.AnalysisPostResponse {
 	var res dto.AnalysisPostResponse
 
-	res.ID = p.PublicID
+	res.ID = p.PostID
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
 	res.Image = p.ImgURL
@@ -77,10 +86,19 @@ func ToAnalysisPostResponse(p models.Post) dto.AnalysisPostResponse {
 		res.Book.Cover = p.Book.CoverImgURL
 	}
 
+	res.IsLiked = p.IsLiked
+	res.IsSaved = p.IsSaved
+
 	if p.Stats != nil {
 		res.Likes = p.Stats.LikeCount
 		res.Comments = p.Stats.CommentCount
 		res.Shares = p.Stats.SaveCount
+	}
+
+	res.CommentList = []dto.CommentResponse{}
+	for _, commentModel := range p.Comments {
+		commentDTO := ToCommentResponse(commentModel, currentUserID)
+		res.CommentList = append(res.CommentList, commentDTO)
 	}
 
 	return res

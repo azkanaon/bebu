@@ -31,7 +31,13 @@ export default function HomePage() {
 						? "http://localhost:8080/api/v1/posts"
 						: "http://localhost:8080/api/v1/posts"; // sementara sama
 
-				const res = await fetch(endpoint);
+				const res = await fetch(endpoint, {
+					method: "GET",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					credentials: "include",
+				});
 				const data = await res.json();
 
 				setPosts(data);

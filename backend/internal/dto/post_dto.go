@@ -3,7 +3,7 @@ package dto
 import "time"
 
 type ReviewPostResponse struct {
-	ID   string `json:"id"`
+	ID   uint `json:"id"`
 	Type string `json:"type"`
 
 	User struct {
@@ -15,10 +15,15 @@ type ReviewPostResponse struct {
 	CreatedAt string `json:"createdAt"`
 	Content   string `json:"content"`
 
+	IsLiked   bool   `json:"is_liked"`
+	IsSaved   bool   `json:"is_saved"`
+		
 	Likes    int  `json:"likes"`
 	Comments int  `json:"comments"`
 	Shares   int  `json:"shares"`
 	Saved    int `json:"saved"`
+
+	CommentList []CommentResponse `json:"comment_list"`
 
 	Book struct {
 		Title  string   `json:"title"`
@@ -31,7 +36,7 @@ type ReviewPostResponse struct {
 }
 
 type AnalysisPostResponse struct {
-	ID        string `json:"id"`
+	ID        uint `json:"id"`
 	Type      string `json:"type"`
 	Content   string `json:"content"`
 	Image     string `json:"image"`
@@ -40,6 +45,11 @@ type AnalysisPostResponse struct {
 	Likes    int `json:"likes"`
 	Comments int `json:"comments"`
 	Shares   int `json:"shares"`
+
+	CommentList []CommentResponse `json:"comment_list"`
+
+	IsLiked   bool   `json:"is_liked"`
+	IsSaved   bool   `json:"is_saved"`
 
 	User struct {
 		DisplayName string `json:"displayName"`

@@ -1,9 +1,28 @@
 // src/types/post.ts
 
+export interface CommentType {
+  id: number;
+  user_id: number;
+  user_public_id: string;
+  username: string;
+  avatar: string;
+  comment: string;
+  likeCount: number;
+  isLiked: boolean;
+  replies?: CommentType[] | null;
+  created_at: string;
+}
+
+export interface CreateCommentRequest {
+  post_id: number;
+  parent_comment_id: number | null;
+  comment: string;
+}
+
 export type PostType = "review" | "analysis";
 
 export interface BasePost {
-  id: string;
+  id: number;
   type: PostType;
   user: {
     username: string;
@@ -16,6 +35,8 @@ export interface BasePost {
   comments: number;
   shares: number;
   saved: boolean;
+
+  comment_list?: CommentType[];
 }
 
 export interface ReviewPostType extends BasePost {
@@ -28,6 +49,8 @@ export interface ReviewPostType extends BasePost {
     genres: string[];
     rating: number;
   };
+  is_liked: boolean;
+  is_saved: boolean;
 }
 
 export interface AnalysisPostType extends BasePost {
@@ -37,6 +60,9 @@ export interface AnalysisPostType extends BasePost {
     cover: string;
   };
   image?: string;
+  likes: number;
+  is_liked: boolean;
+  is_saved: boolean;
 }
 
 export type CreatePostPayload = {

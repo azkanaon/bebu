@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-	MoreHorizontal,
-	Bookmark,
+	MoreVertical,
 	Flag,
 	EyeOff,
 	Link,
@@ -33,7 +32,7 @@ export default function PostMenu() {
 				onClick={() => setOpen(!open)}
 				className="p-2 rounded-full hover:bg-gray-800 transition"
 			>
-				<MoreHorizontal size={20} />
+				<MoreVertical size={20} />
 			</button>
 
 			{/* Dropdown */}
