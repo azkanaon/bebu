@@ -11,13 +11,13 @@ func SeedUserSettings(db *gorm.DB) {
     db.Find(&users)
 
     for i, user := range users {
-        setting := models.UserSettings{
+        setting := models.UserSetting{
             UserID:              user.UserID,
             IsProfilePublic:           i%5 == 0, // beberapa private
             ShowActivityHeatmap: true,
             AllowDmFromPublic:   i%3 != 0,
         }
 
-        db.FirstOrCreate(&setting, models.UserSettings{UserID: user.UserID})
+        db.FirstOrCreate(&setting, models.UserSetting{UserID: user.UserID})
     }
 }
