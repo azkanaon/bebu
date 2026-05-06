@@ -113,6 +113,9 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			users.GET("/:username/likes", authMiddleware.OptionalAuth(), postHandler.GetUserLikedPosts)
 			users.GET("/:username/saves", authMiddleware.OptionalAuth(), postHandler.GetUserSavedPosts)
 			users.GET("/search", authMiddleware.RequiredAuth(), userHandler.SearchUsers)
+
+			users.GET("/:username/followers", authMiddleware.OptionalAuth(), userHandler.GetFollowers)
+			users.GET("/:username/following", authMiddleware.OptionalAuth(), userHandler.GetFollowing)
 		}
 
 		followRequests := v1.Group("/follow-requests").Use(authMiddleware.RequiredAuth())

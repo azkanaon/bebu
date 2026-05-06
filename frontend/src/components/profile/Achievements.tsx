@@ -1,20 +1,91 @@
 'use client'
 
 import { useState } from 'react'
+import CollectionOverlay from './CollectionOverlay'
 
 const achievements = [
-  { title: 'Bookworm', score: '+100' },
-  { title: 'Fantasy Enthusiast', score: '+50' },
-  { title: 'Sci-Fi Scholar', score: '+50' },
-  { title: 'Discussion Leader', score: '+50' },
-  { title: 'Literary Explorer', score: '+25' },
-  { title: 'More Coming', score: '+10' },
+  {
+    id: 1,
+    title: 'Minum Air Putih',
+    description: 'Minum minimal 8 gelas air untuk menjaga hidrasi tubuh.',
+    icon: 'water-drop',
+    points: 10,
+    category: 'Kesehatan',
+  },
+  {
+    id: 2,
+    title: 'Lari Pagi',
+    description: 'Lari santai sejauh 3km di sekitar komplek perumahan.',
+    icon: 'run',
+    points: 50,
+    category: 'Olahraga',
+  },
+  {
+    id: 3,
+    title: 'Membaca Buku',
+    description: 'Baca minimal satu bab buku pengembangan diri.',
+    icon: 'book-open',
+    points: 20,
+    category: 'Edukasi',
+  },
+  {
+    id: 4,
+    title: 'Meditasi',
+    description: 'Sesi menenangkan pikiran selama 10 menit di pagi hari.',
+    icon: 'self-improvement',
+    points: 15,
+    category: 'Mental Health',
+  },
+  {
+    id: 5,
+    title: 'Belajar Coding',
+    description: 'Selesaikan satu modul TypeScript atau React.',
+    icon: 'code',
+    points: 100,
+    category: 'Edukasi',
+  },
+  {
+    id: 6,
+    title: 'Membersihkan Meja',
+    description: 'Rapikan ruang kerja agar fokus tetap terjaga.',
+    icon: 'cleaning-services',
+    points: 5,
+    category: 'Produktivitas',
+  },
+  {
+    id: 7,
+    title: 'Makan Buah',
+    icon: 'apple',
+    points: 10,
+    category: 'Kesehatan',
+  },
+  {
+    id: 8,
+    title: 'Review Keuangan',
+    description: 'Catat pengeluaran harian ke dalam aplikasi budget.',
+    icon: 'payments',
+    points: 30,
+    category: 'Finansial',
+  },
+  {
+    id: 9,
+    title: 'Tidur Tepat Waktu',
+    description: 'Pastikan sudah tidur sebelum jam 11 malam.',
+    icon: 'bedtime',
+    points: 25,
+    category: 'Kesehatan',
+  },
+  {
+    id: 10,
+    title: 'Update Portofolio',
+    icon: 'work-history',
+    points: 150,
+    category: 'Karir',
+  },
 ]
 
 export default function Achievements() {
-  const [showAll, setShowAll] = useState(false)
-
-  const displayed = showAll ? achievements : achievements.slice(0, 4)
+  const [openAchievements, setOpenAchievements] = useState(false)
 
   return (
     <div>
@@ -23,26 +94,32 @@ export default function Achievements() {
 
         {achievements.length > 4 && (
           <button
-            onClick={() => setShowAll(!showAll)}
-            className="text-blue-400 text-sm"
+            onClick={() => setOpenAchievements(!openAchievements)}
+            className="text-blue-400 text-sm cursor-pointer"
           >
-            {showAll ? 'Show less' : 'See all'}
+            Show All
           </button>
         )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {displayed.map((item, i) => (
+        {achievements.slice(0, 4).map((item, i) => (
           <div
             key={i}
             className="bg-[#0B1220] border border-white/10 rounded-xl p-4 text-center"
           >
             <div className="h-12 mb-2 bg-white/10 rounded-lg" />
             <p className="text-sm text-white">{item.title}</p>
-            <p className="text-blue-400 text-xs mt-1">{item.score}</p>
+            <p className="text-blue-400 text-xs mt-1">{item.points}</p>
           </div>
         ))}
       </div>
+      <CollectionOverlay
+        open={openAchievements}
+        onClose={() => setOpenAchievements(false)}
+        title="Achievements"
+        items={achievements}
+      />
     </div>
   )
 }

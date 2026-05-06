@@ -88,7 +88,7 @@ export default function ActivityTracking() {
       <div className="overflow-x-auto custom-scrollbar-x pb-2">
         <div className="min-w-max">
           {/* MONTH LABEL */}
-          <div className="relative h-4 mb-1 pl-[32px]">
+          <div className="relative h-4 mb-1 pl-8">
             {' '}
             {/* Memberi ruang untuk label hari */}
             {monthLabels.map((m, i) => (
@@ -106,7 +106,7 @@ export default function ActivityTracking() {
           <div className="flex gap-2">
             {/* DAY LABEL */}
             {/* Dihapus 'pt-6' dan diganti dengan alignment dari flex parent */}
-            <div className="flex flex-col text-xs text-gray-400 w-6 gap-[3px]">
+            <div className="flex flex-col text-xs text-gray-400 w-6 gap-0.75">
               {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((d, i) => (
                 <div
                   key={i}
@@ -118,9 +118,9 @@ export default function ActivityTracking() {
             </div>
 
             {/* GRID */}
-            <div className="flex gap-[3px]">
+            <div className="flex gap-0.75">
               {weeks.map((week, wi) => (
-                <div key={wi} className="flex flex-col gap-[3px]">
+                <div key={wi} className="flex flex-col gap-0.75">
                   {week.map((day, di) => (
                     <motion.div
                       key={di}

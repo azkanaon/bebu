@@ -339,43 +339,82 @@ func (h *UserHandler) DeclineFollowRequest(c *gin.Context) {
 }
 
 func (h *UserHandler) BlockUser(c *gin.Context) {
+	// 1. Ambil username target dari URL
 	targetUsername := c.Param("username")
 
-	sourceUserID, exists := c.Get("userID")
-	if !exists { /* ... handle error ... */ }
-	sourceUserIDUint, ok := sourceUserID.(uint)
-	if !ok { /* ... handle error ... */ }
+	// 2. Ambil ID user yang melakukan aksi (source) dari context dengan aman
+	sourceUserIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 
-	err := h.userService.BlockUser(sourceUserIDUint, targetUsername)
+	sourceUserID, ok := sourceUserIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in context"})
+		return
+	}
+
+	// 3. Panggil service untuk menjalankan logika block
+	err := h.userService.BlockUser(sourceUserID, targetUsername)
+
+	// 4. Handle response berdasarkan hasil dari service
 	if err != nil {
-		// ... (handle error 'user not found' dan 'cannot block yourself') ...
+		// Cek error spesifik yang didefinisikan di service
+		if err.Error() == "user to block not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		if err.Error() == "cannot block yourself" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) // 400 Bad Request karena ini adalah aksi yang tidak valid dari sisi klien
+			return
+		}
+
+		// Untuk semua error tak terduga lainnya
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to block user"})
 		return
 	}
 
+	// 5. Jika sukses
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully blocked " + targetUsername})
 }
 
 // UnblockUser adalah handler untuk DELETE /users/:username/block
 func (h *UserHandler) UnblockUser(c *gin.Context) {
+	// 1. Ambil username target dari URL
 	targetUsername := c.Param("username")
 
-	sourceUserID, exists := c.Get("userID")
-	if !exists { /* ... handle error ... */ }
-	sourceUserIDUint, ok := sourceUserID.(uint)
-	if !ok { /* ... handle error ... */ }
+	// 2. Ambil ID user yang melakukan aksi (source) dari context dengan aman
+	sourceUserIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
 
-	err := h.userService.UnblockUser(sourceUserIDUint, targetUsername)
+	sourceUserID, ok := sourceUserIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in context"})
+		return
+	}
+
+	err := h.userService.UnblockUser(sourceUserID, targetUsername)
+
 	if err != nil {
+		if err.Error() == "user to unblock not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "You are not blocking this user"})
 			return
 		}
-		// ... (handle error lain) ...
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unblock user"})
 		return
 	}
 
+	// 5. Jika sukses
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully unblocked " + targetUsername})
 }
 
@@ -396,4 +435,44 @@ func (h *UserHandler) SearchUsers(c *gin.Context) {
         "status": "success",
         "data":   users,
     })
+}
+
+func (h *UserHandler) GetFollowers(c *gin.Context) {
+	// Parsing username, page, limit, dan viewerID (sama seperti GetUserPosts)
+	username := c.Param("username")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	viewerID := getViewerID(c) // Asumsi ada helper getViewerID
+
+	// Panggil service yang sesuai
+	followers, pagination, err := h.userService.GetFollowerList(viewerID, username, page, limit)
+	if err != nil { /* ... handle error ... */ }
+
+	c.JSON(http.StatusOK, gin.H{"data": followers, "meta": pagination})
+}
+
+func (h *UserHandler) GetFollowing(c *gin.Context) {
+	username := c.Param("username")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	viewerID := getViewerID(c)
+
+	following, pagination, err := h.userService.GetFollowingList(viewerID, username, page, limit)
+	if err != nil { /* ... handle error ... */ }
+
+	c.JSON(http.StatusOK, gin.H{"data": following, "meta": pagination})
+}
+
+func getViewerID(c *gin.Context) *uint {
+	idValue, exists := c.Get("userID")
+	if !exists {
+		return nil
+	}
+	
+	id, ok := idValue.(uint)
+	if !ok {
+		return nil
+	}
+	
+	return &id
 }

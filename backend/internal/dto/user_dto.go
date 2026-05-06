@@ -91,3 +91,18 @@ type FollowRequestDTO struct {
     DisplayName string `json:"displayName"`
     AvatarURL   string `json:"avatarUrl"`
 }
+
+// UserSummaryDTO merepresentasikan data ringkas seorang user dalam sebuah daftar.
+type UserSummaryDTO struct {
+	Username      string          `json:"username"`
+	DisplayName   string          `json:"displayName"`
+	AvatarURL     string          `json:"avatarUrl"`
+	ViewerContext *FollowerContextDTO `json:"viewerContext,omitempty"`
+}
+
+// FollowerContextDTO adalah konteks spesifik untuk daftar follower/following.
+type FollowerContextDTO struct {
+	IsFollowing    bool `json:"isFollowing"`    // Apakah SAYA follow orang ini?
+	IsFollowedBy   bool `json:"isFollowedBy"`   // Apakah orang ini follow SAYA?
+	IsOwnProfile   bool `json:"isOwnProfile"`
+}

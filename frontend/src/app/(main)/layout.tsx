@@ -96,19 +96,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     })
   }, [currentTab])
 
-	// Fetch user
-	useEffect(() => {
-		api.get("/v1/users/me")
-			.then((res) => {
-				const d = res.data;
-				const mappedUser: User = {
-					id: d.UserID,
-					email: d.Email,
-					role: d.Role,
-					username: d.Username,
-					name: d.Profile?.DisplayName,
-					avatar: d.Profile?.AvatarUrl,
-				};
+  // Fetch user
+  useEffect(() => {
+    api
+      .get('/v1/users/me')
+      .then((res) => {
+        const d = res.data
+        const mappedUser: User = {
+          id: d.UserID,
+          email: d.Email,
+          role: d.Role,
+          username: d.Username,
+          name: d.Profile?.DisplayName,
+          avatar: d.Profile?.AvatarUrl,
+        }
 
         console.log('2. Hasil Mapping:', mappedUser)
         setUser(mappedUser)
@@ -119,7 +120,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       })
   }, [])
 
-	if (!user) return <div>Loading...</div>;
+  if (!user) return <div>Loading...</div>
 
   return (
     <>

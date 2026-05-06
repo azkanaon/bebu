@@ -28,6 +28,9 @@ type UserService interface {
 	UnblockUser(sourceUserID uint, targetUsername string) error
 	GetMyProfile(id uint) (*models.User, error)
 	SearchUsers(query string) ([]dto.UserSearchResponse, error)
+
+	GetFollowerList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error)
+	GetFollowingList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error)
 }
 
 type userService struct {
@@ -621,4 +624,129 @@ func (s *userService) SearchUsers(query string) ([]dto.UserSearchResponse, error
         })
     }
     return result, nil
+}
+
+func (s *userService) GetFollowerList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error) {
+	// 1. Cek akses (menggunakan helper yang sudah ada di PostService, kita asumsikan helper itu ada di sini juga)
+	targetUser, hasAccess, err := s.hasProfileAccess(viewerID, targetUsername)
+	if err != nil || !hasAccess {
+		return make([]dto.UserSummaryDTO, 0), dto.NewPaginationDTO(0, page, limit), err
+	}
+
+	// 2. Panggil repository yang sesuai
+	users, total, err := s.userRepo.GetFollowers(targetUser.UserID, page, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 3. Map ke DTO dan buat paginasi
+	dtos, err := s.mapUsersToSummaryDTOs(viewerID, users)
+	if err != nil {
+		return nil, nil, err
+	}
+	pagination := dto.NewPaginationDTO(total, page, limit)
+
+	return dtos, pagination, nil
+}
+
+
+func (s *userService) GetFollowingList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error) {
+	// 1. Cek akses
+	targetUser, hasAccess, err := s.hasProfileAccess(viewerID, targetUsername)
+	if err != nil || !hasAccess {
+		return make([]dto.UserSummaryDTO, 0), dto.NewPaginationDTO(0, page, limit), err
+	}
+
+	// 2. Panggil repository yang berbeda
+	users, total, err := s.userRepo.GetFollowing(targetUser.UserID, page, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 3. Map ke DTO (menggunakan kembali helper yang sama)
+	dtos, err := s.mapUsersToSummaryDTOs(viewerID, users)
+	if err != nil {
+		return nil, nil, err
+	}
+	pagination := dto.NewPaginationDTO(total, page, limit)
+
+	return dtos, pagination, nil
+}
+
+
+// --- Buat fungsi helper baru untuk mapping ---
+func (s *userService) mapUsersToSummaryDTOs(viewerID *uint, users []models.User) ([]dto.UserSummaryDTO, error) {
+	dtos := make([]dto.UserSummaryDTO, len(users))
+	for i, user := range users {
+		dtos[i] = dto.UserSummaryDTO{
+			Username:    user.Username,
+			DisplayName: user.Profile.DisplayName,
+			AvatarURL:   user.Profile.AvatarUrl,
+		}
+
+		// Jika ada yang melihat, isi viewerContext
+		if viewerID != nil {
+			var isFollowing, isFollowedBy bool
+			
+			// Cek relasi follow antara viewer dan user dalam daftar ini
+			// Ini bisa menyebabkan N+1 query. Untuk produksi, ini perlu dioptimalkan.
+			status, err := s.userRepo.GetFollowStatus(*viewerID, user.UserID)
+			if err != nil { return nil, err }
+			isFollowing = (status == "accepted")
+
+			status, err = s.userRepo.GetFollowStatus(user.UserID, *viewerID)
+			if err != nil { return nil, err }
+			isFollowedBy = (status == "accepted")
+
+			dtos[i].ViewerContext = &dto.FollowerContextDTO{
+				IsFollowing:  isFollowing,
+				IsFollowedBy: isFollowedBy,
+				IsOwnProfile: (*viewerID == user.UserID),
+			}
+		}
+	}
+	return dtos, nil
+}
+
+func (s *userService) hasProfileAccess(viewerID *uint, targetUsername string) (*models.User, bool, error) {
+	targetUser, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, nil // Tidak ditemukan, akses tidak ada, tapi bukan error
+		}
+		return nil, false, err // Error database
+	}
+
+	if viewerID != nil {
+		isOwnProfile := (*viewerID == targetUser.UserID)
+		if isOwnProfile {
+			return targetUser, true, nil // Pemilik selalu punya akses
+		}
+		
+		isBlocked, err := s.userRepo.IsBlocked(targetUser.UserID, *viewerID)
+		if err != nil {
+			return nil, false, err
+		}
+		if isBlocked {
+			return nil, false, nil // Jika diblokir, tidak ada akses
+		}
+	}
+
+	isProfilePublic := (targetUser.Settings == nil || targetUser.Settings.IsProfilePublic)
+	if isProfilePublic {
+		return targetUser, true, nil // Profil publik, semua punya akses
+	}
+
+	if viewerID != nil {
+		followStatus, err := s.userRepo.GetFollowStatus(*viewerID, targetUser.UserID)
+		if err != nil {
+			return nil, false, err
+		}
+		if followStatus == "accepted" {
+			return targetUser, true, nil // Follower yang diterima punya akses
+		}
+	}
+
+	// Jika semua kondisi di atas tidak terpenuhi (profil privat, bukan follower), tidak ada akses.
+	return targetUser, false, nil
 }
