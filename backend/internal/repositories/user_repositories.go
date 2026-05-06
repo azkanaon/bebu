@@ -46,6 +46,9 @@ type UserRepository interface {
 	UpdateUserStat(userID uint, columnName string, amount int) error
     GetUserStats(userID uint) (*models.UserStat, error)
 	SearchUsers(query string, limit int) ([]models.User, error)
+
+	GetFollowers(userID uint, page, limit int) ([]models.User, int64, error)
+	GetFollowing(userID uint, page, limit int) ([]models.User, int64, error)
 }
 
 type userRepository struct {
@@ -476,4 +479,53 @@ func (r *userRepository) SearchUsers(query string, limit int) ([]models.User, er
         Find(&users).Error
         
     return users, err
+}
+
+func (r *userRepository) GetFollowers(userID uint, page, limit int) ([]models.User, int64, error) {
+	var users []models.User
+	var total int64
+	offset := (page - 1) * limit
+
+	// Subquery untuk mendapatkan ID para follower
+	followerIDsSubQuery := r.db.Model(&models.UserFollow{}).
+		Select("user_following_id").
+		Where("user_followed_id = ? AND following_status = ?", userID, "accepted")
+
+	// Hitung total follower
+	err := followerIDsSubQuery.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Ambil data user para follower dengan paginasi
+	err = r.db.Preload("Profile").
+		Where("user_id IN (?)", followerIDsSubQuery.Offset(offset).Limit(limit)).
+		Find(&users).Error
+
+	return users, total, err
+}
+
+// GetFollowing mengambil daftar user yang diikuti oleh userID.
+func (r *userRepository) GetFollowing(userID uint, page, limit int) ([]models.User, int64, error) {
+	var users []models.User
+	var total int64
+	offset := (page - 1) * limit
+
+	// Subquery untuk mendapatkan ID user yang di-follow
+	followingIDsSubQuery := r.db.Model(&models.UserFollow{}).
+		Select("user_followed_id").
+		Where("user_following_id = ? AND following_status = ?", userID, "accepted")
+
+	// Hitung total
+	err := followingIDsSubQuery.Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Ambil data user yang di-follow dengan paginasi
+	err = r.db.Preload("Profile").
+		Where("user_id IN (?)", followingIDsSubQuery.Offset(offset).Limit(limit)).
+		Find(&users).Error
+
+	return users, total, err
 }
