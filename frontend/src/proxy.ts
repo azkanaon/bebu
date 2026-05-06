@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server'
 const protectedRoutes = ['/profile', '/settings', '/dashboard', '/chat'] // Tambah sesuai kebutuhan
 const authRoutes = ['/login', '/register', '/reset-password']
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const response = NextResponse.next()
 
   // 1. Tambahkan Security Headers
@@ -32,10 +32,15 @@ export function middleware(request: NextRequest) {
 
   // Redirect untuk path route
   const isRootPath = pathname === '/'
-  const isProtectedRoute = isRootPath || protectedRoutes.some((route) => pathname.startsWith(route))
+  const isProtectedRoute =
+    isRootPath || protectedRoutes.some((route) => pathname.startsWith(route))
 
   // 3. LOGIKA A: Jika user BELUM login tapi mencoba akses halaman TERPROTEKSI
-  if (!token && (isProtectedRoute || protectedRoutes.some((route) => pathname.startsWith(route)))) {
+  if (
+    !token &&
+    (isProtectedRoute ||
+      protectedRoutes.some((route) => pathname.startsWith(route)))
+  ) {
     // Redirect ke halaman login
     const loginUrl = new URL('/login', request.url)
     // (Opsional) Simpan halaman asal agar setelah login bisa kembali ke sini
