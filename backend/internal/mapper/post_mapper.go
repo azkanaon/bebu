@@ -92,7 +92,7 @@ func ToAnalysisPostResponse(p models.Post, currentUserID uint) dto.AnalysisPostR
 	if p.Stats != nil {
 		res.Likes = p.Stats.LikeCount
 		res.Comments = p.Stats.CommentCount
-		res.Shares = p.Stats.SaveCount
+		res.Shares = p.Stats.ShareCount
 	}
 
 	res.CommentList = []dto.CommentResponse{}

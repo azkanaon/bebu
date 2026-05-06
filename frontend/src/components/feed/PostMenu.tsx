@@ -9,9 +9,15 @@ import {
 	Link,
 	UserX,
 } from "lucide-react";
+import ReportModal from "./ReportModal";
 
-export default function PostMenu() {
+interface PostMenuProps {
+	postId: number;
+}
+
+export default function PostMenu({ postId }: PostMenuProps) {
 	const [open, setOpen] = useState(false);
+	const [isReportOpen, setIsReportOpen] = useState(false);
 	const ref = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -53,7 +59,6 @@ export default function PostMenu() {
 							z-50
 						"
 					>
-
 						{/* Copy Link */}
 						<MenuItem icon={<Link size={16} />} label="Copy link" />
 
@@ -82,10 +87,21 @@ export default function PostMenu() {
 							icon={<Flag size={16} />}
 							label="Report"
 							color="hover:text-red-400"
+							onClick={() => {
+								setIsReportOpen(true); // Buka modal report
+								setOpen(false); // Tutup dropdown menu
+							}}
 						/>
 					</motion.div>
 				)}
 			</AnimatePresence>
+
+			<ReportModal
+				isOpen={isReportOpen}
+				onClose={() => setIsReportOpen(false)}
+				entityId={postId}
+				entityType="post"
+			/>
 		</div>
 	);
 }
@@ -94,13 +110,16 @@ function MenuItem({
 	icon,
 	label,
 	color = "hover:text-white",
+	onClick,
 }: {
 	icon: React.ReactNode;
 	label: string;
 	color?: string;
+	onClick?: () => void;
 }) {
 	return (
 		<button
+			onClick={onClick}
 			className={`
 				w-full flex items-center gap-3 px-4 py-2.5
 				text-sm text-gray-300

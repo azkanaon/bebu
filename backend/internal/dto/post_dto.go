@@ -83,9 +83,27 @@ type PostSummaryDTO struct {
 	Book        *BookSummaryDTO `json:"book,omitempty"` // Buku bisa jadi opsional
 }
 
-// PostStatsDTO merepresentasikan statistik sebuah post.
 type PostStatsDTO struct {
 	LikeCount    int `json:"likeCount"`
 	CommentCount int `json:"commentCount"`
 	SaveCount    int `json:"saveCount"`
+}
+
+type ShareRequest struct {
+	PostID      uint   `json:"post_id" binding:"required"`
+	ReceiverIDs []uint `json:"receiver_ids" binding:"required"`
+	Message     string `json:"message"`
+}
+
+type ShareResponse struct {
+	Message string `json:"message"`
+	Count   int    `json:"count"`
+}
+
+// Untuk recet user di Share Modal
+type UserSearchResponse struct {
+    ID          uint   `json:"id"`
+    Username    string `json:"username"`
+    DisplayName string `json:"display_name"`
+    Avatar      string `json:"avatar"`
 }

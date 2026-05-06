@@ -23,14 +23,10 @@ type PostRepository interface {
 	WithTx(tx *gorm.DB) PostRepository
 }
 
-// --- 2. Struct Implementasi (Privat) ---
-// Nama struct diawali huruf kecil.
 type postRepository struct {
 	db *gorm.DB
 }
 
-// --- 3. "Pabrik" (Factory Function) ---
-// Mengembalikan interface publik.
 func NewPostRepository(db *gorm.DB) PostRepository {
 	return &postRepository{db: db}
 }
@@ -235,18 +231,18 @@ func (r *postRepository) GetCommentsByPostID(postID uint, userID uint) ([]models
 	err := r.db.Debug().
 		Where("post_id = ? AND parent_comment_id IS NULL", postID).
 		Preload("User.Profile").
-		Preload("Likes", "user_id = ?", userID). 
-        Preload("Replies.User.Profile").
-        Preload("Replies.Likes", "user_id = ?", userID).
-        Preload("Replies.Replies.User.Profile").
-        Preload("Replies.Replies.Likes", "user_id = ?", userID).
+		Preload("Likes", "user_id = ?", userID).
+		Preload("Replies.User.Profile").
+		Preload("Replies.Likes", "user_id = ?", userID).
+		Preload("Replies.Replies.User.Profile").
+		Preload("Replies.Replies.Likes", "user_id = ?", userID).
 		Order("created_at DESC").
 		Find(&comments).Error
 	return comments, err
 }
 
 func (r *postRepository) DecrementCommentCountByAmount(postID uint, amount int) error {
-    return r.db.Model(&models.PostStat{}).
-        Where("post_id = ?", postID).
-        Update("comment_count", gorm.Expr("comment_count - ?", amount)).Error
+	return r.db.Model(&models.PostStat{}).
+		Where("post_id = ?", postID).
+		Update("comment_count", gorm.Expr("comment_count - ?", amount)).Error
 }

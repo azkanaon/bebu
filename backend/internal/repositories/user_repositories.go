@@ -45,6 +45,7 @@ type UserRepository interface {
 	UnblockUser(blockingUserID, blockedUserID uint) error
 	UpdateUserStat(userID uint, columnName string, amount int) error
     GetUserStats(userID uint) (*models.UserStat, error)
+	SearchUsers(query string, limit int) ([]models.User, error)
 }
 
 type userRepository struct {
@@ -463,3 +464,16 @@ func (r *userRepository) GetUserStats(userID uint) (*models.UserStat, error) {
     return &stats, result.Error
 }
 
+func (r *userRepository) SearchUsers(query string, limit int) ([]models.User, error) {
+    var users []models.User
+    
+    // Cari berdasarkan username atau display name
+    err := r.db.Preload("Profile").
+        Joins("JOIN user_profiles ON user_profiles.user_id = users.user_id").
+        Where("users.username ILIKE ? OR user_profiles.display_name ILIKE ?", 
+            "%"+query+"%", "%"+query+"%").
+        Limit(limit).
+        Find(&users).Error
+        
+    return users, err
+}

@@ -378,3 +378,22 @@ func (h *UserHandler) UnblockUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully unblocked " + targetUsername})
 }
+
+func (h *UserHandler) SearchUsers(c *gin.Context) {
+    query := c.Query("q")
+    if query == "" {
+        c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
+        return
+    }
+
+    users, err := h.userService.SearchUsers(query)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mencari user"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "status": "success",
+        "data":   users,
+    })
+}

@@ -25,15 +25,13 @@ type PostService interface {
 }
 
 
-// --- 2. Buat Struct Implementasi (Privat) ---
 type postService struct {
-	postRepo repositories.PostRepository // Dependensi ke interface PostRepository
-	userRepo repositories.UserRepository // Dependensi ke interface UserRepository
-	db       *gorm.DB                      // DB untuk transaksi
+	postRepo repositories.PostRepository
+	userRepo repositories.UserRepository
+	db       *gorm.DB
 }
 
 
-// --- 3. Buat "Pabrik" (Factory Function) ---
 func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, db *gorm.DB) PostService {
 	return &postService{
 		postRepo: postRepo,
@@ -42,10 +40,7 @@ func NewPostService(postRepo repositories.PostRepository, userRepo repositories.
 	}
 }
 
-// GetPosts (Fungsi lama Anda, sedikit disederhanakan)
 func (s *postService) GetPosts(userID uint) ([]interface{}, error) {
-    // Berikan userID ke repository
-
     posts, err := s.postRepo.GetAllPosts(userID)
     if err != nil {
         return nil, err

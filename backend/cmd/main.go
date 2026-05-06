@@ -48,6 +48,14 @@ func main() {
 	commentService := services.NewCommentService(commentRepo, postRepo)
 	commentHandler := handlers.NewCommentHandler(commentService)
 
+	reportRepo := repositories.NewReportRepository(db)
+    reportService := services.NewReportService(reportRepo)
+    reportHandler := handlers.NewReportHandler(reportService)
+
+	shareRepo := repositories.NewPostShareRepository(db)
+	shareService := services.NewPostShareService(shareRepo)
+	shareHandler := handlers.NewPostShareHandler(shareService)
+
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
 
 	r := gin.Default()
@@ -59,13 +67,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler,)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler,) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler,) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -104,6 +112,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			users.GET("/:username/posts", authMiddleware.OptionalAuth(), postHandler.GetUserPosts)
 			users.GET("/:username/likes", authMiddleware.OptionalAuth(), postHandler.GetUserLikedPosts)
 			users.GET("/:username/saves", authMiddleware.OptionalAuth(), postHandler.GetUserSavedPosts)
+			users.GET("/search", authMiddleware.RequiredAuth(), userHandler.SearchUsers)
 		}
 
 		followRequests := v1.Group("/follow-requests").Use(authMiddleware.RequiredAuth())
@@ -152,6 +161,12 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			posts.GET("/:id/comments", authMiddleware.OptionalAuth(), postHandler.GetPostComments)
 			posts.POST("/:id/save", authMiddleware.RequiredAuth(), postHandler.ToggleSave)
 			posts.POST("/:id/like", authMiddleware.RequiredAuth(), postHandler.ToggleLike)
+			
+			shares := posts.Group("/shares")
+			{
+				shares.POST("", authMiddleware.RequiredAuth(), shareHandler.SharePost)
+				shares.GET("/recent-recipients", authMiddleware.RequiredAuth(), shareHandler.GetRecentRecipients)
+			}
 		}
 
 		comments := v1.Group("/comments")
@@ -162,5 +177,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		}
 
 		v1.GET("/leaderboard", handlers.GetLeaderboard)
+
+		v1.POST("/report", authMiddleware.RequiredAuth(), reportHandler.CreateReport)
 	}
 }
