@@ -43,25 +43,29 @@ func main() {
 	bookshelfRepo := repositories.NewBookshelfRepository(db)
 	bookshelfService := services.NewBookshelfService(db, bookshelfRepo, userRepo)
 	bookshelfHandler := handlers.NewBookshelfHandler(bookshelfService)
+	
+	commentRepo := repositories.NewCommentRepository(db)
+	commentService := services.NewCommentService(commentRepo, postRepo)
+	commentHandler := handlers.NewCommentHandler(commentService)
 
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, // frontend kamu
+		AllowOrigins:     []string{"http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler,)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler,) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -130,8 +134,6 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			notes.DELETE("/:id", bookshelfHandler.DeleteNote)
 		}
 
-
-
 		categories := v1.Group("/categories")
 		{
 			categories.GET("/user", handlers.GetUserCategories)
@@ -146,7 +148,17 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		posts := v1.Group("/posts")
 		{
 			posts.POST("", authMiddleware.RequiredAuth(), postHandler.CreatePost)
-			posts.GET("",authMiddleware.OptionalAuth(), postHandler.GetPosts)
+			posts.GET("", authMiddleware.OptionalAuth(), postHandler.GetPosts)
+			posts.GET("/:id/comments", authMiddleware.OptionalAuth(), postHandler.GetPostComments)
+			posts.POST("/:id/save", authMiddleware.RequiredAuth(), postHandler.ToggleSave)
+			posts.POST("/:id/like", authMiddleware.RequiredAuth(), postHandler.ToggleLike)
+		}
+
+		comments := v1.Group("/comments")
+		{
+			comments.POST("/", authMiddleware.RequiredAuth(), commentHandler.CreateComment)
+			comments.POST("/:id/like", authMiddleware.RequiredAuth(), commentHandler.ToggleLike)
+			comments.DELETE("/:id",  authMiddleware.RequiredAuth(), commentHandler.DeleteComment)
 		}
 
 		v1.GET("/leaderboard", handlers.GetLeaderboard)

@@ -7,17 +7,21 @@ import (
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/internal/utils"
+	"backend-bebu/internal/mapper"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type PostService interface {
-	GetPosts() ([]interface{}, error)
+	GetPosts(userID uint) ([]interface{}, error)
 	CreatePost(req dto.CreatePostRequest) error
 	GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
 	GetUserLikedPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
 	GetUserSavedPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
+	ToggleLike(postID uint, userID uint) (bool, error)
+	ToggleSave(userID uint, postID uint) (bool, error)
+	GetComments(postID uint, userID uint) ([]dto.CommentResponse, error)
 }
 
 
@@ -39,24 +43,24 @@ func NewPostService(postRepo repositories.PostRepository, userRepo repositories.
 }
 
 // GetPosts (Fungsi lama Anda, sedikit disederhanakan)
-func (s *postService) GetPosts() ([]interface{}, error) {
-	posts, err := s.postRepo.GetAllPosts()
-	if err != nil {
-		return nil, err
-	}
+func (s *postService) GetPosts(userID uint) ([]interface{}, error) {
+    // Berikan userID ke repository
 
-	// Di sini Anda bisa memindahkan logika mapping ke paket 'mapper' jika ada
-	var result []interface{}
-	for _, p := range posts {
-		// Asumsi mapper.To... mengembalikan DTO yang sesuai
-		if p.PostType == "review" {
-			// result = append(result, mapper.ToReviewPostResponse(p))
-		} else if p.PostType == "analysis" {
-			// result = append(result, mapper.ToAnalysisPostResponse(p))
-		}
-	}
+    posts, err := s.postRepo.GetAllPosts(userID)
+    if err != nil {
+        return nil, err
+    }
 
-	return result, nil
+    var result []interface{}
+    for _, p := range posts {
+        if p.PostType == "review" {
+            result = append(result, mapper.ToReviewPostResponse(p, userID))
+        } else if p.PostType == "analysis" {
+            result = append(result, mapper.ToAnalysisPostResponse(p, userID))
+        }
+    }
+
+    return result, nil
 }
 
 func (s *postService) CreatePost(req dto.CreatePostRequest) error {
@@ -293,4 +297,33 @@ func (s *postService) mapPostsToSummaryDTOs(posts []models.Post) []dto.PostSumma
 		dtos = append(dtos, postDTO)
 	}
 	return dtos
+}
+
+func (s *postService) ToggleLike(postID uint, userID uint) (bool, error) {
+    return s.postRepo.ToggleLike(postID, userID)
+}
+
+func (s *postService) ToggleSave(userID uint, postID uint) (bool, error) {
+    isSaved, err := s.postRepo.ToggleSave(userID, postID)
+    if err != nil {
+        return false, err
+    }
+
+    increment := 1
+    if !isSaved {
+        increment = -1
+    }
+    
+    _ = s.postRepo.UpdateSaveCount(postID, increment)
+
+    return isSaved, nil
+}
+
+func (s *postService) GetComments(postID uint, userID uint) ([]dto.CommentResponse, error) {
+    comments, err := s.postRepo.GetCommentsByPostID(postID, userID)
+    if err != nil {
+        return nil, err
+    }
+
+    return mapper.ToCommentResponseList(comments, userID), nil
 }

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"backend-bebu/internal/dto" // Menggunakan alias dto
+	"backend-bebu/internal/dto"
 	"backend-bebu/internal/services"
-	"backend-bebu/pkg/utils" // Asumsi utils ada di pkg
+	"backend-bebu/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,19 +30,22 @@ func NewPostHandler(service services.PostService) *PostHandler {
 	return &PostHandler{service: service}
 }
 
-
-// --- 3. Method yang Sudah Ada (GetPosts, CreatePost) ---
-
-// GetPosts tidak perlu diubah secara signifikan.
 func (h *PostHandler) GetPosts(c *gin.Context) {
-	data, err := h.service.GetPosts()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to fetch posts",
-		})
-		return
-	}
-	c.JSON(http.StatusOK, data)
+    // 1. Cek apakah ada userID dari middleware
+    var currentUserID uint
+    val, exists := c.Get("userID")
+    if exists {
+        currentUserID = val.(uint)
+    }
+	
+    // 2. Panggil service dengan userID (akan 0 jika tidak login)
+    data, err := h.service.GetPosts(currentUserID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
+        return
+    }
+
+    c.JSON(http.StatusOK, data)
 }
 
 // CreatePost tidak perlu diubah secara signifikan.
@@ -187,4 +190,68 @@ func (h *PostHandler) GetUserSavedPosts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": posts, "meta": pagination})
+}
+
+func (h *PostHandler) ToggleLike(c *gin.Context) {
+    postID, _ := strconv.Atoi(c.Param("id"))
+    uid, _ := c.Get("userID")
+
+    isLiked, err := h.service.ToggleLike(uint(postID), uid.(uint))
+    if err != nil {
+        c.JSON(500, gin.H{"error": "Gagal update like"})
+        return
+    }
+    c.JSON(200, gin.H{"is_liked": isLiked})
+}
+
+func (h *PostHandler) ToggleSave(c *gin.Context) {
+    // 1. Ambil UserID dari Middleware
+    val, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+        return
+    }
+    userID := val.(uint)
+
+    // 2. Ambil PostID dari URL (/posts/:id/save)
+    postIDStr := c.Param("id")
+    postID, err := strconv.ParseUint(postIDStr, 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+        return
+    }
+
+    // 3. Eksekusi Toggle
+    isSaved, err := h.service.ToggleSave(userID, uint(postID))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    status := "saved"
+    if !isSaved {
+        status = "unsaved"
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message":  "Post " + status + " successfully",
+        "is_saved": isSaved,
+    })
+}
+
+func (h *PostHandler) GetPostComments(c *gin.Context) {
+    postID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+    userID := c.MustGet("userID").(uint)
+
+    // Service sekarang memberikan data yang sudah "siap saji" (DTO)
+    comments, err := h.service.GetComments(uint(postID), userID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "status": "success",
+        "data":   comments,
+    })
 }

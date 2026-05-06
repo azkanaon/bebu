@@ -31,6 +31,11 @@ type Post struct {
 	Likes      []PostLike     `gorm:"foreignKey:PostID"`
 	Saves      []PostSave     `gorm:"foreignKey:PostID"`
 	Shares     []PostShare    `gorm:"foreignKey:PostID"`
+
+	// Virtual Column
+    TotalLikes int  `gorm:"-" json:"likes"`
+    IsLiked   bool           `gorm:"->;column:is_liked" json:"is_liked"`
+	IsSaved    bool `gorm:"->;column:is_saved" json:"is_saved"`
 }
 
 type PostCategory struct {
