@@ -11,6 +11,7 @@ import {
 	deleteCommentAPI,
 } from "@/lib/api";
 import { CommentType, CreateCommentRequest } from "@/types/post";
+import ReportModal from "./ReportModal";
 
 type Props = {
 	postId: number;
@@ -185,6 +186,11 @@ export default function CommentModal({
 		}
 	};
 
+	const [reportTarget, setReportTarget] = useState<{
+		id: number;
+		type: "post" | "comment";
+	} | null>(null);
+
 	const modalContent = (
 		<div className="fixed inset-0 z-[999] flex items-center justify-center p-0 sm:p-4">
 			{/* Backdrop dengan Blur */}
@@ -308,12 +314,22 @@ export default function CommentModal({
 																	Hapus
 																</button>
 															) : (
-																<button className="w-full px-4 py-2 text-left text-[11px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors">
+																<button
+																	onClick={() =>
+																		setReportTarget(
+																			{
+																				id: c.id,
+																				type: "comment",
+																			},
+																		)
+																	}
+																	className="w-full px-4 py-2 text-left text-[11px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
+																>
 																	<Flag
 																		size={
 																			12
 																		}
-																	/>{" "}
+																	/>
 																	Laporkan
 																</button>
 															)}
@@ -450,9 +466,11 @@ export default function CommentModal({
 																				) : (
 																					<button
 																						onClick={() =>
-																							console.log(
-																								"Melaporkan balasan:",
-																								reply.id,
+																							setReportTarget(
+																								{
+																									id: c.id,
+																									type: "comment",
+																								},
 																							)
 																						}
 																						className="w-full px-3 py-1.5 text-left text-[10px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
@@ -582,6 +600,13 @@ export default function CommentModal({
 					</div>
 				</div>
 			</motion.div>
+
+			<ReportModal
+				isOpen={!!reportTarget}
+				onClose={() => setReportTarget(null)}
+				entityId={reportTarget?.id || 0}
+				entityType={reportTarget?.type || "comment"}
+			/>
 		</div>
 	);
 

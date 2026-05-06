@@ -26,15 +26,16 @@ type PostSave struct {
 }
 
 type PostShare struct {
-	PostID         uint           `gorm:"column:post_id;primaryKey"`
-	UserSenderID   uint           `gorm:"column:user_sender_id;primaryKey"`
-	UserReceiverID uint           `gorm:"column:user_receiver_id;primaryKey"`
-	CreatedAt      time.Time      `gorm:"column:created_at;autoCreateTime"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index"`
+    PostShareID    uint           `gorm:"column:post_share_id;primaryKey;autoIncrement"`
+    PostID         uint           `gorm:"column:post_id"`
+    UserSenderID   uint           `gorm:"column:user_sender_id"`
+    UserReceiverID uint           `gorm:"column:user_receiver_id"`
+    CreatedAt      time.Time      `gorm:"column:created_at;autoCreateTime"`
+    DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index"`
 
-	Post         Post `gorm:"foreignKey:PostID;references:PostID"`
-	UserSender   User `gorm:"foreignKey:UserSenderID;references:UserID"`
-	UserReceiver User `gorm:"foreignKey:UserReceiverID;references:UserID"`
+    Post         Post `gorm:"foreignKey:PostID;references:PostID"`
+    UserSender   User `gorm:"foreignKey:UserSenderID;references:UserID"`
+    UserReceiver User `gorm:"foreignKey:UserReceiverID;references:UserID"`
 }
 
 type PostComment struct {

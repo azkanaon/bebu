@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { useState } from "react";
 import CommentModal from "./CommentModal";
+import ShareModal from "./ShareModal";
 
 type Props = {
 	post: AnalysisPostType;
@@ -105,6 +106,13 @@ export default function AnalysisPost({ post }: Props) {
 		}
 	};
 
+	const [isShareOpen, setIsShareOpen] = useState(false);
+	const [shareCount, setShareCount] = useState(post.shares);
+
+	const handleShareSuccess = (count: number) => {
+		setShareCount((prev) => prev + count);
+	};
+
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: 10 }}
@@ -157,7 +165,7 @@ export default function AnalysisPost({ post }: Props) {
 					</div>
 				</div>
 
-				<PostMenu />
+				<PostMenu postId={post.id} />
 			</div>
 
 			{/* CONTENT */}
@@ -214,10 +222,11 @@ export default function AnalysisPost({ post }: Props) {
 
 					<motion.button
 						whileTap={{ scale: 0.9 }}
+						onClick={() => setIsShareOpen(true)}
 						className="flex items-center gap-1 hover:text-purple-400 transition"
 					>
 						<Share2 size={18} />
-						<span>{post.shares}</span>
+						<span>{shareCount}</span>
 					</motion.button>
 				</div>
 
@@ -298,6 +307,13 @@ export default function AnalysisPost({ post }: Props) {
 					/>
 				)}
 			</AnimatePresence>
+
+			<ShareModal
+				isOpen={isShareOpen}
+				onClose={() => setIsShareOpen(false)}
+				postId={post.id}
+				onShareSuccess={handleShareSuccess}
+			/>
 		</motion.div>
 	);
 }

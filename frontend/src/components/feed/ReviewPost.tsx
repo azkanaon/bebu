@@ -7,6 +7,7 @@ import PostMenu from "./PostMenu";
 import { toggleLikeAPI, toggleSaveAPI, createCommentAPI } from "@/lib/api";
 import { useState } from "react";
 import CommentModal from "./CommentModal";
+import ShareModal from "./ShareModal";
 
 type Props = {
 	post: ReviewPostType;
@@ -14,19 +15,19 @@ type Props = {
 
 export default function ReviewPost({ post }: Props) {
 	const [isLoading, setIsLoading] = useState(false);
-	
+
 	const [likesCount, setLikesCount] = useState(post.likes);
 	const [isLiked, setIsLiked] = useState(post.is_liked);
-	
+
 	const handleLike = async () => {
 		if (isLoading) return;
-		
+
 		const previousLikes = likesCount;
 		const previousStatus = isLiked;
-		
+
 		setIsLiked(!previousStatus);
 		setLikesCount(previousStatus ? previousLikes - 1 : previousLikes + 1);
-		
+
 		setIsLoading(true);
 		try {
 			// 3. Tembak API (Gunakan Number(post.id) jika id di TS adalah string)
@@ -43,28 +44,28 @@ export default function ReviewPost({ post }: Props) {
 
 	const [isSaved, setIsSaved] = useState(post.is_saved);
 	const [isSaveLoading, setIsSaveLoading] = useState(false);
-	
+
 	const handleSave = async () => {
 		if (isSaveLoading) return;
-		
+
 		const previousStatus = isSaved;
-	
-			// 1. Optimistic Update (Ubah UI dulu)
-			setIsSaved(!previousStatus);
-	
-			setIsSaveLoading(true);
-			try {
-				// 2. Tembak API
-				// Asumsi toggleSaveAPI sudah dibuat di api.ts
-				await toggleSaveAPI(Number(post.id));
-			} catch (error) {
-				// 3. Rollback jika gagal
-				setIsSaved(previousStatus);
-				console.error("Save failed:", error);
-			} finally {
-				setIsSaveLoading(false);
-			}
-		};
+
+		// 1. Optimistic Update (Ubah UI dulu)
+		setIsSaved(!previousStatus);
+
+		setIsSaveLoading(true);
+		try {
+			// 2. Tembak API
+			// Asumsi toggleSaveAPI sudah dibuat di api.ts
+			await toggleSaveAPI(Number(post.id));
+		} catch (error) {
+			// 3. Rollback jika gagal
+			setIsSaved(previousStatus);
+			console.error("Save failed:", error);
+		} finally {
+			setIsSaveLoading(false);
+		}
+	};
 
 	const [showComments, setShowComments] = useState(false);
 	const [commentText, setCommentText] = useState("");
@@ -75,31 +76,38 @@ export default function ReviewPost({ post }: Props) {
 	);
 
 	const handlePostComment = async (e: React.FormEvent) => {
-			e.preventDefault();
-			if (!commentText.trim() || isSubmitting) return;
-	
-			setIsSubmitting(true);
-			try {
-				const payload = {
-					post_id: post.id,
-					parent_comment_id: null,
-					comment: commentText,
-				};
-	
-				const response = await createCommentAPI(payload);
-				const newComment = response.data;
-	
-				// ✅ UPDATE STATE LOKAL (BUKAN PROPS)
-				setLocalCommentsCount((prev) => prev + 1);
-				setLocalCommentList((prev) => [newComment, ...prev].slice(0, 2));
-	
-				setCommentText("");
-			} catch (error) {
-				console.error("Gagal kirim komentar:", error);
-			} finally {
-				setIsSubmitting(false);
-			}
-		};
+		e.preventDefault();
+		if (!commentText.trim() || isSubmitting) return;
+
+		setIsSubmitting(true);
+		try {
+			const payload = {
+				post_id: post.id,
+				parent_comment_id: null,
+				comment: commentText,
+			};
+
+			const response = await createCommentAPI(payload);
+			const newComment = response.data;
+
+			// ✅ UPDATE STATE LOKAL (BUKAN PROPS)
+			setLocalCommentsCount((prev) => prev + 1);
+			setLocalCommentList((prev) => [newComment, ...prev].slice(0, 2));
+
+			setCommentText("");
+		} catch (error) {
+			console.error("Gagal kirim komentar:", error);
+		} finally {
+			setIsSubmitting(false);
+		}
+	};
+
+	const [isShareOpen, setIsShareOpen] = useState(false);
+	const [shareCount, setShareCount] = useState(post.shares);
+
+	const handleShareSuccess = (count: number) => {
+		setShareCount((prev) => prev + count);
+	};
 
 	return (
 		<motion.div
@@ -134,7 +142,7 @@ export default function ReviewPost({ post }: Props) {
 					</div>
 				</div>
 
-				<PostMenu />
+				<PostMenu postId={post.id} />
 			</div>
 
 			{/* Content */}
@@ -239,10 +247,11 @@ export default function ReviewPost({ post }: Props) {
 
 					<motion.button
 						whileTap={{ scale: 0.9 }}
+						onClick={() => setIsShareOpen(true)}
 						className="flex items-center gap-1 hover:text-purple-400 transition"
 					>
 						<Share2 size={18} />
-						<span>{post.shares}</span>
+						<span>{shareCount}</span>
 					</motion.button>
 				</div>
 
@@ -324,6 +333,13 @@ export default function ReviewPost({ post }: Props) {
 					/>
 				)}
 			</AnimatePresence>
+
+			<ShareModal
+				isOpen={isShareOpen}
+				onClose={() => setIsShareOpen(false)}
+				postId={post.id}
+				onShareSuccess={handleShareSuccess}
+			/>
 		</motion.div>
 	);
 }

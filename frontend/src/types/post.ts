@@ -1,5 +1,3 @@
-// src/types/post.ts
-
 export interface CommentType {
   id: number;
   user_id: number;
@@ -74,3 +72,26 @@ export type CreatePostPayload = {
 	categories: string[];
 	file?: File | null;
 };
+
+export interface ShareRequest {
+  post_id: number;
+  receiver_ids: number[];
+  message?: string; // Optional pesan tambahan
+}
+
+export interface ShareResponse {
+  message: string;
+  count: number;
+}
+
+export interface UserSearchResponse {
+  id: number;
+  username: string;
+  display_name: string;
+  avatar: string;
+}
+
+export interface GenericResponse<T> {
+  status: string;
+  data: T;
+}

@@ -9,7 +9,6 @@ import (
 	"backend-bebu/internal/services"
 
 	"strconv"
-	"fmt"
 )
 
 type CategoryResponse struct {
@@ -141,8 +140,6 @@ func UnfavoriteCategory(c *gin.Context) {
 
 func (h *CategoryHandler) Search(c *gin.Context) {
 	query := c.Query("search")
-
-	fmt.Println("🔥 SEARCH HIT:", query)
 	
 	data, err := h.service.Search(query)
 	if err != nil {

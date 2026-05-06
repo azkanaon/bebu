@@ -27,6 +27,7 @@ type UserService interface {
 	BlockUser(sourceUserID uint, targetUsername string) error
 	UnblockUser(sourceUserID uint, targetUsername string) error
 	GetMyProfile(id uint) (*models.User, error)
+	SearchUsers(query string) ([]dto.UserSearchResponse, error)
 }
 
 type userService struct {
@@ -592,4 +593,32 @@ func (s *userService) GetMyProfile(id uint) (*models.User, error) {
     // Kamu bisa mengosongkan password sebelum dikirim ke handler
     user.PasswordHash = "" 
     return user, nil
+}
+
+func (s *userService) SearchUsers(query string) ([]dto.UserSearchResponse, error) {
+    users, err := s.userRepo.SearchUsers(query, 20) // Limit 20 hasil pencarian
+    if err != nil {
+        return nil, err
+    }
+
+    var result []dto.UserSearchResponse
+    for _, u := range users {
+        avatar := ""
+        displayName := u.Username
+        
+        if u.Profile != nil {
+            avatar = u.Profile.AvatarUrl
+            if u.Profile.DisplayName != "" {
+                displayName = u.Profile.DisplayName
+            }
+        }
+
+        result = append(result, dto.UserSearchResponse{
+            ID:          u.UserID,
+            Username:    u.Username,
+            DisplayName: displayName,
+            Avatar:      avatar,
+        })
+    }
+    return result, nil
 }
