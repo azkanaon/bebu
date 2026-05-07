@@ -10,26 +10,37 @@ import {
 	toggleLikeCommentAPI,
 	deleteCommentAPI,
 } from "@/lib/api";
-import { CommentType, CreateCommentRequest } from "@/types/post";
+import {
+	CommentType,
+	CreateCommentRequest,
+	AnalysisPostType,
+	ReviewPostType,
+} from "@/types/post";
 import ReportModal from "./ReportModal";
+import AnalysisPost from "./AnalysisPost";
+import ReviewPost from "./ReviewPost";
 
 type Props = {
 	postId: number;
 	onClose: () => void;
 	onCommentAdded?: () => void;
+	post: AnalysisPostType | ReviewPostType;
+	type: "analysis" | "review";
 };
 
 export default function CommentModal({
 	postId,
 	onClose,
 	onCommentAdded,
+	post,
+	type,
 }: Props) {
 	const authStorage = localStorage.getItem("bebu-auth-storage");
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
 
 	const user = parsedStorage?.state?.user?.data;
 	const currentUserId = user?.user_public_id;
-	
+
 	const [comments, setComments] = useState<CommentType[]>([]);
 	const [loading, setLoading] = useState(true);
 
@@ -209,8 +220,8 @@ export default function CommentModal({
 				exit={{ y: "100%", opacity: 0 }}
 				transition={{ type: "spring", damping: 25, stiffness: 200 }}
 				className="
-          relative bg-gray-950 w-full max-w-lg 
-          h-full sm:h-[80vh] 
+          relative bg-gray-950 w-full max-w-2xl
+          h-full sm:h-[90vh] 
           rounded-t-[2rem] sm:rounded-2xl 
           border-t sm:border border-gray-800 
           flex flex-col shadow-2xl overflow-hidden
@@ -235,326 +246,339 @@ export default function CommentModal({
 				</div>
 
 				{/* Scrollable Comment List */}
-				<div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
-					{loading ? (
-						<div className="flex flex-col items-center justify-center h-full space-y-3">
-							<div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-							<p className="text-gray-500 text-sm animate-pulse">
-								Memuat komentar...
-							</p>
-						</div>
-					) : (comments?.length ?? 0) === 0 ? (
-						<div className="text-center py-20">
-							<div className="text-gray-700 mb-2 flex justify-center">
-								<Send size={40} className="opacity-20" />
+				<div className="flex-1 overflow-y-auto custom-scrollbar">
+					<div className="border-b border-gray-800 bg-gray-900/20">
+						{type === "analysis" ? (
+							// Pastikan AnalysisPost sudah di-import di atas
+							<AnalysisPost
+								post={post as AnalysisPostType}
+								isModalView={true}
+							/>
+						) : (
+							<ReviewPost
+								post={post as ReviewPostType}
+								isModalView={true}
+							/>
+						)}
+					</div>
+					<div className="p-5 space-y-6">
+						{loading ? (
+							<div className="flex flex-col items-center justify-center h-full space-y-3">
+								<div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+								<p className="text-gray-500 text-sm animate-pulse">
+									Memuat komentar...
+								</p>
 							</div>
-							<p className="text-gray-500 font-medium">
-								Belum ada diskusi
-							</p>
-							<p className="text-xs text-gray-600">
-								Mulai percakapan pertama Anda!
-							</p>
-						</div>
-					) : (
-						comments.map((c) => (
-							<div
-								key={c.id}
-								className="flex flex-col gap-3 group"
-							>
-								{/* KOMENTAR UTAMA */}
-								<div className="flex gap-3 items-start group/main relative">
-									<img
-										src={
-											c.avatar ||
-											"https://ui-avatars.com/api/?name=" +
-												c.username
-										}
-										alt={c.username}
-										className="w-9 h-9 rounded-full object-cover ring-1 ring-gray-800"
-									/>
-									<div className="flex-1">
-										<div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-3 group-hover:bg-gray-900 transition-colors relative">
-											<div className="flex justify-between items-center mb-1 pr-6">
-												{" "}
-												{/* Beri padding kanan agar tidak tabrakan dengan titik tiga */}
-												<p className="text-sm font-bold text-blue-400">
-													@{c.username}
-												</p>
-												{/* --- MENU ACTIONS (TITIK TIGA) --- */}
-												<div className="absolute right-3 top-3">
-													<div className="relative group/menu">
-														<button className="p-1 text-gray-500 hover:text-white transition-colors rounded-full hover:bg-gray-800">
-															{/* Menggunakan MoreVertical agar titik tiganya berdiri */}
-															<MoreVertical
-																size={16}
-															/>
-														</button>
+						) : (comments?.length ?? 0) === 0 ? (
+							<div className="text-center py-20">
+								<div className="text-gray-700 mb-2 flex justify-center">
+									<Send size={40} className="opacity-20" />
+								</div>
+								<p className="text-gray-500 font-medium">
+									Belum ada diskusi
+								</p>
+								<p className="text-xs text-gray-600">
+									Mulai percakapan pertama Anda!
+								</p>
+							</div>
+						) : (
+							comments.map((c) => (
+								<div
+									key={c.id}
+									className="flex flex-col gap-3 group"
+								>
+									{/* KOMENTAR UTAMA */}
+									<div className="flex gap-3 items-start group/main relative">
+										<img
+											src={
+												c.avatar ||
+												"https://ui-avatars.com/api/?name=" +
+													c.username
+											}
+											alt={c.username}
+											className="w-9 h-9 rounded-full object-cover ring-1 ring-gray-800"
+										/>
+										<div className="flex-1">
+											<div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-3 group-hover:bg-gray-900 transition-colors relative">
+												<div className="flex justify-between items-center mb-1 pr-6">
+													{" "}
+													{/* Beri padding kanan agar tidak tabrakan dengan titik tiga */}
+													<p className="text-sm font-bold text-blue-400">
+														@{c.username}
+													</p>
+													{/* --- MENU ACTIONS (TITIK TIGA) --- */}
+													<div className="absolute right-3 top-3">
+														<div className="relative group/menu">
+															<button className="p-1 text-gray-500 hover:text-white transition-colors rounded-full hover:bg-gray-800">
+																{/* Menggunakan MoreVertical agar titik tiganya berdiri */}
+																<MoreVertical
+																	size={16}
+																/>
+															</button>
 
-														<div className="invisible group-hover/menu:visible opacity-0 group-hover/menu:opacity-100 absolute right-0 mt-1 w-32 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl z-50 transition-all duration-200 overflow-hidden">
-															{String(
-																c.user_public_id,
-															) ===
-															String(
-																currentUserId,
-															) ? (
-																<button
-																	onClick={() =>
-																		handleDelete(
-																			c.id,
-																			postId,
-																		)
-																	}
-																	className="w-full px-4 py-2 text-left text-[11px] text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors"
-																>
-																	<Trash2
-																		size={
-																			12
-																		}
-																	/>{" "}
-																	Hapus
-																</button>
-															) : (
-																<button
-																	onClick={() =>
-																		setReportTarget(
-																			{
-																				id: c.id,
-																				type: "comment",
-																			},
-																		)
-																	}
-																	className="w-full px-4 py-2 text-left text-[11px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
-																>
-																	<Flag
-																		size={
-																			12
-																		}
-																	/>
-																	Laporkan
-																</button>
-															)}
-														</div>
-													</div>
-												</div>
-												<span className="text-[10px] text-gray-500">
-													{c.created_at}
-												</span>
-											</div>
-											<p className="text-sm text-gray-200 leading-relaxed">
-												{c.comment}
-											</p>
-										</div>
-
-										{/* Tombol Aksi */}
-										<div className="flex gap-4 mt-2 ml-2">
-											<button
-												onClick={() =>
-													handleToggleLike(c.id)
-												}
-												className={`flex items-center gap-1 text-[10px] transition-all duration-200 font-bold uppercase tracking-wider ${
-													c.isLiked
-														? "text-red-500 scale-110"
-														: "text-gray-500 hover:text-red-400"
-												}`}
-											>
-												{/* Gunakan Heart fill jika isLiked true */}
-												<Heart
-													size={12}
-													fill={
-														c.isLiked
-															? "currentColor"
-															: "none"
-													}
-													className={
-														c.isLiked
-															? "animate-pulse"
-															: ""
-													}
-												/>
-
-												{/* Tampilkan angka jika > 0, jika 0 tampilkan teks "Suka" saja */}
-												{c.likeCount > 0 ? (
-													<span>{c.likeCount}</span>
-												) : (
-													"Suka"
-												)}
-											</button>
-											<button
-												onClick={() =>
-													handleReplyClick(c)
-												}
-												className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-400 transition font-bold uppercase tracking-wider"
-											>
-												Balas
-											</button>
-										</div>
-
-										{/* --- RENDER BALASAN (REPLIES) --- */}
-										{c.replies &&
-											Array.isArray(c.replies) &&
-											c.replies.length > 0 && (
-												<div className="mt-4 ml-4 border-l border-gray-800 pl-4 space-y-4">
-													{c.replies?.map((reply) => (
-														<div
-															key={reply.id}
-															className="flex gap-2 items-start relative group/reply"
-														>
-															<img
-																src={
-																	c.avatar ||
-																	"https://ui-avatars.com/api/?name=" +
-																		c.username
-																}
-																alt={
-																	reply.username
-																}
-																className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-800"
-															/>
-															<div className="flex-1">
-																<div className="bg-gray-800/30 border border-gray-800/50 rounded-xl p-2.5 relative">
-																	<div className="flex justify-between items-center mb-0.5 pr-5">
-																		<p className="text-xs font-bold text-blue-400">
-																			@
-																			{
-																				reply.username
-																			}
-																		</p>
-
-																		{/* Titik Tiga untuk Reply */}
-																		<div className="absolute right-2 top-2.5 group/replymenu">
-																			<button className="p-0.5 text-gray-600 hover:text-white transition-colors">
-																				<MoreVertical
-																					size={
-																						14
-																					}
-																				/>
-																			</button>
-																			<div className="invisible group-hover/replymenu:visible opacity-0 group-hover/replymenu:opacity-100 absolute right-0 mt-1 w-28 bg-gray-900 border border-gray-800 rounded-lg shadow-2xl z-50 transition-all overflow-hidden">
-																				{/* 
-      PERBAIKAN 1: Logika Pencocokan User
-      Gunakan user_public_id dari balasan dan bandingkan dengan currentUserId dari storage
-    */}
-																				{currentUserId &&
-																				reply.user_public_id &&
-																				String(
-																					reply.user_public_id,
-																				) ===
-																					String(
-																						currentUserId,
-																					) ? (
-																					<button
-																						onClick={() =>
-																							/* 
-                  PERBAIKAN 2: Argumen handleDelete
-                  Pastikan mengirim ID balasan (reply.id) sebagai argumen pertama,
-                  dan postId (dari scope induk) sebagai argumen kedua.
-                */
-																							handleDelete(
-																								reply.id, // ID komentar/balasan yang akan dihapus
-																								postId, // ID postingan asal
-																							)
-																						}
-																						className="w-full px-3 py-1.5 text-left text-[10px] text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors"
-																					>
-																						<Trash2
-																							size={
-																								10
-																							}
-																						/>
-																						Hapus
-																					</button>
-																				) : (
-																					<button
-																						onClick={() =>
-																							setReportTarget(
-																								{
-																									id: c.id,
-																									type: "comment",
-																								},
-																							)
-																						}
-																						className="w-full px-3 py-1.5 text-left text-[10px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
-																					>
-																						<Flag
-																							size={
-																								10
-																							}
-																						/>
-																						Laporkan
-																					</button>
-																				)}
-																			</div>
-																		</div>
-
-																		<span className="text-[9px] text-gray-600">
-																			{
-																				reply.created_at
-																			}
-																		</span>
-																	</div>
-																	<p className="text-xs text-gray-300 leading-relaxed">
-																		{
-																			reply.comment
-																		}
-																	</p>
-																</div>
-																<div className="flex gap-3 mt-1.5 ml-1">
+															<div className="invisible group-hover/menu:visible opacity-0 group-hover/menu:opacity-100 absolute right-0 mt-1 w-32 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl z-50 transition-all duration-200 overflow-hidden">
+																{String(
+																	c.user_public_id,
+																) ===
+																String(
+																	currentUserId,
+																) ? (
 																	<button
 																		onClick={() =>
-																			handleToggleLike(
-																				reply.id,
+																			handleDelete(
+																				c.id,
+																				postId,
 																			)
 																		}
-																		className={`text-[9px] font-bold uppercase transition-all duration-200 ${
-																			reply.isLiked
-																				? "text-red-500 scale-110"
-																				: "text-gray-500 hover:text-red-400"
-																		}`}
+																		className="w-full px-4 py-2 text-left text-[11px] text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors"
 																	>
-																		{/* Tampilkan angka jika ada yang like, jika tidak tampilkan teks "Suka" */}
-																		{reply.isLiked ||
-																		reply.likeCount >
-																			0 ? (
-																			<span className="flex items-center gap-1">
-																				<Heart
-																					size={
-																						8
-																					}
-																					fill={
-																						reply.isLiked
-																							? "currentColor"
-																							: "none"
-																					}
-																				/>
+																		<Trash2
+																			size={
+																				12
+																			}
+																		/>{" "}
+																		Hapus
+																	</button>
+																) : (
+																	<button
+																		onClick={() =>
+																			setReportTarget(
 																				{
-																					reply.likeCount
-																				}
-																			</span>
-																		) : (
-																			"Suka"
-																		)}
-																	</button>
-																	<button
-																		onClick={() =>
-																			handleReplyClick(
-																				reply,
+																					id: c.id,
+																					type: "comment",
+																				},
 																			)
 																		}
-																		className="text-[9px] text-gray-500 hover:text-blue-400 font-bold uppercase transition-colors"
+																		className="w-full px-4 py-2 text-left text-[11px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
 																	>
-																		Balas
+																		<Flag
+																			size={
+																				12
+																			}
+																		/>
+																		Laporkan
 																	</button>
-																</div>
+																)}
 															</div>
 														</div>
-													))}
+													</div>
+													<span className="text-[10px] text-gray-500">
+														{c.created_at}
+													</span>
 												</div>
-											)}
+												<p className="text-sm text-gray-200 leading-relaxed">
+													{c.comment}
+												</p>
+											</div>
+
+											{/* Tombol Aksi */}
+											<div className="flex gap-4 mt-2 ml-2">
+												<button
+													onClick={() =>
+														handleToggleLike(c.id)
+													}
+													className={`flex items-center gap-1 text-[10px] transition-all duration-200 font-bold uppercase tracking-wider ${
+														c.isLiked
+															? "text-red-500 scale-110"
+															: "text-gray-500 hover:text-red-400"
+													}`}
+												>
+													{/* Gunakan Heart fill jika isLiked true */}
+													<Heart
+														size={12}
+														fill={
+															c.isLiked
+																? "currentColor"
+																: "none"
+														}
+														className={
+															c.isLiked
+																? "animate-pulse"
+																: ""
+														}
+													/>
+
+													{/* Tampilkan angka jika > 0, jika 0 tampilkan teks "Suka" saja */}
+													{c.likeCount > 0 ? (
+														<span>
+															{c.likeCount}
+														</span>
+													) : (
+														"Suka"
+													)}
+												</button>
+												<button
+													onClick={() =>
+														handleReplyClick(c)
+													}
+													className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-400 transition font-bold uppercase tracking-wider"
+												>
+													Balas
+												</button>
+											</div>
+
+											{/* --- RENDER BALASAN (REPLIES) --- */}
+											{c.replies &&
+												Array.isArray(c.replies) &&
+												c.replies.length > 0 && (
+													<div className="mt-4 ml-4 border-l border-gray-800 pl-4 space-y-4">
+														{c.replies?.map(
+															(reply) => (
+																<div
+																	key={
+																		reply.id
+																	}
+																	className="flex gap-2 items-start relative group/reply"
+																>
+																	<img
+																		src={
+																			c.avatar ||
+																			"https://ui-avatars.com/api/?name=" +
+																				c.username
+																		}
+																		alt={
+																			reply.username
+																		}
+																		className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-800"
+																	/>
+																	<div className="flex-1">
+																		<div className="bg-gray-800/30 border border-gray-800/50 rounded-xl p-2.5 relative">
+																			<div className="flex justify-between items-center mb-0.5 pr-5">
+																				<p className="text-xs font-bold text-blue-400">
+																					@
+																					{
+																						reply.username
+																					}
+																				</p>
+
+																				{/* Titik Tiga untuk Reply */}
+																				<div className="absolute right-2 top-2.5 group/replymenu">
+																					<button className="p-0.5 text-gray-600 hover:text-white transition-colors">
+																						<MoreVertical
+																							size={
+																								14
+																							}
+																						/>
+																					</button>
+																					<div className="invisible group-hover/replymenu:visible opacity-0 group-hover/replymenu:opacity-100 absolute right-0 mt-1 w-28 bg-gray-900 border border-gray-800 rounded-lg shadow-2xl z-50 transition-all overflow-hidden">
+																						{currentUserId &&
+																						reply.user_public_id &&
+																						String(
+																							reply.user_public_id,
+																						) ===
+																							String(
+																								currentUserId,
+																							) ? (
+																							<button
+																								onClick={() =>
+																									handleDelete(
+																										reply.id, // ID komentar/balasan yang akan dihapus
+																										postId, // ID postingan asal
+																									)
+																								}
+																								className="w-full px-3 py-1.5 text-left text-[10px] text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors"
+																							>
+																								<Trash2
+																									size={
+																										10
+																									}
+																								/>
+																								Hapus
+																							</button>
+																						) : (
+																							<button
+																								onClick={() =>
+																									setReportTarget(
+																										{
+																											id: c.id,
+																											type: "comment",
+																										},
+																									)
+																								}
+																								className="w-full px-3 py-1.5 text-left text-[10px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
+																							>
+																								<Flag
+																									size={
+																										10
+																									}
+																								/>
+																								Laporkan
+																							</button>
+																						)}
+																					</div>
+																				</div>
+
+																				<span className="text-[9px] text-gray-600">
+																					{
+																						reply.created_at
+																					}
+																				</span>
+																			</div>
+																			<p className="text-xs text-gray-300 leading-relaxed">
+																				{
+																					reply.comment
+																				}
+																			</p>
+																		</div>
+																		<div className="flex gap-3 mt-1.5 ml-1">
+																			<button
+																				onClick={() =>
+																					handleToggleLike(
+																						reply.id,
+																					)
+																				}
+																				className={`text-[9px] font-bold uppercase transition-all duration-200 ${
+																					reply.isLiked
+																						? "text-red-500 scale-110"
+																						: "text-gray-500 hover:text-red-400"
+																				}`}
+																			>
+																				{/* Tampilkan angka jika ada yang like, jika tidak tampilkan teks "Suka" */}
+																				{reply.isLiked ||
+																				reply.likeCount >
+																					0 ? (
+																					<span className="flex items-center gap-1">
+																						<Heart
+																							size={
+																								8
+																							}
+																							fill={
+																								reply.isLiked
+																									? "currentColor"
+																									: "none"
+																							}
+																						/>
+																						{
+																							reply.likeCount
+																						}
+																					</span>
+																				) : (
+																					"Suka"
+																				)}
+																			</button>
+																			<button
+																				onClick={() =>
+																					handleReplyClick(
+																						reply,
+																					)
+																				}
+																				className="text-[9px] text-gray-500 hover:text-blue-400 font-bold uppercase transition-colors"
+																			>
+																				Balas
+																			</button>
+																		</div>
+																	</div>
+																</div>
+															),
+														)}
+													</div>
+												)}
+										</div>
 									</div>
 								</div>
-							</div>
-						))
-					)}
+							))
+						)}
+					</div>
 				</div>
 
 				{/* Bottom Input Area */}

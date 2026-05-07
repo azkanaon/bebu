@@ -15,7 +15,6 @@ func ToReviewPostResponse(p models.Post, currentUserID uint) dto.ReviewPostRespo
 	res.CreatedAt = p.CreatedAt.Format("2006-01-02")
 	res.Book.Rating = int(p.Rating)
 
-	// USER
 	if p.User != nil && p.User.Profile != nil {
 		res.User.Username = p.User.Username
 		res.User.DisplayName = p.User.Profile.DisplayName
@@ -27,29 +26,30 @@ func ToReviewPostResponse(p models.Post, currentUserID uint) dto.ReviewPostRespo
 		res.Book.Cover = p.Book.CoverImgURL
 		res.Book.Pages = p.Book.TotalPages
 
-		// 🔥 AUTHORS (pivot model)
+		res.Book.Author = "Unknown Author"
 		if len(p.Book.BookAuthors) > 0 {
-			var authors []string
-
-			for _, ba := range p.Book.BookAuthors {
-				if ba.Author.AuthorName != "" {
-					authors = append(authors, ba.Author.AuthorName)
+            var authors []string
+            for _, ba := range p.Book.BookAuthors {
+                // ba.Author sekarang sudah terisi karena Preload di atas
+                if ba.Author.AuthorName != "" {
+                    authors = append(authors, ba.Author.AuthorName)
+                }
+            }
+            if len(authors) > 0 {
+                res.Book.Author = strings.Join(authors, ", ")
+            }
+        }
+		
+		res.Book.Genres = []string{}
+		if len(p.Book.BookGenres) > 0 {
+			for _, bg := range p.Book.BookGenres {
+				if bg.Genre.GenreID != 0 {
+					res.Book.Genres = append(res.Book.Genres, bg.Genre.GenreName)
 				}
 			}
-
-			res.Book.Author = strings.Join(authors, ", ")
 		}
 	}
 
-	res.Book.Genres = []string{}
-
-	if len(p.Book.BookGenres) > 0 {
-		for _, bg := range p.Book.BookGenres {
-			if bg.Genre.GenreID != 0 {
-				res.Book.Genres = append(res.Book.Genres, bg.Genre.GenreName)
-			}
-		}
-	}
 
 	res.IsLiked = p.IsLiked
 	res.IsSaved = p.IsSaved

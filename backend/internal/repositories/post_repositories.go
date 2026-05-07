@@ -35,21 +35,22 @@ func (r *postRepository) GetAllPosts(userID uint) ([]models.Post, error) {
 	var posts []models.Post
 
 	err := r.db.Debug().
-		// Subquery untuk cek status like
-		Select(`posts.*, 
+        Select(`posts.*, 
             (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
             (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
-			userID, userID).
-		Preload("User.Profile").
-		Preload("Book").
-		Preload("Stats").
-		Preload("Comments", func(db *gorm.DB) *gorm.DB {
-			return db.Where("post_comment_id IN (SELECT post_comment_id FROM (SELECT post_comment_id, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY created_at DESC) as rn FROM post_comments WHERE parent_comment_id IS NULL) tmp WHERE rn <= 2)")
-		}).
-		Preload("Comments.User.Profile").
-		Where("publish_status = ?", "published").
-		Order("created_at DESC").
-		Find(&posts).Error
+            userID, userID).
+        Preload("User.Profile").
+        Preload("Book").
+        Preload("Book.BookAuthors.Author"). 
+        Preload("Book.BookGenres.Genre").
+        Preload("Stats").
+        Preload("Comments", func(db *gorm.DB) *gorm.DB {
+            return db.Where("post_comment_id IN (SELECT post_comment_id FROM (SELECT post_comment_id, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY created_at DESC) as rn FROM post_comments WHERE parent_comment_id IS NULL) tmp WHERE rn <= 2)")
+        }).
+        Preload("Comments.User.Profile").
+        Where("publish_status = ?", "published").
+        Order("created_at DESC").
+        Find(&posts).Error
 
 	for i := range posts {
 		if posts[i].Stats != nil {

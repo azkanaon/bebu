@@ -1,66 +1,75 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
+import { usePostStore } from "@/stores/usePostStore";
 import { ReviewPostType } from "@/types/post";
 import { ThumbsUp, MessageCircle, Share2, Bookmark, Star } from "lucide-react";
 import PostMenu from "./PostMenu";
 import { toggleLikeAPI, toggleSaveAPI, createCommentAPI } from "@/lib/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CommentModal from "./CommentModal";
 import ShareModal from "./ShareModal";
 
 type Props = {
 	post: ReviewPostType;
+	isModalView?: boolean;
 };
 
-export default function ReviewPost({ post }: Props) {
+export default function ReviewPost({ post, isModalView = false }: Props) {
 	const [isLoading, setIsLoading] = useState(false);
 
-	const [likesCount, setLikesCount] = useState(post.likes);
-	const [isLiked, setIsLiked] = useState(post.is_liked);
+	const {
+		interactions,
+		initPost,
+		toggleLikeStore,
+		toggleSaveStore,
+		addShareCountStore,
+	} = usePostStore();
+
+	useEffect(() => {
+		initPost(post.id, {
+			likes: post.likes,
+			is_liked: post.is_liked,
+			is_saved: post.is_saved,
+			shares: post.shares,
+		});
+	}, [post.id]);
+
+	const currentData = interactions[post.id] || {
+		likes: post.likes,
+		is_liked: post.is_liked,
+		is_saved: post.is_saved,
+		shares: post.shares,
+	};
 
 	const handleLike = async () => {
 		if (isLoading) return;
 
-		const previousLikes = likesCount;
-		const previousStatus = isLiked;
-
-		setIsLiked(!previousStatus);
-		setLikesCount(previousStatus ? previousLikes - 1 : previousLikes + 1);
+		toggleLikeStore(post.id);
 
 		setIsLoading(true);
 		try {
-			// 3. Tembak API (Gunakan Number(post.id) jika id di TS adalah string)
 			await toggleLikeAPI(Number(post.id));
 		} catch (error) {
-			// 4. Jika gagal, kembalikan ke kondisi semula
-			setLikesCount(previousLikes);
-			setIsLiked(previousStatus);
+			toggleLikeStore(post.id);
 			console.error("Like failed:", error);
 		} finally {
 			setIsLoading(false);
 		}
 	};
 
-	const [isSaved, setIsSaved] = useState(post.is_saved);
 	const [isSaveLoading, setIsSaveLoading] = useState(false);
 
 	const handleSave = async () => {
 		if (isSaveLoading) return;
 
-		const previousStatus = isSaved;
-
-		// 1. Optimistic Update (Ubah UI dulu)
-		setIsSaved(!previousStatus);
+		toggleSaveStore(post.id);
 
 		setIsSaveLoading(true);
 		try {
-			// 2. Tembak API
-			// Asumsi toggleSaveAPI sudah dibuat di api.ts
 			await toggleSaveAPI(Number(post.id));
 		} catch (error) {
-			// 3. Rollback jika gagal
-			setIsSaved(previousStatus);
+			toggleSaveStore(post.id);
 			console.error("Save failed:", error);
 		} finally {
 			setIsSaveLoading(false);
@@ -103,26 +112,30 @@ export default function ReviewPost({ post }: Props) {
 	};
 
 	const [isShareOpen, setIsShareOpen] = useState(false);
-	const [shareCount, setShareCount] = useState(post.shares);
 
 	const handleShareSuccess = (count: number) => {
-		setShareCount((prev) => prev + count);
+		addShareCountStore(post.id, count);
 	};
 
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: 10 }}
 			animate={{ opacity: 1, y: 0 }}
-			whileHover={{ y: -2 }}
+			whileHover={isModalView ? {} : { y: -2 }}
 			transition={{ duration: 0.2 }}
-			className="
+			className={`
 				bg-gradient-to-b from-gray-900 to-gray-950
 				border border-gray-800
 				rounded-2xl
 				p-4
 				space-y-4
 				shadow-[0_6px_30px_rgba(0,0,0,0.4)]
-			"
+				${
+					isModalView
+						? "w-full border-none shadow-none rounded-none" // Gaya menyatu dengan modal
+						: "border border-gray-800 rounded-2xl shadow-[0_6px_30px_rgba(0,0,0,0.4)]"
+				}
+			`}
 		>
 			{/* Header */}
 			<div className="flex items-start justify-between">
@@ -223,22 +236,23 @@ export default function ReviewPost({ post }: Props) {
 						onClick={handleLike} // <-- Hubungkan di sini
 						disabled={isLoading}
 						className={`flex items-center gap-1 transition ${
-							isLiked
+							currentData.is_liked
 								? "text-blue-500"
 								: "hover:text-blue-400 text-gray-500"
 						}`}
 					>
 						<ThumbsUp
 							size={18}
-							// Beri warna isi (fill) jika di-like agar lebih jelas
-							fill={isLiked ? "currentColor" : "none"}
+							fill={
+								currentData.is_liked ? "currentColor" : "none"
+							}
 						/>
-						<span className="font-medium">{likesCount}</span>
+						<span className="font-medium">{currentData.likes}</span>
 					</motion.button>
 
 					<motion.button
 						whileTap={{ scale: 0.9 }}
-						onClick={() => setShowComments(true)}
+						onClick={() => !isModalView && setShowComments(true)}
 						className="flex items-center gap-1 hover:text-green-400 transition"
 					>
 						<MessageCircle size={18} />
@@ -251,7 +265,7 @@ export default function ReviewPost({ post }: Props) {
 						className="flex items-center gap-1 hover:text-purple-400 transition"
 					>
 						<Share2 size={18} />
-						<span>{shareCount}</span>
+						<span>{currentData.shares}</span>
 					</motion.button>
 				</div>
 
@@ -260,7 +274,7 @@ export default function ReviewPost({ post }: Props) {
 					onClick={handleSave}
 					disabled={isSaveLoading}
 					className={`transition-colors p-2 rounded-full ${
-						isSaved
+						currentData.is_saved
 							? "text-yellow-500 bg-yellow-500/10"
 							: "text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"
 					}`}
@@ -268,64 +282,76 @@ export default function ReviewPost({ post }: Props) {
 					<Bookmark
 						size={18}
 						// Efek fill (isi warna) jika di-save
-						fill={isSaved ? "currentColor" : "none"}
+						fill={currentData.is_saved ? "currentColor" : "none"}
 					/>
 				</motion.button>
 			</div>
 
-			<div className="mt-4 pt-4 border-t border-gray-800 space-y-3">
-				{post.comment_list?.map((c) => (
-					<div key={c.id} className="flex gap-2 items-start text-sm">
-						<img
-							src={
-								c.avatar ||
-								"https://ui-avatars.com/api/?name=" + c.username
-							}
-							className="w-6 h-6 rounded-full object-cover mt-0.5"
-						/>
-						<div className="flex-1">
-							<span className="font-bold text-gray-200 mr-2">
-								{c.username}
-							</span>
-							<span className="text-gray-400">{c.comment}</span>
+			{!isModalView && (
+				<div className="mt-4 pt-4 border-t border-gray-800 space-y-3">
+					{post.comment_list?.map((c) => (
+						<div
+							key={c.id}
+							className="flex gap-2 items-start text-sm"
+						>
+							<img
+								src={
+									c.avatar ||
+									"https://ui-avatars.com/api/?name=" +
+										c.username
+								}
+								className="w-6 h-6 rounded-full object-cover mt-0.5"
+							/>
+							<div className="flex-1">
+								<span className="font-bold text-gray-200 mr-2">
+									{c.username}
+								</span>
+								<span className="text-gray-400">
+									{c.comment}
+								</span>
+							</div>
 						</div>
-					</div>
-				))}
+					))}
 
-				{post.comments > 2 && (
-					<button
-						onClick={() => setShowComments(true)}
-						className="text-xs text-gray-500 hover:text-gray-400 ml-8 font-medium"
+					{post.comments > 2 && (
+						<button
+							onClick={() => setShowComments(true)}
+							className="text-xs text-gray-500 hover:text-gray-400 ml-8 font-medium"
+						>
+							Lihat semua {post.comments} komentar
+						</button>
+					)}
+
+					{/* QUICK INPUT */}
+					<form
+						onSubmit={handlePostComment}
+						className="flex items-center gap-2 mt-2"
 					>
-						Lihat semua {post.comments} komentar
-					</button>
-				)}
-
-				{/* QUICK INPUT */}
-				<form
-					onSubmit={handlePostComment}
-					className="flex items-center gap-2 mt-2"
-				>
-					<img
-						src={post.user.avatar}
-						className="w-6 h-6 rounded-full object-cover"
-					/>
-					<input
-						disabled={isSubmitting}
-						value={commentText}
-						onChange={(e) => setCommentText(e.target.value)}
-						placeholder={
-							isSubmitting ? "Mengirim..." : "Tulis komentar..."
-						}
-						className={`flex-1 bg-gray-800/50 border border-gray-700 rounded-full px-4 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 transition ${isSubmitting ? "opacity-50" : ""}`}
-					/>
-				</form>
-			</div>
+						<img
+							src={post.user.avatar}
+							className="w-6 h-6 rounded-full object-cover"
+						/>
+						<input
+							disabled={isSubmitting}
+							value={commentText}
+							onChange={(e) => setCommentText(e.target.value)}
+							placeholder={
+								isSubmitting
+									? "Mengirim..."
+									: "Tulis komentar..."
+							}
+							className={`flex-1 bg-gray-800/50 border border-gray-700 rounded-full px-4 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 transition ${isSubmitting ? "opacity-50" : ""}`}
+						/>
+					</form>
+				</div>
+			)}
 
 			<AnimatePresence>
 				{showComments && (
 					<CommentModal
 						postId={post.id}
+						post={post}
+						type="review"
 						onClose={() => setShowComments(false)}
 						onCommentAdded={() =>
 							setLocalCommentsCount((prev) => prev + 1)
