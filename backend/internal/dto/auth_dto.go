@@ -38,6 +38,7 @@ type LoginResponse struct {
 	AvatarUrl    string    `json:"avatar_url"`
 	Bio          string    `json:"bio"`
 	Gender       string    `json:"gender"`
+	Role		 string	   `json:"role"`
 }
 
 type ForgotPasswordRequest struct {

@@ -69,6 +69,7 @@ type Achievement struct {
 type UserBadge struct {
 	UserID          uint      `gorm:"column:user_id;primaryKey"`
 	BadgeID         uint      `gorm:"column:badge_id;primaryKey"`
+	DisplayOrder    *int16
 	EarnedAt        time.Time `gorm:"column:earned_at;autoCreateTime"`
 	ProgressPercent int       `gorm:"column:progress_percent;not null;default:0"`
 	CreatedAt       time.Time `gorm:"column:created_at;autoCreateTime"`

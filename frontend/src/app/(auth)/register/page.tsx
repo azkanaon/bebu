@@ -7,11 +7,11 @@ import Image from 'next/image'
 import { Eye, EyeOff, Camera, AlertCircle, X, Check } from 'lucide-react'
 
 import { getCroppedImg } from '@/lib/cropImage'
-import { useAuthActions } from '@/hooks/useAuthActions'
 import { base64ToBlob } from '@/lib/utils'
+import { useRegister } from '@/api/auth/useRegister'
 
 export default function RegisterPage() {
-  const { register, isLoading, error } = useAuthActions()
+  const { mutate: register, isPending, error } = useRegister()
 
   // States untuk visibilitas password
   const [showPass, setShowPass] = useState(false)
@@ -114,7 +114,7 @@ export default function RegisterPage() {
     }
 
     // 3. Kirim ke Hook Register
-    await register({
+    register({
       ...formData,
       avatar: avatarBlob as Blob, // Kirim biner ke service
     })
@@ -136,7 +136,9 @@ export default function RegisterPage() {
       </div>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
-        {error && <div className="text-red-500 text-xs mb-4">{error}</div>}
+        {error && (
+          <div className="text-red-500 text-xs mb-4">{error.message}</div>
+        )}
         {/* Profile Picture Upload */}
         <div className="flex flex-col items-center gap-4 mb-6">
           <div className="relative group">
@@ -163,14 +165,14 @@ export default function RegisterPage() {
 
           {/* Modal Cropping Image */}
           {isModalOpen && imageToCrop && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-              <div className="relative w-full max-w-[500px] rounded-2xl bg-auth-form p-6 shadow-2xl ring-1 ring-white/10">
+            <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+              <div className="relative w-full max-w-125 rounded-2xl bg-auth-form p-6 shadow-2xl ring-1 ring-white/10">
                 <h3 className="mb-4 text-center font-bold text-white">
                   Adjust Profile Picture
                 </h3>
 
                 {/* Area Cropper */}
-                <div className="relative h-[350px] w-full overflow-hidden rounded-xl bg-black">
+                <div className="relative h-87.5 w-full overflow-hidden rounded-xl bg-black">
                   <Cropper
                     image={imageToCrop}
                     crop={crop}
@@ -346,7 +348,7 @@ export default function RegisterPage() {
           disabled={!!passError || !!confirmError}
           className="h-12 w-full rounded-xl bg-my text-sm font-semibold text-font-button transition-all cursor-pointer hover:bg-ym hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isLoading ? 'Creating Account...' : 'Create Account'}
+          {isPending ? 'Creating Account...' : 'Create Account'}
         </button>
 
         <div className="mt-6 text-center text-sm text-gray-400">

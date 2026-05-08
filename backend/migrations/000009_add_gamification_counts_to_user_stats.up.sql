@@ -1,0 +1,3 @@
+ALTER TABLE user_stats
+ADD COLUMN total_badges INT NOT NULL DEFAULT 0,
+ADD COLUMN total_achievements INT NOT NULL DEFAULT 0;

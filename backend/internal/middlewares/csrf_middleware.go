@@ -3,6 +3,7 @@ package middlewares
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 )
@@ -35,8 +36,16 @@ func CSRFMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// 3. Bandingkan keduanya
-		if cookieToken != headerToken {
+		// --- TAMBAHKAN LOGIKA INI ---
+		// Lakukan unescape manual pada header agar sinkron dengan cookie
+		decodedHeaderToken, err := url.QueryUnescape(headerToken)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid CSRF header encoding"})
+			return
+		}
+
+		// 3. Bandingkan (Gunakan decodedHeaderToken)
+		if cookieToken != decodedHeaderToken {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "CSRF token mismatch"})
 			return
 		}

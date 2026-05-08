@@ -115,7 +115,9 @@ export default function Badges() {
           >
             <div className="h-12 mb-2 bg-white/10 rounded-full" />
             <p className="text-sm text-white">{item.title}</p>
-            <p className="text-xs text-gray-400 mt-1">{item.description}</p>
+            <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+              {item.description}
+            </p>
           </div>
         ))}
       </div>

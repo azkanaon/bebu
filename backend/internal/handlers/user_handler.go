@@ -114,7 +114,7 @@ func (h *UserHandler) FollowUser(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow user"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) 
 		return
 	}
 

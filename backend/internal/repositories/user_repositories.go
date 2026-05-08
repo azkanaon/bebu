@@ -27,23 +27,21 @@ type UserRepository interface {
 	// user profile
 	FindUserByPublicID(publicID uuid.UUID) (*models.User, error)
 	FindByUsername(username string) (*models.User, error)
-	GetFollowerCount(userID uint) (int64, error)
-	GetFollowingCount(userID uint) (int64, error)
 	IsFollowing(viewerID, targetID uint) (bool, error)
 	IsBlocked(viewerID, targetID uint) (bool, error)
-	FollowUser(sourceUserID, targetUserID uint, status string) (string, error)
-	UnfollowUser(followerID, followingID uint) error
+	FollowUser(db *gorm.DB, sourceUserID, targetUserID uint, status string) (string, bool, error)
+	UnfollowUser(db *gorm.DB, followerID, followingID uint) error
 	UpdateProfile(userID uint, updates map[string]interface{}) error
 	UpdateSettings(userID uint, updates map[string]interface{}) error
 	UpdateSocialLinks(userID uint, links []models.UserSocialLink) error
 	WithTx(tx *gorm.DB) UserRepository
 	GetFollowStatus(sourceUserID, targetUserID uint) (string, error)
 	GetPendingFollowRequests(userID uint) ([]models.UserFollow, error)
-	UpdateFollowStatus(sourceUserID, targetUserID uint, newStatus string) error
+	UpdateFollowStatus(db *gorm.DB, sourceUserID, targetUserID uint, newStatus string) error
 	DeleteFollowRequest(sourceUserID, targetUserID uint) error
-	BlockUser(blockingUserID, blockedUserID uint) error
+	BlockUser(db *gorm.DB, blockingUserID, blockedUserID uint) error
 	UnblockUser(blockingUserID, blockedUserID uint) error
-	UpdateUserStat(userID uint, columnName string, amount int) error
+	UpdateUserStat(db *gorm.DB, userID uint, columnName string, amount int) error
     GetUserStats(userID uint) (*models.UserStat, error)
 	SearchUsers(query string, limit int) ([]models.User, error)
 
@@ -169,8 +167,13 @@ func (r *userRepository) FindByUsername(username string) (*models.User, error) {
 		Preload("Profile").
 		Preload("Settings").
 		Preload("SocialLinks.Platform"). // Preload social links dan platform-nya
-		Preload("Badges").               // Preload badges yg dimiliki user
-		Preload("UserAchievements.Achievement").
+		Preload("FavoriteUserBadges", "display_order IS NOT NULL", func(db *gorm.DB) *gorm.DB {
+            return db.Order("user_badges.display_order ASC").Limit(4).Preload("Badge")
+        }).
+        // Preload Favorite Achievements melalui UserAchievement
+        Preload("FavoriteUserAchievements", "display_order IS NOT NULL", func(db *gorm.DB) *gorm.DB {
+            return db.Order("user_achievements.display_order ASC").Limit(4).Preload("Achievement")
+        }).
 		Joins("JOIN user_profiles ON users.user_id = user_profiles.user_id"). // pastikan profile ada
 		Where("users.username = ?", username).
 		First(&user).Error
@@ -179,23 +182,6 @@ func (r *userRepository) FindByUsername(username string) (*models.User, error) {
 		return nil, err // GORM akan return gorm.ErrRecordNotFound jika tidak ada
 	}
 	return &user, nil
-}
-
-func (r *userRepository) GetFollowerCount(userID uint) (int64, error) {
-	stats, err := r.GetUserStats(userID)
-	if err != nil {
-		return 0, err
-	}
-	return int64(stats.TotalFollowers), nil
-}
-
-// GetFollowingCount sekarang membaca dari tabel user_stats
-func (r *userRepository) GetFollowingCount(userID uint) (int64, error) {
-	stats, err := r.GetUserStats(userID)
-	if err != nil {
-		return 0, err
-	}
-	return int64(stats.TotalFollowing), nil
 }
 
 // IsFollowing memeriksa apakah viewerID mengikuti targetID
@@ -214,50 +200,47 @@ func (r *userRepository) FindUserByPublicID(publicID uuid.UUID) (*models.User, e
 }
 
 // FollowUser membuat entri baru di tabel user_follows.
-func (r *userRepository) FollowUser(sourceUserID, targetUserID uint, status string) (string, error) {
+func (r *userRepository) FollowUser(db *gorm.DB, sourceUserID, targetUserID uint, status string) (string, bool, error) {
+	// 1. Cek apakah sudah ada di database
+	var existing models.UserFollow
+	err := db.Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).First(&existing).Error
+	
+	if err == nil {
+		// Jika tidak error, artinya data sudah ada (sudah follow sebelumnya)
+		return "", false, errors.New("you already follow this user")
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		// Jika error karena database down/masalah lain
+		return "", false, err
+	}
+
+	// 2. Jika tidak ada, lakukan Insert
 	follow := models.UserFollow{
 		UserFollowingID: sourceUserID,
 		UserFollowedID:  targetUserID,
-		FollowingStatus: status, // Gunakan status yang di-passing dari service
+		FollowingStatus: status,
 	}
 
-	// Kita gunakan OnConflict untuk menangani kasus re-follow atau re-request.
-	// Jika sudah ada (misal: sudah 'pending' atau 'accepted'), tidak akan melakukan apa-apa.
-	// Jika belum ada, akan INSERT.
-	result := r.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "user_following_id"}, {Name: "user_followed_id"}},
-		DoNothing: true,
-	}).Create(&follow)
-
-	if result.Error != nil {
-		return "", result.Error
+	if err := db.Create(&follow).Error; err != nil {
+		return "", false, err
 	}
-    
-    // Jika tidak ada baris yang terpengaruh (karena konflik), artinya relasi sudah ada.
-    // Kita perlu mengambil status yang sudah ada tersebut.
-    if result.RowsAffected == 0 {
-        var existingFollow models.UserFollow
-        r.db.First(&existingFollow, "user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID)
-        return existingFollow.FollowingStatus, nil
-    }
 
-	// Jika berhasil INSERT, kembalikan status yang baru saja dimasukkan.
-	return status, nil
+	return status, true, nil // true = data baru
 }
 
 // UnfollowUser menghapus entri dari tabel user_follows.
-func (r *userRepository) UnfollowUser(sourceUserID, targetUserID uint) error {
-	follow := models.UserFollow{
-		UserFollowingID: sourceUserID,
-		UserFollowedID:  targetUserID,
-	}
-	result := r.db.Delete(&follow)
+func (r *userRepository) UnfollowUser(db *gorm.DB, sourceUserID, targetUserID uint) error {
+	result := db.Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).Delete(&models.UserFollow{})
+	
 	if result.Error != nil {
 		return result.Error
 	}
+	
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
+	
 	return nil
 }
 
@@ -369,7 +352,7 @@ func (r *userRepository) GetPendingFollowRequests(userID uint) ([]models.UserFol
 }
 
 // UpdateFollowStatus mengubah status sebuah relasi follow.
-func (r *userRepository) UpdateFollowStatus(sourceUserID, targetUserID uint, newStatus string) error {
+func (r *userRepository) UpdateFollowStatus(db *gorm.DB, sourceUserID, targetUserID uint, newStatus string) error {
 	result := r.db.Model(&models.UserFollow{}).
 		Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).
 		Update("following_status", newStatus)
@@ -401,14 +384,14 @@ func (r *userRepository) DeleteFollowRequest(sourceUserID, targetUserID uint) er
 }
 
 // BlockUser membuat entri baru di tabel user_blocks.
-func (r *userRepository) BlockUser(blockingUserID, blockedUserID uint) error {
+func (r *userRepository) BlockUser(db *gorm.DB, blockingUserID, blockedUserID uint) error {
 	block := models.UserBlock{
-		UserBlockingID: blockingUserID, // Yang memblokir
-		UserBlockedID:  blockedUserID,  // Yang diblokir
+		UserBlockingID: blockingUserID,
+		UserBlockedID:  blockedUserID,
 	}
 
-	// Gunakan OnConflict agar tidak error jika mencoba memblokir user yang sama dua kali.
-	result := r.db.Clauses(clause.OnConflict{
+	// Gunakan db yang dipassing (yang sudah terikat transaksi)
+	result := db.Clauses(clause.OnConflict{
 		DoNothing: true,
 	}).Create(&block)
 
@@ -442,18 +425,15 @@ func (r *userRepository) IsBlocked(blockingUserID, blockedUserID uint) (bool, er
 }
 
 // amount bisa positif (untuk increment) atau negatif (untuk decrement).
-func (r *userRepository) UpdateUserStat(userID uint, columnName string, amount int) error {
-	// Kita gunakan GORM's Clauses(clause.OnConflict) untuk melakukan UPSERT.
-	// Ini akan membuat baris baru jika user belum punya stats, atau mengupdate jika sudah ada.
-	// `gorm.Expr` digunakan untuk melakukan operasi aritmatika di level database.
-	return r.db.Model(&models.UserStat{}).Clauses(clause.OnConflict{
+func (r *userRepository) UpdateUserStat(db *gorm.DB, userID uint, columnName string, amount int) error {
+	return db.Model(&models.UserStat{}).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			columnName: gorm.Expr(columnName + " + ?", amount),
+			columnName: gorm.Expr("user_stats." + columnName + " + ?", amount),
 		}),
 	}).Create(map[string]interface{}{
-		"user_id":  userID,
-		columnName: amount,
+		"user_id":    userID,
+		columnName:   amount,
 	}).Error
 }
 

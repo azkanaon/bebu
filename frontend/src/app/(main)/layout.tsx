@@ -6,26 +6,16 @@ import Sidebar from '@/components/leftbar/Sidebar'
 import RightSidebar from '@/components/rightbar/RightSidebar'
 import CreatePostModal from '@/components/feed/CreatePostModal'
 import { Toaster } from 'react-hot-toast'
-import api from '@/lib/axios'
-
-type User = {
-  id: number
-  email: string
-  role: 'user' | 'admin'
-  name: string
-  username: string
-  avatar: string
-}
+import { useAuthStore } from '@/stores/useAuthStore'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-
   // INI PERUBAHAN TERAKHIR
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
   const disableSidebarScroll = useRef(false)
   const [offset, setOffset] = useState(0)
   const [isResetting, setIsResetting] = useState(false)
+  const { user } = useAuthStore()
 
   useEffect(() => {
     let lastScrollY = window.scrollY
@@ -95,33 +85,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setOffset(0)
     })
   }, [currentTab])
-
-  // Fetch user
-  useEffect(() => {
-    api
-      .get('/v1/users/me')
-      .then((res) => {
-        const d = res.data
-        const mappedUser: User = {
-          id: d.UserID,
-          email: d.Email,
-          role: d.Role,
-          username: d.Username,
-          name: d.Profile?.DisplayName,
-          avatar: d.Profile?.AvatarUrl,
-        }
-
-        console.log('2. Hasil Mapping:', mappedUser)
-        setUser(mappedUser)
-      })
-      .catch((err) => {
-        console.error('Fetch Error:', err)
-        setUser(null)
-      })
-  }, [])
-
-  if (!user) return <div>Loading...</div>
-
+  console.log(user)
   return (
     <>
       <div className="flex justify-center gap-6 min-h-screen">

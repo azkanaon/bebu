@@ -10,10 +10,11 @@ type ProfileResponseDTO struct {
 	PublicID      string           `json:"publicId"`
 	Username      string           `json:"username"`
 	Profile       ProfileInfoDTO   `json:"profile"`
-	Stats         StatsDTO         `json:"stats"`
+	Stats         UserStatsDTO         `json:"stats"`
 	SocialLinks   []SocialLinkDTO  `json:"socialLinks"`
-	Badges        []BadgeDTO       `json:"badges"`
-	Achievements  []AchievementDTO `json:"achievements"`
+	FavoriteBadges        []BadgeDTO `json:"favoriteBadges"`
+	FavoriteAchievements  []AchievementDTO `json:"favoriteAchievements"`
+
 	ViewerContext *ViewerContextDTO `json:"viewerContext,omitempty"` // omitempty: field ini tidak akan muncul di JSON jika nilainya nil (misal, user tidak login)
 	IsPrivate 	  bool 				`json:"isPrivate"`
 }
@@ -28,12 +29,12 @@ type ProfileInfoDTO struct {
 	JoinedAt    time.Time `json:"joinedAt"` // Menggunakan CreatedAt dari model User
 }
 
-// StatsDTO berisi data agregat (count) yang dihitung.
-// Data ini didenormalisasi untuk performa agar frontend tidak perlu menghitungnya.
-type StatsDTO struct {
-	PostCount      int64 `json:"postCount"`      // Didapat dari tabel posts
-	FollowerCount  int64 `json:"followerCount"`  // Dihitung dari tabel user_follows
-	FollowingCount int64 `json:"followingCount"` // Dihitung dari tabel user_follows
+type UserStatsDTO struct {
+    TotalFollowers     int `json:"totalFollowers"`
+    TotalFollowing     int `json:"totalFollowing"`
+    TotalPosts         int `json:"totalPosts"`
+    TotalBadges        int `json:"totalBadges"`        // <-- TAMBAHKAN
+    TotalAchievements  int `json:"totalAchievements"`  // <-- TAMBAHKAN
 }
 
 // SocialLinkDTO merepresentasikan satu link sosial milik user.

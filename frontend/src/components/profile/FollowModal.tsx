@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { X, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import ClientPortal from '../ClientPortal'
+import Image from 'next/image'
 
 type User = {
   id: number
@@ -56,11 +57,11 @@ export default function FollowModal({
             animate={{ opacity: 0.6 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[100] bg-black backdrop-blur-sm"
+            className="fixed inset-0 z-100 bg-black backdrop-blur-sm"
           />
 
           {/* WRAPPER */}
-          <div className="fixed inset-0 z-[110] flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
+          <div className="fixed inset-0 z-110 flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
             {/* MODAL CONTENT */}
             <motion.div
               // MENGGUNAKAN 100dvh AGAR MENEMBUS LAYAR SAAT EXIT
@@ -72,10 +73,10 @@ export default function FollowModal({
                 damping: 28, // Sedikit lebih smooth
                 stiffness: 220,
               }}
-              className="pointer-events-auto relative w-full h-[85dvh] md:h-auto md:max-h-[75vh] md:w-[420px] bg-[#0B1220] rounded-t-[1.5rem] md:rounded-[1.5rem] border border-white/10 shadow-2xl flex flex-col overflow-hidden"
+              className="pointer-events-auto relative w-full h-[85dvh] md:h-auto md:max-h-[75vh] md:w-105 bg-[#0B1220] rounded-t-3xl md:rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden"
             >
               {/* HEADER */}
-              <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0">
+              <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
                 <h2 className="text-base font-semibold text-white tracking-tight">
                   Connections
                 </h2>
@@ -88,14 +89,14 @@ export default function FollowModal({
               </div>
 
               {/* TABS */}
-              <div className="flex border-b border-white/5 bg-white/[0.01] shrink-0">
+              <div className="flex border-b border-white/5 bg-white/1 shrink-0">
                 {(['followers', 'following'] as const).map((tab) => {
                   const isActive = activeTab === tab
                   return (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className="relative flex-1 py-2.5 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                      className="relative flex-1 py-3 text-[11px] font-semibold uppercase tracking-wider transition-colors"
                     >
                       <span
                         className={isActive ? 'text-white' : 'text-gray-500'}
@@ -125,7 +126,7 @@ export default function FollowModal({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search..."
-                    className="w-full rounded-xl border border-white/5 bg-white/5 px-9 py-1.5 text-sm text-white placeholder:text-gray-600 outline-none focus:bg-white/[0.08] transition-all"
+                    className="w-full rounded-xl border border-white/5 bg-white/5 px-9 py-1.5 text-sm text-white placeholder:text-gray-600 outline-none focus:bg-white/8 transition-all"
                   />
                 </div>
               </div>
@@ -144,14 +145,17 @@ export default function FollowModal({
                     {users.map((user) => (
                       <div
                         key={user.id}
-                        className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-white/[0.02] transition-colors group"
+                        className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/2 transition-colors group"
                       >
                         <div className="flex items-center gap-3">
-                          <img
-                            src={user.avatar}
-                            alt={user.username}
-                            className="h-9 w-9 rounded-full object-cover border border-white/10"
-                          />
+                          <div className="relative h-9 w-9 border border-white/10 rounded-full overflow-hidden">
+                            <Image
+                              src={user.avatar}
+                              alt={user.username}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
                           <div>
                             <p className="text-xs md:text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">
                               {user.name}
