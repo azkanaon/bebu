@@ -14,9 +14,16 @@ type ProfileResponseDTO struct {
 	SocialLinks   []SocialLinkDTO  `json:"socialLinks"`
 	FavoriteBadges        []BadgeDTO `json:"favoriteBadges"`
 	FavoriteAchievements  []AchievementDTO `json:"favoriteAchievements"`
+	Settings      *UserSettingsDTO `json:"settings,omitempty"` // omitempty: field ini tidak akan muncul di JSON jika nil (misal, user belum mengatur preferensi)
 
 	ViewerContext *ViewerContextDTO `json:"viewerContext,omitempty"` // omitempty: field ini tidak akan muncul di JSON jika nilainya nil (misal, user tidak login)
 	IsPrivate 	  bool 				`json:"isPrivate"`
+	IsPrivateAccount bool 			`json:"isPrivateAccount"`
+}
+
+type UserSettingsDTO struct {
+	IsProfilePublic   bool `json:"isProfilePublic"`
+	AllowDmFromPublic bool `json:"allowDmFromPublic"`
 }
 
 // ProfileInfoDTO berisi data spesifik dari tabel user_profiles.
@@ -41,8 +48,8 @@ type UserStatsDTO struct {
 // Ini adalah gabungan data dari user_social_links dan platforms.
 type SocialLinkDTO struct {
 	PlatformName     string `json:"platformName"`
-	PlatformImageUrl string `json:"platformImageUrl"`
 	URL              string `json:"url"`
+	PlatformSlug     string `json:"platformSlug"`
 }
 
 // BadgeDTO merepresentasikan satu badge yang telah diperoleh user.
@@ -70,6 +77,7 @@ type ViewerContextDTO struct {
 	IsBlocked     bool `json:"isBlocked"` // Ini berarti: Apakah target memblokir SAYA?
     IsBlockedByYou bool `json:"isBlockedByYou"` // Ini berarti: Apakah SAYA memblokir target?
 	IsOwnProfile bool `json:"isOwnProfile"` // Apakah ini profil milik viewer sendiri?
+	
 }
 
 type UpdateProfileRequestDTO struct {
@@ -80,6 +88,7 @@ type UpdateProfileRequestDTO struct {
 	SocialLinks       []SocialLinkInputDTO // Menerima array social links
 	IsProfilePublic   *bool // Pointer agar bisa diabaikan jika tidak di-supply
 	AllowDmFromPublic *bool
+	RemoveAvatar *bool `json:"remove_avatar"`
 }
 
 type SocialLinkInputDTO struct {
@@ -106,4 +115,6 @@ type FollowerContextDTO struct {
 	IsFollowing    bool `json:"isFollowing"`    // Apakah SAYA follow orang ini?
 	IsFollowedBy   bool `json:"isFollowedBy"`   // Apakah orang ini follow SAYA?
 	IsOwnProfile   bool `json:"isOwnProfile"`
+	IsPending    bool `json:"isPending"`
 }
+

@@ -21,7 +21,7 @@ type UserService interface {
 	FollowUser(sourceUserID uint, targetUsername string) (string, error)
 	UnfollowUser(sourceUserID uint, targetUsername string) error
 	UpdateProfile(userID uint, req *dto.UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*dto.ProfileInfoDTO, error)
-	GetFollowRequests(userID uint) ([]dto.FollowRequestDTO, error)
+	GetFollowRequests(userID uint, page, limit int) ([]dto.FollowRequestDTO, *dto.PaginationDTO, error)
 	AcceptFollowRequest(currentUserID uint, requesterUsername string) error
 	DeclineFollowRequest(currentUserID uint, requesterUsername string) error
 	BlockUser(sourceUserID uint, targetUsername string) error
@@ -54,6 +54,11 @@ func (s *userService) GetProfileByUsername(username string, viewerID *uint) (*dt
 			return nil, err
 		}
 		return nil, err
+	}
+
+	actualIsPrivateAccount := false
+	if user.Settings != nil {
+		actualIsPrivateAccount = !user.Settings.IsProfilePublic
 	}
 
 	// --- LOGIKA BLOKIR ASIMETRIS BARU ---
@@ -125,17 +130,18 @@ func (s *userService) GetProfileByUsername(username string, viewerID *uint) (*dt
 	if !hasFullAccess {
 		// Jika tidak punya akses penuh (karena profil privat dan belum di-follow),
 		// kembalikan data terbatas TAPI DENGAN viewerContext.
-		return s.mapToPrivateProfileDTO(user, stats,viewerContext), nil
+		return s.mapToPrivateProfileDTO(user, stats,actualIsPrivateAccount, viewerContext), nil
 	}
 	
 	// 3. Panggil mapper untuk merakit response akhir.
-	response := s.mapToPublicProfileDTO(user, stats, viewerContext)
+	response := s.mapToPublicProfileDTO(user, stats,actualIsPrivateAccount, viewerContext)
 	return response, nil
 }
 
 func (s *userService) mapToPublicProfileDTO(
 	user *models.User,
 	stats *models.UserStat,
+	isPrivateAcc bool,
 	ctx *dto.ViewerContextDTO,
 ) *dto.ProfileResponseDTO {
 
@@ -145,10 +151,7 @@ func (s *userService) mapToPublicProfileDTO(
 		dto := dto.SocialLinkDTO{
 			PlatformName: link.Platform.PlatformName,
 			URL:          link.SocialURL,
-		}
-        // PERBAIKAN DI SINI: Cek pointer nil sebelum digunakan
-		if link.Platform.PlatformImageURL != nil {
-			dto.PlatformImageUrl = *link.Platform.PlatformImageURL
+			PlatformSlug: link.Platform.Slug,
 		}
 		socialLinks[i] = dto
 	}
@@ -178,10 +181,16 @@ func (s *userService) mapToPublicProfileDTO(
 	dto := &dto.ProfileResponseDTO{
 		PublicID: user.PublicID.String(),
 		Username: user.Username,
+		IsPrivateAccount: isPrivateAcc,
+		Settings: &dto.UserSettingsDTO{
+			IsProfilePublic: user.Settings != nil && user.Settings.IsProfilePublic,
+			AllowDmFromPublic: user.Settings != nil && user.Settings.AllowDmFromPublic,
+		},
 		Profile: dto.ProfileInfoDTO{
 			DisplayName: user.Profile.DisplayName,
 			AvatarURL:   user.Profile.AvatarUrl,
 			Bio:         user.Profile.Bio,
+			Gender:      user.Profile.Gender,
 			Location:    user.Profile.Location,
 			JoinedAt:    user.CreatedAt,
 		},
@@ -202,17 +211,14 @@ func (s *userService) mapToPublicProfileDTO(
 }
 
 // mapToPrivateProfileDTO adalah mapper BARU untuk profil privat
-func (s *userService) mapToPrivateProfileDTO(user *models.User, stats *models.UserStat,  viewerContext *dto.ViewerContextDTO) *dto.ProfileResponseDTO {
+func (s *userService) mapToPrivateProfileDTO(user *models.User, stats *models.UserStat, isPrivateAccount bool,  viewerContext *dto.ViewerContextDTO) *dto.ProfileResponseDTO {
 	// 1. Mapping Social Links
 	socialLinks := make([]dto.SocialLinkDTO, len(user.SocialLinks))
 	for i, link := range user.SocialLinks {
 		dto := dto.SocialLinkDTO{
 			PlatformName: link.Platform.PlatformName,
 			URL:          link.SocialURL,
-		}
-
-		if link.Platform.PlatformImageURL != nil {
-			dto.PlatformImageUrl = *link.Platform.PlatformImageURL
+			PlatformSlug: link.Platform.Slug,
 		}
 		socialLinks[i] = dto
 	}
@@ -222,10 +228,12 @@ func (s *userService) mapToPrivateProfileDTO(user *models.User, stats *models.Us
 		PublicID: user.PublicID.String(),
 		Username: user.Username,
         IsPrivate: true,
+		IsPrivateAccount: isPrivateAccount,
 		Profile: dto.ProfileInfoDTO{
 			DisplayName: user.Profile.DisplayName,
 			AvatarURL:   user.Profile.AvatarUrl,
 			Bio:         user.Profile.Bio,
+			Gender:      user.Profile.Gender,
 			Location:    user.Profile.Location,
 			JoinedAt:    user.CreatedAt,
 		},
@@ -237,7 +245,13 @@ func (s *userService) mapToPrivateProfileDTO(user *models.User, stats *models.Us
         	TotalAchievements:     0,
 
 		},
+		Settings: &dto.UserSettingsDTO{
+			IsProfilePublic: user.Settings != nil && user.Settings.IsProfilePublic,
+			AllowDmFromPublic: user.Settings != nil && user.Settings.AllowDmFromPublic,
+		},
 		SocialLinks:   socialLinks,
+		FavoriteBadges:        []dto.BadgeDTO{},
+		FavoriteAchievements:  []dto.AchievementDTO{},
 		ViewerContext: viewerContext,
 	}
 	return dto
@@ -353,16 +367,27 @@ func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) err
 
 func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*dto.ProfileInfoDTO, error) {
 	// 1. Upload avatar baru jika ada, di luar transaksi.
-	// Kita lakukan ini di awal agar jika upload gagal, kita tidak perlu memulai transaksi DB.
 	var avatarURL string
-	if avatarFile != nil {
-		url, err := utils.UploadToCloudinary(avatarFile, "bebu/avatars")
-		if err != nil {
-			return nil, fmt.Errorf("failed to upload avatar: %w", err)
-		}
-		avatarURL = url
-	}
+    var shouldUpdateAvatar bool // Flag untuk menandai apakah kolom avatar harus diupdate
 
+    // 1. Logika Prioritas Foto:
+    // Kondisi A: User mengunggah file baru
+    if avatarFile != nil {
+        url, err := utils.UploadToCloudinary(avatarFile, "bebu/avatars")
+        if err != nil {
+            return nil, fmt.Errorf("failed to upload avatar: %w", err)
+        }
+        avatarURL = url
+        shouldUpdateAvatar = true
+    } else if req.RemoveAvatar != nil && *req.RemoveAvatar == true {
+        // Kondisi B: User tidak upload file, tapi centang "Hapus Foto"
+        avatarURL = "" // Set ke string kosong di database (kembali ke default)
+        shouldUpdateAvatar = true
+    }
+	currentUser, err := s.userRepo.FindUserByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch current user data: %w", err)
+	}
 	// 2. Mulai Transaksi Database
 	tx := s.db.Begin()
 	if tx.Error != nil {
@@ -371,7 +396,7 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 	// Defer a rollback. Jika ada panic, transaksi akan dibatalkan.
 	// Jika sukses (commit), rollback tidak akan berpengaruh.
 	defer tx.Rollback()
-
+	txRepo := s.userRepo.WithTx(tx) 
 	// 3. Siapkan dan jalankan update untuk UserProfile
 	profileUpdates := make(map[string]interface{})
 	if req.DisplayName != nil {
@@ -386,9 +411,9 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 	if req.Gender != nil { // <-- TAMBAHKAN BLOK INI
 		profileUpdates["gender"] = *req.Gender
 	}
-	if avatarURL != "" { // Hanya update URL jika upload berhasil
-		profileUpdates["avatar_url"] = avatarURL
-	}
+	if shouldUpdateAvatar {
+        profileUpdates["avatar_url"] = avatarURL
+    }
 	
 	if len(profileUpdates) > 0 {
 		// Panggil repository DENGAN transaksi
@@ -401,8 +426,31 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 	// 4. Siapkan dan jalankan update untuk UserSettings
 	settingsUpdates := make(map[string]interface{})
 	if req.IsProfilePublic != nil {
+		
+		// Gunakan pengecekan yang aman
+		var currentIsPublic bool
+		if currentUser.Settings != nil {
+			currentIsPublic = currentUser.Settings.IsProfilePublic
+		}
+
+		// LOGIKA: Status baru TRUE (Public) DAN Status lama FALSE (Private)
+		isTurningPublic := *req.IsProfilePublic == true && currentIsPublic == false
+		
 		settingsUpdates["is_profile_public"] = *req.IsProfilePublic
+		
+		if isTurningPublic {
+			// Jalankan proses auto-accept
+			followerIDs, err := txRepo.GetPendingFollowerIDs(userID)
+			if err == nil && len(followerIDs) > 0 {
+				// Gunakan handle transaksi (txRepo dan tx) secara konsisten
+				_, _ = txRepo.AcceptAllPendingFollows(userID)
+				_ = txRepo.UpdateUserStat(tx, userID, "total_followers", len(followerIDs))
+				_ = txRepo.BulkUpdateUserStat(tx, followerIDs, "total_following", 1)
+			}
+		}
 	}
+
+
 	if req.AllowDmFromPublic != nil {
 		settingsUpdates["allow_dm_from_public"] = *req.AllowDmFromPublic
 	}
@@ -450,18 +498,20 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 		AvatarURL:   updatedUser.Profile.AvatarUrl,
 		Bio:         updatedUser.Profile.Bio,
 		Location:    updatedUser.Profile.Location,
+		Gender:      updatedUser.Profile.Gender,
 		JoinedAt:    updatedUser.CreatedAt, // JoinedAt tidak berubah
 	}, nil
 }
 
-func (s *userService) GetFollowRequests(userID uint) ([]dto.FollowRequestDTO, error) {
-	requests, err := s.userRepo.GetPendingFollowRequests(userID)
+func (s *userService) GetFollowRequests(userID uint, page, limit int) ([]dto.FollowRequestDTO, *dto.PaginationDTO, error) {
+	// Ambil data dan total dari repo
+	requests, total, err := s.userRepo.GetPendingFollowRequests(userID, page, limit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	
 	// Mapping dari model ke DTO
-	var responseDTOs []dto.FollowRequestDTO
+	responseDTOs := make([]dto.FollowRequestDTO, 0, len(requests))
 	for _, req := range requests {
 		responseDTOs = append(responseDTOs, dto.FollowRequestDTO{
 			Username:    req.UserFollowing.Username,
@@ -469,8 +519,11 @@ func (s *userService) GetFollowRequests(userID uint) ([]dto.FollowRequestDTO, er
 			AvatarURL:   req.UserFollowing.Profile.AvatarUrl,
 		})
 	}
+
+	// Buat metadata paginasi menggunakan helper yang sudah kita punya
+	pagination := dto.NewPaginationDTO(total, page, limit)
 	
-	return responseDTOs, nil
+	return responseDTOs, pagination, nil
 }
 
 func (s *userService) AcceptFollowRequest(currentUserID uint, requesterUsername string) error {
@@ -516,35 +569,49 @@ func (s *userService) DeclineFollowRequest(currentUserID uint, requesterUsername
 }
 
 func (s *userService) BlockUser(sourceUserID uint, targetUsername string) error {
-	// 1. Cari user target
 	targetUser, err := s.userRepo.FindByUsername(targetUsername)
 	if err != nil {
 		return errors.New("user to block not found")
 	}
 
-	// 2. Validasi
 	if sourceUserID == targetUser.UserID {
 		return errors.New("cannot block yourself")
 	}
 
-	// 3. Mulai Transaksi (Saran: Gunakan s.db.Transaction agar lebih rapi)
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		txRepo := s.userRepo.WithTx(tx)
-		// 4. Hapus semua relasi follow (dua arah)
-		// A unfollow B
-		// Kita harus melewati 'tx' ke repository
-		errA := txRepo.UnfollowUser(tx, sourceUserID, targetUser.UserID)
-		if errA != nil && !errors.Is(errA, gorm.ErrRecordNotFound) {
-			return errA
+
+		// --- 1. PROSES UNFOLLOW A -> B (Source block Target) ---
+		statusAToB, err := txRepo.GetFollowStatus(sourceUserID, targetUser.UserID)
+		if err == nil && statusAToB != "not_following" {
+			// Hapus hubungan follow
+			if err := txRepo.UnfollowUser(tx, sourceUserID, targetUser.UserID); err != nil {
+				return err
+			}
+			// Update stats hanya jika sebelumnya sudah 'accepted'
+			if statusAToB == "accepted" {
+				// Kurangi Following A, Kurangi Follower B
+				_ = txRepo.UpdateUserStat(tx, sourceUserID, "total_following", -1)
+				_ = txRepo.UpdateUserStat(tx, targetUser.UserID, "total_followers", -1)
+			}
 		}
 
-		// B unfollow A
-		errB := txRepo.UnfollowUser(tx, targetUser.UserID, sourceUserID)
-		if errB != nil && !errors.Is(errB, gorm.ErrRecordNotFound) {
-			return errB
+		// --- 2. PROSES UNFOLLOW B -> A (Target pernah follow Source) ---
+		statusBToA, err := txRepo.GetFollowStatus(targetUser.UserID, sourceUserID)
+		if err == nil && statusBToA != "not_following" {
+			// Hapus hubungan follow
+			if err := txRepo.UnfollowUser(tx, targetUser.UserID, sourceUserID); err != nil {
+				return err
+			}
+			// Update stats hanya jika sebelumnya sudah 'accepted'
+			if statusBToA == "accepted" {
+				// Kurangi Following B, Kurangi Follower A
+				_ = txRepo.UpdateUserStat(tx, targetUser.UserID, "total_following", -1)
+				_ = txRepo.UpdateUserStat(tx, sourceUserID, "total_followers", -1)
+			}
 		}
 
-		// 5. Buat entri blokir
+		// --- 3. BUAT ENTRI BLOKIR ---
 		if err := txRepo.BlockUser(tx, sourceUserID, targetUser.UserID); err != nil {
 			return err
 		}
@@ -605,13 +672,13 @@ func (s *userService) SearchUsers(query string) ([]dto.UserSearchResponse, error
 
 func (s *userService) GetFollowerList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error) {
 	// 1. Cek akses (menggunakan helper yang sudah ada di PostService, kita asumsikan helper itu ada di sini juga)
-	targetUser, hasAccess, err := s.hasProfileAccess(viewerID, targetUsername)
+	targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, targetUsername)
 	if err != nil || !hasAccess {
 		return make([]dto.UserSummaryDTO, 0), dto.NewPaginationDTO(0, page, limit), err
 	}
 
 	// 2. Panggil repository yang sesuai
-	users, total, err := s.userRepo.GetFollowers(targetUser.UserID, page, limit)
+	users, total, err := s.userRepo.GetFollowers(viewerID, targetUser.UserID, page, limit)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -623,31 +690,24 @@ func (s *userService) GetFollowerList(viewerID *uint, targetUsername string, pag
 	}
 	pagination := dto.NewPaginationDTO(total, page, limit)
 
-	return dtos, pagination, nil
+	return dtos, pagination, err
 }
 
 
 func (s *userService) GetFollowingList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error) {
-	// 1. Cek akses
-	targetUser, hasAccess, err := s.hasProfileAccess(viewerID, targetUsername)
+	targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, targetUsername)
 	if err != nil || !hasAccess {
-		return make([]dto.UserSummaryDTO, 0), dto.NewPaginationDTO(0, page, limit), err
+		return []dto.UserSummaryDTO{}, dto.NewPaginationDTO(0, page, limit), err
 	}
 
-	// 2. Panggil repository yang berbeda
-	users, total, err := s.userRepo.GetFollowing(targetUser.UserID, page, limit)
+	// PERUBAHAN: Sekarang kita masukkan viewerID ke parameter pertama
+	users, total, err := s.userRepo.GetFollowing(viewerID, targetUser.UserID, page, limit)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// 3. Map ke DTO (menggunakan kembali helper yang sama)
 	dtos, err := s.mapUsersToSummaryDTOs(viewerID, users)
-	if err != nil {
-		return nil, nil, err
-	}
-	pagination := dto.NewPaginationDTO(total, page, limit)
-
-	return dtos, pagination, nil
+	return dtos, dto.NewPaginationDTO(total, page, limit), err
 }
 
 
@@ -663,21 +723,20 @@ func (s *userService) mapUsersToSummaryDTOs(viewerID *uint, users []models.User)
 
 		// Jika ada yang melihat, isi viewerContext
 		if viewerID != nil {
-			var isFollowing, isFollowedBy bool
 			
 			// Cek relasi follow antara viewer dan user dalam daftar ini
 			// Ini bisa menyebabkan N+1 query. Untuk produksi, ini perlu dioptimalkan.
-			status, err := s.userRepo.GetFollowStatus(*viewerID, user.UserID)
+			myFollowStatus, err := s.userRepo.GetFollowStatus(*viewerID, user.UserID)
 			if err != nil { return nil, err }
-			isFollowing = (status == "accepted")
 
-			status, err = s.userRepo.GetFollowStatus(user.UserID, *viewerID)
+			// 2. Cek status hubungan orang di list ini terhadap SAYA (Viewer)
+			theirFollowStatus, err := s.userRepo.GetFollowStatus(user.UserID, *viewerID)
 			if err != nil { return nil, err }
-			isFollowedBy = (status == "accepted")
 
 			dtos[i].ViewerContext = &dto.FollowerContextDTO{
-				IsFollowing:  isFollowing,
-				IsFollowedBy: isFollowedBy,
+				IsFollowing:    (myFollowStatus == "accepted"),
+				IsPending:    (myFollowStatus == "pending"),  // <-- SET FIELD BARU DI SINI
+				IsFollowedBy:   (theirFollowStatus == "accepted"),
 				IsOwnProfile: (*viewerID == user.UserID),
 			}
 		}
@@ -685,45 +744,3 @@ func (s *userService) mapUsersToSummaryDTOs(viewerID *uint, users []models.User)
 	return dtos, nil
 }
 
-func (s *userService) hasProfileAccess(viewerID *uint, targetUsername string) (*models.User, bool, error) {
-	targetUser, err := s.userRepo.FindByUsername(targetUsername)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, false, nil // Tidak ditemukan, akses tidak ada, tapi bukan error
-		}
-		return nil, false, err // Error database
-	}
-
-	if viewerID != nil {
-		isOwnProfile := (*viewerID == targetUser.UserID)
-		if isOwnProfile {
-			return targetUser, true, nil // Pemilik selalu punya akses
-		}
-		
-		isBlocked, err := s.userRepo.IsBlocked(targetUser.UserID, *viewerID)
-		if err != nil {
-			return nil, false, err
-		}
-		if isBlocked {
-			return nil, false, nil // Jika diblokir, tidak ada akses
-		}
-	}
-
-	isProfilePublic := (targetUser.Settings == nil || targetUser.Settings.IsProfilePublic)
-	if isProfilePublic {
-		return targetUser, true, nil // Profil publik, semua punya akses
-	}
-
-	if viewerID != nil {
-		followStatus, err := s.userRepo.GetFollowStatus(*viewerID, targetUser.UserID)
-		if err != nil {
-			return nil, false, err
-		}
-		if followStatus == "accepted" {
-			return targetUser, true, nil // Follower yang diterima punya akses
-		}
-	}
-
-	// Jika semua kondisi di atas tidak terpenuhi (profil privat, bukan follower), tidak ada akses.
-	return targetUser, false, nil
-}

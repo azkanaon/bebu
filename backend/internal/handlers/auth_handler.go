@@ -30,10 +30,6 @@ func NewAuthHandler(authService services.AuthService) *AuthHandler {
 func (h *AuthHandler) Register(c *gin.Context) {
 	// 1. Bind data form (non-file)
 	var req dto.RegisterRequest
-	// if err := c.ShouldBind(&req); err != nil { 
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	// 	return
-	// }
 
 	req.Username = c.PostForm("username")
 	req.Email = c.PostForm("email")
@@ -59,7 +55,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file upload"})
 		return
 	}	
-
 
 	response, err := h.authService.Register(&req, file)
 	if err != nil {

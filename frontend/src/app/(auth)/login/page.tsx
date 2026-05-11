@@ -5,18 +5,22 @@ import Link from 'next/link'
 import { Eye, EyeOff } from 'lucide-react'
 import ResetPasswordModal from '@/components/auth/ResetPasswordModal'
 import { useLogin } from '@/api/auth/useLogin'
+import { toast } from 'sonner'
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [identifier, setIdentifier] = useState('') // Email or Username
   const [password, setPassword] = useState('')
   const [isResetOpen, setIsResetOpen] = useState(false)
-  const { mutate: login, isPending, error } = useLogin()
+  const { mutate: login, isPending } = useLogin()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Panggil mutate (TanStack otomatis ngurus loading & try-catch)
+    if (!identifier || !password) {
+      toast.error('Email dan Password harus diisi')
+      return
+    }
+    if (isPending) return
     login({ email_or_username: identifier, password })
   }
 
@@ -36,11 +40,6 @@ export default function LoginPage() {
       </div>
 
       <form className="space-y-5" onSubmit={handleSubmit}>
-        {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-medium">
-            {error.message}
-          </div>
-        )}
         {/* Input Groups */}
         <div className="space-y-1.5">
           <input

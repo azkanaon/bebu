@@ -111,11 +111,26 @@ func (s *authService) Register(req *dto.RegisterRequest, file *multipart.FileHea
 		Email:        req.Email,
 		Username:     req.Username,
 		PasswordHash: string(hashedPassword),
+		// GORM akan otomatis membuatkan baris di tabel user_profiles
 		Profile: &models.UserProfile{
-			DisplayName: 	req.DisplayName,
-			Bio:         	req.Bio,
-			Gender:	  		req.Gender,
-			AvatarUrl:  	avatarURL,
+			DisplayName: req.DisplayName,
+			Bio:         req.Bio,
+			Gender:      req.Gender,
+			AvatarUrl:   avatarURL,
+		},
+		// GORM akan otomatis membuatkan baris di tabel user_settings dengan nilai default
+		Settings: &models.UserSetting{
+			IsProfilePublic:     true, // Default akun publik
+			AllowDmFromPublic:   true,
+			ShowActivityHeatmap: true,
+		},
+		// GORM akan otomatis membuatkan baris di tabel user_stats dengan nilai 0
+		Stats: &models.UserStat{
+			TotalFollowers:     0,
+			TotalFollowing:     0,
+			TotalPosts:         0,
+			TotalBadges:        0,
+			TotalAchievements:  0,
 		},
 	}
 	// Jika display_name kosong, gunakan username

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { authService } from '@/services/authService'
+import { authService } from '@/services/auth.service'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useRouter } from 'next/navigation'
 

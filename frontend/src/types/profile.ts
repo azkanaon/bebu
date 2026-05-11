@@ -4,10 +4,12 @@ export interface UserProfileResponse {
   profile: ProfileInfo
   stats: ProfileStats
   socialLinks: SocialLink[]
-  badges: Badge[]
-  achievements: Achievement[]
-  viewerContext: ViewerContext
+  favoriteBadges: Badge[]
+  favoriteAchievements: Achievement[]
+  settings?: UserSetting
+  viewerContext?: ViewerContext
   isPrivate: boolean
+  isPrivateAccount: boolean
 }
 
 export interface ProfileInfo {
@@ -20,14 +22,16 @@ export interface ProfileInfo {
 }
 
 export interface ProfileStats {
-  postCount: number
-  followerCount: number
-  followingCount: number
+  totalFollowers: number
+  totalFollowing: number
+  totalPosts: number
+  totalBadges: number
+  totalAchievements: number
 }
 
 export interface SocialLink {
   platformName: string
-  platformImageUrl: string
+  platformSlug: string
   url: string
 }
 
@@ -50,4 +54,30 @@ export interface ViewerContext {
   isBlocked: boolean
   isBlockedByYou: boolean
   isOwnProfile: boolean
+}
+
+export interface UserSetting {
+  isProfilePublic: boolean
+  allowDmFromPublic: boolean
+}
+
+export interface SocialLinkInput {
+  platformId: number // Menggunakan ID sesuai DTO Backend
+  url: string
+}
+
+export interface UpdateProfileRequest {
+  displayName?: string
+  bio?: string
+  location?: string
+  gender?: string
+  socialLinks?: SocialLinkInput[]
+  isProfilePublic?: boolean
+  allowDmFromPublic?: boolean
+}
+
+// Interface untuk response (biasanya mengembalikan data profile yang baru)
+export interface UpdateProfileResponse {
+  message: string
+  data: any // Sesuaikan dengan response asli BE kamu
 }

@@ -1,0 +1,3 @@
+-- MIGRATION DOWN
+ALTER TABLE platforms DROP CONSTRAINT IF EXISTS platforms_slug_unique;
+ALTER TABLE platforms DROP COLUMN IF EXISTS slug;

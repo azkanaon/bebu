@@ -24,6 +24,7 @@ type User struct {
     
     Profile        *UserProfile    `gorm:"foreignKey:UserID;references:UserID"`
     Settings       *UserSetting   `gorm:"foreignKey:UserID;references:UserID"`
+    Stats          *UserStat       `gorm:"foreignKey:UserID;references:UserID"`
     PasswordResets []PasswordReset `gorm:"foreignKey:UserID"`
     Sessions       []UserSession   `gorm:"foreignKey:UserID"`
     SocialLinks    []UserSocialLink  `gorm:"foreignKey:UserID"`

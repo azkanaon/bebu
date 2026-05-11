@@ -85,7 +85,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setOffset(0)
     })
   }, [currentTab])
-  console.log(user)
+
   return (
     <>
       <div className="flex justify-center gap-6 min-h-screen">

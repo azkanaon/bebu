@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { authService, ResetPasswordPayload } from '@/services/authService'
+import { authService, ResetPasswordPayload } from '@/services/auth.service'
 import axios from 'axios'
 
 export const useResetPassword = () => {

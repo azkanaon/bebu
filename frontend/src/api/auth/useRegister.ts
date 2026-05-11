@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { authService } from '@/services/authService'
+import { authService } from '@/services/auth.service'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { RegisterRequest } from '@/types/auth'

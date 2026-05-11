@@ -218,7 +218,12 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 			return
 		}
 	}
-
+	if val, ok := c.GetPostForm("remove_avatar"); ok {
+		b, err := strconv.ParseBool(val)
+		if err == nil {
+			req.RemoveAvatar = &b
+		}
+	}
 	// Data File (Avatar)
 	var avatarFile *multipart.FileHeader
 	file, err := c.FormFile("avatar")
@@ -246,32 +251,33 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 }
 
 func (h *UserHandler) GetFollowRequests(c *gin.Context) {
-	// 1. Ambil ID user yang sedang login dari context
-	userID, exists := c.Get("userID")
+	// 1. Ambil ID user dari context (Pola Aman)
+	userIDValue, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-	currentUserID, ok := userID.(uint)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID in context"})
-		return
-	}
+	currentUserID := userIDValue.(uint)
 
-	// 2. Panggil service untuk mendapatkan daftar permintaan
-	requests, err := h.userService.GetFollowRequests(currentUserID)
+	// 2. Parse parameter paginasi dari query string
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 { page = 1 }
+	
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if limit < 1 { limit = 20 }
+
+	// 3. Panggil service
+	requests, pagination, err := h.userService.GetFollowRequests(currentUserID, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch follow requests"})
 		return
 	}
 
-	// Jika tidak ada permintaan, kembalikan array kosong, bukan error
-	if requests == nil {
-		requests = make([]dto.FollowRequestDTO, 0)
-	}
-
-	// 3. Kirim response
-	c.JSON(http.StatusOK, gin.H{"data": requests})
+	// 4. Kirim response dengan format data & meta
+	c.JSON(http.StatusOK, gin.H{
+		"data": requests,
+		"meta": pagination,
+	})
 }
 
 
@@ -476,3 +482,4 @@ func getViewerID(c *gin.Context) *uint {
 	
 	return &id
 }
+
