@@ -27,28 +27,30 @@ type UserRepository interface {
 	// user profile
 	FindUserByPublicID(publicID uuid.UUID) (*models.User, error)
 	FindByUsername(username string) (*models.User, error)
-	GetFollowerCount(userID uint) (int64, error)
-	GetFollowingCount(userID uint) (int64, error)
 	IsFollowing(viewerID, targetID uint) (bool, error)
 	IsBlocked(viewerID, targetID uint) (bool, error)
-	FollowUser(sourceUserID, targetUserID uint, status string) (string, error)
-	UnfollowUser(followerID, followingID uint) error
+	FollowUser(db *gorm.DB, sourceUserID, targetUserID uint, status string) (string, bool, error)
+	UnfollowUser(db *gorm.DB, followerID, followingID uint) error
 	UpdateProfile(userID uint, updates map[string]interface{}) error
 	UpdateSettings(userID uint, updates map[string]interface{}) error
 	UpdateSocialLinks(userID uint, links []models.UserSocialLink) error
 	WithTx(tx *gorm.DB) UserRepository
 	GetFollowStatus(sourceUserID, targetUserID uint) (string, error)
-	GetPendingFollowRequests(userID uint) ([]models.UserFollow, error)
-	UpdateFollowStatus(sourceUserID, targetUserID uint, newStatus string) error
+	GetPendingFollowRequests(userID uint, page, limit int) ([]models.UserFollow, int64, error)
+	UpdateFollowStatus(db *gorm.DB, sourceUserID, targetUserID uint, newStatus string) error
 	DeleteFollowRequest(sourceUserID, targetUserID uint) error
-	BlockUser(blockingUserID, blockedUserID uint) error
+	BlockUser(db *gorm.DB, blockingUserID, blockedUserID uint) error
 	UnblockUser(blockingUserID, blockedUserID uint) error
-	UpdateUserStat(userID uint, columnName string, amount int) error
+	UpdateUserStat(db *gorm.DB, userID uint, columnName string, amount int) error
     GetUserStats(userID uint) (*models.UserStat, error)
 	SearchUsers(query string, limit int) ([]models.User, error)
 
-	GetFollowers(userID uint, page, limit int) ([]models.User, int64, error)
-	GetFollowing(userID uint, page, limit int) ([]models.User, int64, error)
+	GetFollowers(viewerID *uint, targetUserID uint, page, limit int) ([]models.User, int64, error)
+    GetFollowing(viewerID *uint, targetUserID uint, page, limit int) ([]models.User, int64, error)
+	AcceptAllPendingFollows(userID uint) (int64, error)
+	GetPendingFollowerIDs(userID uint) ([]uint, error)
+    BulkUpdateUserStat(db *gorm.DB, userIDs []uint, columnName string, amount int) error
+	
 }
 
 type userRepository struct {
@@ -62,13 +64,10 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 
 // CreateUserAndProfile membuat user dan profile dalam satu transaksi
 func (r *userRepository) CreateUserAndProfile(user *models.User) (*models.User, error) {
-	// Kita hanya butuh satu kali panggilan Create.
-	// GORM akan secara otomatis menangani pembuatan record User dan UserProfile
-	// yang berelasi karena Anda sudah mendefinisikan asosiasinya di struct model.
+	// GORM secara default akan menyimpan asosiasi (Profile, Settings, Stats) 
+	// yang ada di dalam struct user selama field tersebut bukan nil/kosong.
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(user).Error; err != nil {
-			// Jika ada error (misal, unique constraint violation di tabel users),
-			// transaksi akan di-rollback secara otomatis.
 			return err
 		}
 		return nil
@@ -78,7 +77,6 @@ func (r *userRepository) CreateUserAndProfile(user *models.User) (*models.User, 
 		return nil, err
 	}
 	
-	// 'user' object sekarang sudah terisi dengan ID yang digenerate oleh database
 	return user, nil
 }
 
@@ -102,11 +100,11 @@ func (r *userRepository) FindSessionByRefreshTokenHash(hash string) (*models.Use
 	return &session, err
 }
 
-func (r *userRepository) FindUserByID(id uint) (*models.User, error) {
-    var user models.User
-	err := r.db.Preload("Profile").First(&user, id).Error
-    
-    return &user, err
+func (r *userRepository) FindUserByID(userID uint) (*models.User, error) {
+	var user models.User
+	// PASTIKAN .Preload("Setting") (atau Settings) ada di sini!
+	err := r.db.Preload("Profile").Preload("Settings").First(&user, userID).Error
+	return &user, err
 }
 
 func (r *userRepository) CreatePasswordReset(reset *models.PasswordReset) error {
@@ -169,8 +167,13 @@ func (r *userRepository) FindByUsername(username string) (*models.User, error) {
 		Preload("Profile").
 		Preload("Settings").
 		Preload("SocialLinks.Platform"). // Preload social links dan platform-nya
-		Preload("Badges").               // Preload badges yg dimiliki user
-		Preload("UserAchievements.Achievement").
+		Preload("FavoriteUserBadges", "display_order IS NOT NULL", func(db *gorm.DB) *gorm.DB {
+            return db.Order("user_badges.display_order ASC").Limit(4).Preload("Badge")
+        }).
+        // Preload Favorite Achievements melalui UserAchievement
+        Preload("FavoriteUserAchievements", "display_order IS NOT NULL", func(db *gorm.DB) *gorm.DB {
+            return db.Order("user_achievements.display_order ASC").Limit(4).Preload("Achievement")
+        }).
 		Joins("JOIN user_profiles ON users.user_id = user_profiles.user_id"). // pastikan profile ada
 		Where("users.username = ?", username).
 		First(&user).Error
@@ -179,23 +182,6 @@ func (r *userRepository) FindByUsername(username string) (*models.User, error) {
 		return nil, err // GORM akan return gorm.ErrRecordNotFound jika tidak ada
 	}
 	return &user, nil
-}
-
-func (r *userRepository) GetFollowerCount(userID uint) (int64, error) {
-	stats, err := r.GetUserStats(userID)
-	if err != nil {
-		return 0, err
-	}
-	return int64(stats.TotalFollowers), nil
-}
-
-// GetFollowingCount sekarang membaca dari tabel user_stats
-func (r *userRepository) GetFollowingCount(userID uint) (int64, error) {
-	stats, err := r.GetUserStats(userID)
-	if err != nil {
-		return 0, err
-	}
-	return int64(stats.TotalFollowing), nil
 }
 
 // IsFollowing memeriksa apakah viewerID mengikuti targetID
@@ -214,50 +200,47 @@ func (r *userRepository) FindUserByPublicID(publicID uuid.UUID) (*models.User, e
 }
 
 // FollowUser membuat entri baru di tabel user_follows.
-func (r *userRepository) FollowUser(sourceUserID, targetUserID uint, status string) (string, error) {
+func (r *userRepository) FollowUser(db *gorm.DB, sourceUserID, targetUserID uint, status string) (string, bool, error) {
+	// 1. Cek apakah sudah ada di database
+	var existing models.UserFollow
+	err := db.Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).First(&existing).Error
+	
+	if err == nil {
+		// Jika tidak error, artinya data sudah ada (sudah follow sebelumnya)
+		return "", false, errors.New("you already follow this user")
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		// Jika error karena database down/masalah lain
+		return "", false, err
+	}
+
+	// 2. Jika tidak ada, lakukan Insert
 	follow := models.UserFollow{
 		UserFollowingID: sourceUserID,
 		UserFollowedID:  targetUserID,
-		FollowingStatus: status, // Gunakan status yang di-passing dari service
+		FollowingStatus: status,
 	}
 
-	// Kita gunakan OnConflict untuk menangani kasus re-follow atau re-request.
-	// Jika sudah ada (misal: sudah 'pending' atau 'accepted'), tidak akan melakukan apa-apa.
-	// Jika belum ada, akan INSERT.
-	result := r.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "user_following_id"}, {Name: "user_followed_id"}},
-		DoNothing: true,
-	}).Create(&follow)
-
-	if result.Error != nil {
-		return "", result.Error
+	if err := db.Create(&follow).Error; err != nil {
+		return "", false, err
 	}
-    
-    // Jika tidak ada baris yang terpengaruh (karena konflik), artinya relasi sudah ada.
-    // Kita perlu mengambil status yang sudah ada tersebut.
-    if result.RowsAffected == 0 {
-        var existingFollow models.UserFollow
-        r.db.First(&existingFollow, "user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID)
-        return existingFollow.FollowingStatus, nil
-    }
 
-	// Jika berhasil INSERT, kembalikan status yang baru saja dimasukkan.
-	return status, nil
+	return status, true, nil // true = data baru
 }
 
 // UnfollowUser menghapus entri dari tabel user_follows.
-func (r *userRepository) UnfollowUser(sourceUserID, targetUserID uint) error {
-	follow := models.UserFollow{
-		UserFollowingID: sourceUserID,
-		UserFollowedID:  targetUserID,
-	}
-	result := r.db.Delete(&follow)
+func (r *userRepository) UnfollowUser(db *gorm.DB, sourceUserID, targetUserID uint) error {
+	result := db.Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).Delete(&models.UserFollow{})
+	
 	if result.Error != nil {
 		return result.Error
 	}
+	
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
+	
 	return nil
 }
 
@@ -267,9 +250,6 @@ func (r *userRepository) WithTx(tx *gorm.DB) UserRepository {
 }
 
 func (r *userRepository) UpdateProfile(userID uint, updates map[string]interface{}) error {
-	// Kita update berdasarkan user_id, bukan profile_id, agar lebih konsisten.
-	// .Where("user_id = ?", userID) akan menargetkan baris yang benar.
-	// .Model(&models.UserProfile{}) akan menargetkan tabel yang benar.
 	result := r.db.Model(&models.UserProfile{}).Where("user_id = ?", userID).Updates(updates)
 	if result.Error != nil {
 		return result.Error
@@ -283,8 +263,6 @@ func (r *userRepository) UpdateProfile(userID uint, updates map[string]interface
 
 // UpdateSettings memperbarui kolom-kolom spesifik di tabel user_settings.
 func (r *userRepository) UpdateSettings(userID uint, updates map[string]interface{}) error {
-	// Buat data lengkap untuk operasi Create/Insert.
-	// Kita mulai dengan data update, lalu tambahkan user_id.
 	fullData := make(map[string]interface{})
 	for key, value := range updates {
 		fullData[key] = value
@@ -312,9 +290,6 @@ func (r *userRepository) UpdateSettings(userID uint, updates map[string]interfac
 }
 
 func (r *userRepository) UpdateSocialLinks(userID uint, links []models.UserSocialLink) error {
-	// Operasi ini harus di dalam transaksi, yang sudah kita pastikan di service.
-	
-	// 1. Hapus semua social link yang ada untuk user ini.
 	if err := r.db.Where("user_id = ?", userID).Delete(&models.UserSocialLink{}).Error; err != nil {
 		return err
 	}
@@ -341,35 +316,42 @@ func (r *userRepository) GetFollowStatus(sourceUserID, targetUserID uint) (strin
 	err := r.db.Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).First(&follow).Error
 	
 	if err != nil {
-		// Jika tidak ada baris sama sekali, GORM akan mengembalikan ErrRecordNotFound.
-		// Ini bukan error, artinya statusnya adalah "not_following".
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return "not_following", nil
 		}
 		// Untuk error database lainnya, kembalikan error
 		return "", err
 	}
-	
-	// Jika baris ditemukan, kembalikan statusnya
 	return follow.FollowingStatus, nil
 }
 
-func (r *userRepository) GetPendingFollowRequests(userID uint) ([]models.UserFollow, error) {
+func (r *userRepository) GetPendingFollowRequests(userID uint, page, limit int) ([]models.UserFollow, int64, error) {
 	var requests []models.UserFollow
-	
-	// Kita cari semua baris di mana userID adalah 'user_followed_id' (target)
-	// dan statusnya 'pending'.
-	// Kita juga Preload data 'UserFollowing' agar bisa menampilkan info user yang me-request.
-	err := r.db.
-		Preload("UserFollowing.Profile"). // Preload data user yang me-request + profilnya
-		Where("user_followed_id = ? AND following_status = ?", userID, "pending").
+	var total int64
+	offset := (page - 1) * limit
+
+	// Buat query dasar
+	query := r.db.Model(&models.UserFollow{}).
+		Where("user_followed_id = ? AND following_status = ?", userID, "pending")
+
+	// 1. Hitung total baris untuk metadata
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// 2. Ambil data dengan paginasi dan preload
+	err := query.
+		Preload("UserFollowing.Profile").
+		Order("created_at DESC"). // Permintaan terbaru muncul paling atas
+		Limit(limit).
+		Offset(offset).
 		Find(&requests).Error
 		
-	return requests, err
+	return requests, total, err
 }
 
 // UpdateFollowStatus mengubah status sebuah relasi follow.
-func (r *userRepository) UpdateFollowStatus(sourceUserID, targetUserID uint, newStatus string) error {
+func (r *userRepository) UpdateFollowStatus(db *gorm.DB, sourceUserID, targetUserID uint, newStatus string) error {
 	result := r.db.Model(&models.UserFollow{}).
 		Where("user_following_id = ? AND user_followed_id = ?", sourceUserID, targetUserID).
 		Update("following_status", newStatus)
@@ -401,14 +383,14 @@ func (r *userRepository) DeleteFollowRequest(sourceUserID, targetUserID uint) er
 }
 
 // BlockUser membuat entri baru di tabel user_blocks.
-func (r *userRepository) BlockUser(blockingUserID, blockedUserID uint) error {
+func (r *userRepository) BlockUser(db *gorm.DB, blockingUserID, blockedUserID uint) error {
 	block := models.UserBlock{
-		UserBlockingID: blockingUserID, // Yang memblokir
-		UserBlockedID:  blockedUserID,  // Yang diblokir
+		UserBlockingID: blockingUserID,
+		UserBlockedID:  blockedUserID,
 	}
 
-	// Gunakan OnConflict agar tidak error jika mencoba memblokir user yang sama dua kali.
-	result := r.db.Clauses(clause.OnConflict{
+	// Gunakan db yang dipassing (yang sudah terikat transaksi)
+	result := db.Clauses(clause.OnConflict{
 		DoNothing: true,
 	}).Create(&block)
 
@@ -442,18 +424,15 @@ func (r *userRepository) IsBlocked(blockingUserID, blockedUserID uint) (bool, er
 }
 
 // amount bisa positif (untuk increment) atau negatif (untuk decrement).
-func (r *userRepository) UpdateUserStat(userID uint, columnName string, amount int) error {
-	// Kita gunakan GORM's Clauses(clause.OnConflict) untuk melakukan UPSERT.
-	// Ini akan membuat baris baru jika user belum punya stats, atau mengupdate jika sudah ada.
-	// `gorm.Expr` digunakan untuk melakukan operasi aritmatika di level database.
-	return r.db.Model(&models.UserStat{}).Clauses(clause.OnConflict{
+func (r *userRepository) UpdateUserStat(db *gorm.DB, userID uint, columnName string, amount int) error {
+	return db.Model(&models.UserStat{}).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "user_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			columnName: gorm.Expr(columnName + " + ?", amount),
+			columnName: gorm.Expr("user_stats." + columnName + " + ?", amount),
 		}),
 	}).Create(map[string]interface{}{
-		"user_id":  userID,
-		columnName: amount,
+		"user_id":    userID,
+		columnName:   amount,
 	}).Error
 }
 
@@ -481,51 +460,112 @@ func (r *userRepository) SearchUsers(query string, limit int) ([]models.User, er
     return users, err
 }
 
-func (r *userRepository) GetFollowers(userID uint, page, limit int) ([]models.User, int64, error) {
+func (r *userRepository) GetFollowers(viewerID *uint, targetUserID uint, page, limit int) ([]models.User, int64, error) {
 	var users []models.User
 	var total int64
 	offset := (page - 1) * limit
 
-	// Subquery untuk mendapatkan ID para follower
-	followerIDsSubQuery := r.db.Model(&models.UserFollow{}).
-		Select("user_following_id").
-		Where("user_followed_id = ? AND following_status = ?", userID, "accepted")
+	// Hitung Total followers target (yang sudah accepted)
+	r.db.Model(&models.UserFollow{}).
+		Where("user_followed_id = ? AND following_status = 'accepted'", targetUserID).
+		Count(&total)
 
-	// Hitung total follower
-	err := followerIDsSubQuery.Count(&total).Error
-	if err != nil {
-		return nil, 0, err
+	selectQuery := r.db.Model(&models.User{}).Select("users.*")
+
+	// JOIN Utama: Mendapatkan list followers si targetUser
+	selectQuery = selectQuery.Joins("JOIN user_follows AS target_follows ON target_follows.user_following_id = users.user_id").
+		Where("target_follows.user_followed_id = ? AND target_follows.following_status = 'accepted'", targetUserID)
+
+	if viewerID != nil {
+		// Logika Skor 4 Tingkat
+		selectQuery = selectQuery.Select(`
+			users.*, 
+			CASE 
+				WHEN users.user_id = ? THEN 3
+				WHEN viewer_follows.following_status = 'accepted' THEN 2
+				WHEN viewer_follows.following_status = 'pending' THEN 1
+				ELSE 0 
+			END AS priority_score`, *viewerID).
+			// PENTING: Kita hapus status='accepted' dari JOIN condition agar 'pending' juga ikut terbaca
+			Joins("LEFT JOIN user_follows AS viewer_follows ON viewer_follows.user_followed_id = users.user_id AND viewer_follows.user_following_id = ?", *viewerID).
+			Order("priority_score DESC")
 	}
 
-	// Ambil data user para follower dengan paginasi
-	err = r.db.Preload("Profile").
-		Where("user_id IN (?)", followerIDsSubQuery.Offset(offset).Limit(limit)).
+	err := selectQuery.
+		Preload("Profile").
+		Order("users.username ASC").
+		Limit(limit).
+		Offset(offset).
 		Find(&users).Error
 
 	return users, total, err
 }
 
-// GetFollowing mengambil daftar user yang diikuti oleh userID.
-func (r *userRepository) GetFollowing(userID uint, page, limit int) ([]models.User, int64, error) {
+func (r *userRepository) GetFollowing(viewerID *uint, targetUserID uint, page, limit int) ([]models.User, int64, error) {
 	var users []models.User
 	var total int64
 	offset := (page - 1) * limit
 
-	// Subquery untuk mendapatkan ID user yang di-follow
-	followingIDsSubQuery := r.db.Model(&models.UserFollow{}).
-		Select("user_followed_id").
-		Where("user_following_id = ? AND following_status = ?", userID, "accepted")
+	// Hitung Total following target (yang sudah accepted)
+	r.db.Model(&models.UserFollow{}).
+		Where("user_following_id = ? AND following_status = 'accepted'", targetUserID).
+		Count(&total)
 
-	// Hitung total
-	err := followingIDsSubQuery.Count(&total).Error
-	if err != nil {
-		return nil, 0, err
+	selectQuery := r.db.Model(&models.User{}).Select("users.*")
+
+	// JOIN Utama: Mendapatkan list siapa saja yang di-follow si targetUser
+	selectQuery = selectQuery.Joins("JOIN user_follows AS target_follows ON target_follows.user_followed_id = users.user_id").
+		Where("target_follows.user_following_id = ? AND target_follows.following_status = 'accepted'", targetUserID)
+
+	if viewerID != nil {
+		// Logika Skor 4 Tingkat yang sama
+		selectQuery = selectQuery.Select(`
+			users.*, 
+			CASE 
+				WHEN users.user_id = ? THEN 3
+				WHEN viewer_follows.following_status = 'accepted' THEN 2
+				WHEN viewer_follows.following_status = 'pending' THEN 1
+				ELSE 0 
+			END AS priority_score`, *viewerID).
+			Joins("LEFT JOIN user_follows AS viewer_follows ON viewer_follows.user_followed_id = users.user_id AND viewer_follows.user_following_id = ?", *viewerID).
+			Order("priority_score DESC")
 	}
 
-	// Ambil data user yang di-follow dengan paginasi
-	err = r.db.Preload("Profile").
-		Where("user_id IN (?)", followingIDsSubQuery.Offset(offset).Limit(limit)).
+	err := selectQuery.
+		Preload("Profile").
+		Order("users.username ASC").
+		Limit(limit).
+		Offset(offset).
 		Find(&users).Error
 
 	return users, total, err
+}
+
+func (r *userRepository) AcceptAllPendingFollows(userID uint) (int64, error) {
+	// Update semua yang pending menjadi accepted untuk user yang dituju (userID)
+	result := r.db.Model(&models.UserFollow{}).
+		Where("user_followed_id = ? AND following_status = ?", userID, "pending").
+		Update("following_status", "accepted")
+
+	return result.RowsAffected, result.Error
+}
+
+func (r *userRepository) GetPendingFollowerIDs(userID uint) ([]uint, error) {
+    var ids []uint
+    // Mengambil semua user_following_id (orang yang follow) yang statusnya pending untuk userID ini
+    err := r.db.Model(&models.UserFollow{}).
+        Where("user_followed_id = ? AND following_status = ?", userID, "pending").
+        Pluck("user_following_id", &ids).Error
+    
+    return ids, err
+}
+
+func (r *userRepository) BulkUpdateUserStat(db *gorm.DB, userIDs []uint, columnName string, amount int) error {
+    if len(userIDs) == 0 {
+        return nil
+    }
+    // Update total_following untuk SEMUA user yang ada di dalam list ID
+    return db.Model(&models.UserStat{}).
+        Where("user_id IN ?", userIDs).
+        Update(columnName, gorm.Expr(columnName+" + ?", amount)).Error
 }

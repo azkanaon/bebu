@@ -1,0 +1,1 @@
+ALTER TABLE platforms ADD COLUMN platform_image_url TEXT;

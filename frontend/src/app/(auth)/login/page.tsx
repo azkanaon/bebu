@@ -3,20 +3,25 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff } from 'lucide-react'
-import { useAuthActions } from '@/hooks/useAuthActions'
 import ResetPasswordModal from '@/components/auth/ResetPasswordModal'
+import { useLogin } from '@/api/auth/useLogin'
+import { toast } from 'sonner'
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [identifier, setIdentifier] = useState('') // Email or Username
   const [password, setPassword] = useState('')
   const [isResetOpen, setIsResetOpen] = useState(false)
+  const { mutate: login, isPending } = useLogin()
 
-  const { login, isLoading, error } = useAuthActions() // Pakai hook buatan kita
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    await login({ email_or_username: identifier, password })
+    if (!identifier || !password) {
+      toast.error('Email dan Password harus diisi')
+      return
+    }
+    if (isPending) return
+    login({ email_or_username: identifier, password })
   }
 
   return (
@@ -35,11 +40,6 @@ export default function LoginPage() {
       </div>
 
       <form className="space-y-5" onSubmit={handleSubmit}>
-        {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-medium">
-            {error}
-          </div>
-        )}
         {/* Input Groups */}
         <div className="space-y-1.5">
           <input
@@ -88,9 +88,9 @@ export default function LoginPage() {
         <button
           type="submit"
           className="h-12 w-full rounded-xl bg-my text-sm font-semibold text-font-button transition-all cursor-pointer hover:bg-ym hover:scale-[1.01] active:scale-[0.98]"
-          disabled={isLoading}
+          disabled={isPending}
         >
-          {isLoading ? 'Authenticating...' : 'Log in'}
+          {isPending ? 'Authenticating...' : 'Log in'}
         </button>
 
         {/* Divider */}

@@ -9,7 +9,7 @@ type Platform struct {
 	PlatformID       uint      `gorm:"column:platform_id;primaryKey;autoIncrement"`
 	PublicID         string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	PlatformName     string    `gorm:"column:platform_name;size:100;not null"`
-	PlatformImageURL *string   `gorm:"column:platform_image_url;type:text"`
+	Slug         	 string    `gorm:"column:slug;size:100;not null;unique"`
 	CreatedAt        time.Time `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt        time.Time `gorm:"column:updated_at;autoUpdateTime"`
 }

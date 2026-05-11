@@ -56,6 +56,14 @@ func main() {
 	shareService := services.NewPostShareService(shareRepo)
 	shareHandler := handlers.NewPostShareHandler(shareService)
 
+	gamificationRepo := repositories.NewGamificationRepository(db)
+	gamificationService := services.NewGamificationService(db, gamificationRepo, userRepo)
+	gamificationHandler := handlers.NewGamificationHandler(gamificationService)
+
+	platformRepo := repositories.NewPlatformRepository(db)
+	platformService := services.NewPlatformService(platformRepo)
+	platformHandler := handlers.NewPlatformHandler(platformService)
+
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
 
 	r := gin.Default()
@@ -67,17 +75,17 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler,) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
-	v1.Use(middlewares.CSRFMiddleware())
+	v1.Use()
 	{
 		auth := v1.Group("/auth")
 		{
@@ -116,6 +124,15 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 
 			users.GET("/:username/followers", authMiddleware.OptionalAuth(), userHandler.GetFollowers)
 			users.GET("/:username/following", authMiddleware.OptionalAuth(), userHandler.GetFollowing)
+
+			users.GET("/:username/badges", authMiddleware.OptionalAuth(), gamificationHandler.GetUserBadges)
+    		users.GET("/:username/achievements", authMiddleware.OptionalAuth(), gamificationHandler.GetUserAchievements)
+		}
+
+		profile := v1.Group("/profile").Use(authMiddleware.RequiredAuth())
+		{
+			profile.PUT("/favorite-badges", gamificationHandler.UpdateFavoriteBadges)
+			profile.PUT("/favorite-achievements", gamificationHandler.UpdateFavoriteAchievements)
 		}
 
 		followRequests := v1.Group("/follow-requests").Use(authMiddleware.RequiredAuth())
@@ -180,6 +197,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		}
 
 		v1.GET("/leaderboard", handlers.GetLeaderboard)
+		v1.GET("/platforms", platformHandler.GetAllPlatforms)
 
 		v1.POST("/report", authMiddleware.RequiredAuth(), reportHandler.CreateReport)
 	}

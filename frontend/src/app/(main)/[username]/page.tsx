@@ -6,6 +6,8 @@ import Achievements from '@/components/profile/Achievements'
 import Badges from '@/components/profile/Badges'
 import ActivityTracking from '@/components/profile/ActivityTracking'
 import PostTabs from '@/components/profile/PostTabs'
+import { useProfile } from '@/api/profile/useProfile'
+import { use } from 'react'
 
 const container = {
   hidden: { opacity: 0 },
@@ -29,7 +31,25 @@ const item = {
   },
 }
 
-export default function ProfilePage() {
+type Props = {
+  params: Promise<{
+    username: string
+  }>
+}
+
+export default function ProfilePage({ params }: Props) {
+  const { username } = use(params)
+
+  const { data, isLoading, error } = useProfile(username)
+
+  if (isLoading) {
+    return <div>Loading...</div>
+  }
+
+  if (error || !data) {
+    return <div>Error</div>
+  }
+
   return (
     <motion.div
       variants={container}
@@ -38,7 +58,16 @@ export default function ProfilePage() {
       className="space-y-6 py-4"
     >
       <motion.div variants={item}>
-        <ProfileHeader />
+        <ProfileHeader
+          publicId={data.publicId}
+          username={data.username}
+          profile={data.profile}
+          stats={data.stats}
+          socialLinks={data.socialLinks}
+          viewerContext={data.viewerContext}
+          settings={data.settings}
+          isPrivateAccount={data.isPrivateAccount}
+        />
       </motion.div>
 
       <motion.div variants={item}>

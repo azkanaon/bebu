@@ -1,4 +1,3 @@
-// src/types/auth.ts
 export interface User {
   user_public_id: string
   username: string
@@ -6,11 +5,12 @@ export interface User {
   avatar_url: string
   bio: string
   gender: string
+  role: string
 }
 
-export interface LoginResponse extends User {
-  // Biasanya ada token, saya tambahkan sebagai opsional jika backend mengirimnya
-  token?: string
+export interface LoginResponse {
+  data: User // Data user ada di dalam sini
+  message: string
 }
 
 // Request menggunakan snake_case sesuai tag JSON backend kamu

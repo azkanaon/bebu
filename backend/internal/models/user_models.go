@@ -24,13 +24,14 @@ type User struct {
     
     Profile        *UserProfile    `gorm:"foreignKey:UserID;references:UserID"`
     Settings       *UserSetting   `gorm:"foreignKey:UserID;references:UserID"`
+    Stats          *UserStat       `gorm:"foreignKey:UserID;references:UserID"`
     PasswordResets []PasswordReset `gorm:"foreignKey:UserID"`
     Sessions       []UserSession   `gorm:"foreignKey:UserID"`
     SocialLinks    []UserSocialLink  `gorm:"foreignKey:UserID"`
     Posts          []Post            `gorm:"foreignKey:UserID"`
 
-    UserAchievements []UserAchievement `gorm:"foreignKey:UserID"`
-    Badges           []Badge           `gorm:"many2many:user_badges;foreignKey:UserID;joinForeignKey:UserID;References:BadgeID;joinReferences:BadgeID"`
+    FavoriteUserBadges []UserBadge `gorm:"foreignKey:UserID;references:UserID"`
+	FavoriteUserAchievements []UserAchievement `gorm:"foreignKey:UserID;references:UserID"`
 }
 
 type UserProfile struct {
@@ -93,10 +94,12 @@ type PasswordReset struct {
 
 // UserStat merepresentasikan tabel 'user_stats' di database.
 type UserStat struct {
-	UserID         uint      `gorm:"primaryKey"` // UserID adalah primary key, memastikan 1 baris per user
+	UserID         uint      `gorm:"primaryKey"`
 	TotalFollowers int       `gorm:"not null;default:0"`
 	TotalFollowing int       `gorm:"not null;default:0"`
 	TotalPosts     int       `gorm:"not null;default:0"`
+    TotalBadges        int `json:"totalBadges"`        
+    TotalAchievements  int `json:"totalAchievements"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime"`
 
 	// Relasi: Statistik ini dimiliki oleh satu user.

@@ -33,7 +33,6 @@ export const authService = {
 
     const response = await api.post('/v1/auth/register', formData, {
       headers: {
-        // Axios otomatis mengatur boundary jika kita kirim FormData
         'Content-Type': 'multipart/form-data',
       },
     })
@@ -48,6 +47,11 @@ export const authService = {
 
   resetPassword: async (payload: ResetPasswordPayload) => {
     const response = await api.post('/v1/password/reset', payload)
+    return response.data
+  },
+
+  logout: async () => {
+    const response = await api.post('/v1/auth/logout')
     return response.data
   },
 }

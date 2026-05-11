@@ -9,39 +9,39 @@ import (
 
 func CSRFMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Abaikan pengecekan untuk metode yang aman (tidak mengubah data)
 		method := c.Request.Method
 		path := c.Request.URL.Path
 
-		// Abaikan pengecekan untuk metode aman ATAU rute Auth awal
 		if method == "GET" || method == "OPTIONS" ||
 			path == "/api/v1/auth/login" || path == "/api/v1/auth/register" ||
-           path == "/api/v1/auth/logout" {
+			path == "/api/v1/auth/logout" {
 			c.Next()
 			return
 		}
 
-		// 1. Ambil token dari cookie
+		// 1. Ambil token dari cookie (Gin sudah otomatis unescape nilai cookie)
 		cookieToken, err := c.Cookie("csrf-token")
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "CSRF cookie not found"})
 			return
 		}
 
-		// 2. Ambil token dari header
+		// 2. Ambil token dari header (Ambil nilai aslinya/RAW)
 		headerToken := c.GetHeader("X-CSRF-Token")
 		if headerToken == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "CSRF header not found"})
 			return
 		}
 
-		// 3. Bandingkan keduanya
+		// --- BAGIAN DEBUGGING (Hapus jika sudah lancar) ---
+		// fmt.Printf("DEBUG CSRF: \nCookie: %s\nHeader: %s\n", cookieToken, headerToken)
+
+		// 3. Bandingkan secara langsung
 		if cookieToken != headerToken {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "CSRF token mismatch"})
 			return
 		}
 
-		// Jika semuanya cocok, lanjutkan request
 		c.Next()
 	}
 }

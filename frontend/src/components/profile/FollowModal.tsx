@@ -1,101 +1,140 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Search } from 'lucide-react'
+import { X, Search, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useInView } from 'react-intersection-observer'
 import ClientPortal from '../ClientPortal'
+import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 
-type User = {
-  id: number
-  username: string
-  name: string
-  avatar: string
-  isFollowing: boolean
-}
+import { useFollowUser } from '@/api/profile/useFollowUser'
+import { useUnfollowUser } from '@/api/profile/useUnfollowUser'
+import { FollowUserData } from '@/types/follow'
+import {
+  useInfiniteFollowers,
+  useInfiniteFollowing,
+} from '@/hooks/useInfiniteFollow'
 
 type Props = {
   open: boolean
   onClose: () => void
   initialTab?: 'followers' | 'following'
-  followers: User[]
-  following: User[]
+  username: string
 }
 
 export default function FollowModal({
   open,
   onClose,
   initialTab = 'followers',
-  followers,
-  following,
+  username,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'followers' | 'following'>(
     initialTab,
   )
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    setActiveTab(initialTab)
-  }, [initialTab])
+  // INFINITE HOOKS
+  const {
+    data: followersData,
+    fetchNextPage: fetchFollowers,
+    hasNextPage: hasMoreFollowers,
+    isFetchingNextPage: isFetchingFollowers,
+    isLoading: loadingFollowers,
+  } = useInfiniteFollowers(username)
 
-  const users = useMemo(() => {
-    const list = activeTab === 'followers' ? followers : following
-    return list.filter(
+  const {
+    data: followingData,
+    fetchNextPage: fetchFollowing,
+    hasNextPage: hasMoreFollowing,
+    isFetchingNextPage: isFetchingFollowing,
+    isLoading: loadingFollowing,
+  } = useInfiniteFollowing(username)
+
+  // OBSERVER untuk Infinite Scroll
+  const { ref, inView } = useInView()
+
+  useEffect(() => {
+    if (inView) {
+      if (activeTab === 'followers' && hasMoreFollowers) fetchFollowers()
+      if (activeTab === 'following' && hasMoreFollowing) fetchFollowing()
+    }
+  }, [
+    inView,
+    activeTab,
+    hasMoreFollowers,
+    hasMoreFollowing,
+    fetchFollowers,
+    fetchFollowing,
+  ])
+
+  useEffect(() => {
+    if (open) setActiveTab(initialTab)
+  }, [open, initialTab])
+
+  // GABUNGKAN PAGES MENJADI SATU ARRAY
+  const currentResponse =
+    activeTab === 'followers' ? followersData : followingData
+  const allUsers = useMemo(() => {
+    return currentResponse?.pages.flatMap((page) => page.data) || []
+  }, [currentResponse])
+
+  const isLoading =
+    activeTab === 'followers' ? loadingFollowers : loadingFollowing
+  const isFetchingNext =
+    activeTab === 'followers' ? isFetchingFollowers : isFetchingFollowing
+
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter(
       (u) =>
         u.username.toLowerCase().includes(search.toLowerCase()) ||
-        u.name.toLowerCase().includes(search.toLowerCase()),
+        u.displayName.toLowerCase().includes(search.toLowerCase()),
     )
-  }, [activeTab, followers, following, search])
+  }, [allUsers, search])
 
   return (
     <AnimatePresence>
       {open && (
         <ClientPortal>
-          {/* BACKDROP */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.6 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[100] bg-black backdrop-blur-sm"
+            className="fixed inset-0 z-100 bg-black backdrop-blur-sm"
           />
 
-          {/* WRAPPER */}
-          <div className="fixed inset-0 z-[110] flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
-            {/* MODAL CONTENT */}
+          <div className="fixed inset-0 z-110 flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
             <motion.div
-              // MENGGUNAKAN 100dvh AGAR MENEMBUS LAYAR SAAT EXIT
               initial={{ y: '100dvh', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100dvh', opacity: 0 }}
-              transition={{
-                type: 'spring',
-                damping: 28, // Sedikit lebih smooth
-                stiffness: 220,
-              }}
-              className="pointer-events-auto relative w-full h-[85dvh] md:h-auto md:max-h-[75vh] md:w-[420px] bg-[#0B1220] rounded-t-[1.5rem] md:rounded-[1.5rem] border border-white/10 shadow-2xl flex flex-col overflow-hidden"
+              transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+              className="pointer-events-auto relative w-full h-[85dvh] md:h-auto md:max-h-[75vh] md:w-105 bg-[#0B1220] rounded-t-3xl md:rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden"
             >
               {/* HEADER */}
-              <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0">
-                <h2 className="text-base font-semibold text-white tracking-tight">
+              <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
+                <h2 className="text-sm font-bold text-white tracking-tight uppercase italic">
                   Connections
                 </h2>
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-gray-400"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 outline-none"
                 >
                   <X size={18} />
                 </button>
               </div>
 
               {/* TABS */}
-              <div className="flex border-b border-white/5 bg-white/[0.01] shrink-0">
+              <div className="flex border-b border-white/5 bg-white/1 shrink-0">
                 {(['followers', 'following'] as const).map((tab) => {
                   const isActive = activeTab === tab
                   return (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className="relative flex-1 py-2.5 text-[11px] font-semibold uppercase tracking-wider transition-colors"
+                      className="relative flex-1 py-3 text-[11px] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
                     >
                       <span
                         className={isActive ? 'text-white' : 'text-gray-500'}
@@ -125,60 +164,56 @@ export default function FollowModal({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search..."
-                    className="w-full rounded-xl border border-white/5 bg-white/5 px-9 py-1.5 text-sm text-white placeholder:text-gray-600 outline-none focus:bg-white/[0.08] transition-all"
+                    className="w-full rounded-xl border border-white/5 bg-white/5 px-9 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:bg-white/8 transition-all"
                   />
                 </div>
               </div>
 
               {/* USER LIST */}
               <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeTab}
-                    initial={{ opacity: 0, x: 5 }} // Gunakan x agar transisi antar tab lebih manis
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -5 }}
-                    transition={{ duration: 0.15 }}
-                    className="p-1"
-                  >
-                    {users.map((user) => (
-                      <div
-                        key={user.id}
-                        className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-white/[0.02] transition-colors group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={user.avatar}
-                            alt={user.username}
-                            className="h-9 w-9 rounded-full object-cover border border-white/10"
-                          />
-                          <div>
-                            <p className="text-xs md:text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">
-                              {user.name}
-                            </p>
-                            <p className="text-[10px] md:text-xs text-gray-500">
-                              @{user.username}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          className={`px-3.5 py-1.5 rounded-lg text-[10px] md:text-xs font-semibold transition-all active:scale-95 ${
-                            user.isFollowing
-                              ? 'bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10 hover:text-white'
-                              : 'bg-blue-600 text-white hover:bg-blue-500'
-                          }`}
-                        >
-                          {user.isFollowing ? 'Following' : 'Follow'}
-                        </button>
-                      </div>
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-gray-500 gap-2">
+                    <Loader2 size={24} className="animate-spin text-blue-500" />
+                    <p className="text-[10px] uppercase tracking-widest font-medium">
+                      Loading data...
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-1">
+                    {filteredUsers.map((user) => (
+                      <UserRow
+                        key={user.username}
+                        user={user}
+                        onCloseModal={onClose}
+                        ownerUsername={username}
+                        activeTab={activeTab}
+                      />
                     ))}
-                    {users.length === 0 && (
+
+                    {/* SENTINEL / INFINITE SCROLL TRIGGER */}
+                    <div ref={ref} className="py-6 flex justify-center">
+                      {isFetchingNext ? (
+                        <Loader2
+                          size={20}
+                          className="animate-spin text-blue-500"
+                        />
+                      ) : (hasMoreFollowers || hasMoreFollowing) &&
+                        filteredUsers.length > 0 ? (
+                        <div className="h-1 w-1" />
+                      ) : filteredUsers.length > 0 ? (
+                        <p className="text-[10px] text-gray-600 italic uppercase tracking-widest">
+                          End of list
+                        </p>
+                      ) : null}
+                    </div>
+
+                    {filteredUsers.length === 0 && (
                       <div className="py-12 text-center text-xs text-gray-600 italic tracking-wide">
-                        No results found
+                        No {activeTab} found
                       </div>
                     )}
-                  </motion.div>
-                </AnimatePresence>
+                  </div>
+                )}
               </div>
 
               {/* MOBILE CLOSE */}
@@ -195,5 +230,103 @@ export default function FollowModal({
         </ClientPortal>
       )}
     </AnimatePresence>
+  )
+}
+
+function UserRow({
+  user,
+  onCloseModal,
+  ownerUsername,
+  activeTab,
+}: {
+  user: FollowUserData
+  onCloseModal: () => void
+  ownerUsername: string
+  activeTab: string
+}) {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const { isFollowing, isOwnProfile, isPending } = user.viewerContext
+  const { mutate: follow, isPending: fLoading } = useFollowUser()
+  const { mutate: unfollow, isPending: uLoading } = useUnfollowUser()
+
+  const handleNavigate = () => {
+    onCloseModal()
+    router.push(`/${user.username}`)
+  }
+
+  const handleAction = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isFollowing || isPending) {
+      unfollow(user.username, {
+        onSuccess: () =>
+          queryClient.invalidateQueries({
+            queryKey: [activeTab, ownerUsername],
+          }),
+      })
+    } else {
+      follow(user.username, {
+        onSuccess: () =>
+          queryClient.invalidateQueries({
+            queryKey: [activeTab, ownerUsername],
+          }),
+      })
+    }
+  }
+
+  return (
+    <div
+      onClick={handleNavigate}
+      className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/2 transition-all group cursor-pointer active:scale-[0.98]"
+    >
+      <div className="flex items-center gap-3">
+        <div className="relative h-9 w-9 border border-white/10 rounded-full overflow-hidden bg-white/5">
+          {user.avatarUrl ? (
+            <Image
+              src={user.avatarUrl}
+              alt={user.username}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500 font-bold">
+              {user.username.substring(0, 2).toUpperCase()}
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="text-xs md:text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">
+            {user.displayName}
+          </p>
+          <p className="text-[10px] md:text-xs text-gray-500">
+            @{user.username}
+          </p>
+        </div>
+      </div>
+
+      {!isOwnProfile && (
+        <button
+          disabled={fLoading || uLoading}
+          onClick={handleAction}
+          className={`px-3.5 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all min-w-21.25 flex justify-center ${
+            isFollowing
+              ? 'bg-white/5 text-gray-400 border border-white/5'
+              : isPending
+                ? 'bg-white/5 text-gray-500 italic'
+                : 'bg-blue-600 text-white'
+          }`}
+        >
+          {fLoading || uLoading ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : isFollowing ? (
+            'Following'
+          ) : isPending ? (
+            'Requested'
+          ) : (
+            'Follow'
+          )}
+        </button>
+      )}
+    </div>
   )
 }
