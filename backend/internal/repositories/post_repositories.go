@@ -4,6 +4,7 @@ import (
 	"backend-bebu/internal/models"
 
 	"gorm.io/gorm"
+	"errors"
 )
 
 // --- 1. Interface (Publik, tanpa 'I') ---
@@ -11,6 +12,7 @@ import (
 type PostRepository interface {
 	GetAllPosts(userID uint) ([]models.Post, error)
 	CreatePost(post *models.Post) (*models.Post, error)
+	DeletePost(postID uint, userID uint) error
 	GetPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error)
 	GetLikedPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error)
 	GetSavedPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error)
@@ -44,8 +46,9 @@ func (r *postRepository) GetAllPosts(userID uint) ([]models.Post, error) {
         Preload("Book.BookAuthors.Author"). 
         Preload("Book.BookGenres.Genre").
         Preload("Stats").
+		Preload("Categories").
         Preload("Comments", func(db *gorm.DB) *gorm.DB {
-            return db.Where("post_comment_id IN (SELECT post_comment_id FROM (SELECT post_comment_id, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY created_at DESC) as rn FROM post_comments WHERE parent_comment_id IS NULL) tmp WHERE rn <= 2)")
+            return db.Where("post_comment_id IN (SELECT post_comment_id FROM (SELECT post_comment_id, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY created_at DESC) as rn FROM post_comments WHERE parent_comment_id IS NULL) tmp WHERE rn <= 3)")
         }).
         Preload("Comments.User.Profile").
         Where("publish_status = ?", "published").
@@ -54,7 +57,6 @@ func (r *postRepository) GetAllPosts(userID uint) ([]models.Post, error) {
 
 	for i := range posts {
 		if posts[i].Stats != nil {
-			// ✅ GUNAKAN TotalLikes, karena Likes sudah dipakai oleh slice []PostLike
 			posts[i].TotalLikes = posts[i].Stats.LikeCount
 		}
 	}
@@ -90,15 +92,28 @@ func (r *postRepository) GetPostsByUserID(userID uint, page, limit int) ([]model
 	return posts, total, err
 }
 
-// CreatePost menyimpan post baru ke database.
 func (r *postRepository) CreatePost(post *models.Post) (*models.Post, error) {
 	result := r.db.Create(post)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	// Anda mungkin perlu me-reload relasi Stats yang mungkin dibuat oleh trigger/logika lain
-	// r.db.Preload("Stats").First(post, post.PostID)
+	
 	return post, nil
+}
+
+func (r *postRepository) DeletePost(postID uint, userID uint) error {
+    result := r.db.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&models.Post{})
+    
+    if result.Error != nil {
+        return result.Error
+    }
+
+    // Jika tidak ada baris yang terpengaruh, berarti post tidak ditemukan atau bukan milik user
+    if result.RowsAffected == 0 {
+        return errors.New("post not found or you're not authorized")
+    }
+
+    return nil
 }
 
 func (r *postRepository) WithTx(tx *gorm.DB) PostRepository {
@@ -229,17 +244,16 @@ func (r *postRepository) UpdateSaveCount(postID uint, increment int) error {
 
 func (r *postRepository) GetCommentsByPostID(postID uint, userID uint) ([]models.PostComment, error) {
 	var comments []models.PostComment
-	err := r.db.Debug().
-		Where("post_id = ? AND parent_comment_id IS NULL", postID).
-		Preload("User.Profile").
-		Preload("Likes", "user_id = ?", userID).
-		Preload("Replies.User.Profile").
-		Preload("Replies.Likes", "user_id = ?", userID).
-		Preload("Replies.Replies.User.Profile").
-		Preload("Replies.Replies.Likes", "user_id = ?", userID).
-		Order("created_at DESC").
-		Find(&comments).Error
-	return comments, err
+    
+    // Ambil SEMUA komentar untuk post ini tanpa filter parent_id
+    err := r.db.Debug().
+        Where("post_id = ?", postID).
+        Preload("User.Profile").
+        Preload("Likes", "user_id = ?", userID).
+        Order("created_at ASC"). // ASC agar parent biasanya diproses lebih dulu
+        Find(&comments).Error
+        
+    return comments, err
 }
 
 func (r *postRepository) DecrementCommentCountByAmount(postID uint, amount int) error {

@@ -91,8 +91,6 @@ type PasswordReset struct {
 	User User `gorm:"foreignKey:UserID;references:UserID"`
 }
 
-
-// UserStat merepresentasikan tabel 'user_stats' di database.
 type UserStat struct {
 	UserID         uint      `gorm:"primaryKey"`
 	TotalFollowers int       `gorm:"not null;default:0"`
@@ -102,6 +100,6 @@ type UserStat struct {
     TotalAchievements  int `json:"totalAchievements"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime"`
 
-	// Relasi: Statistik ini dimiliki oleh satu user.
-	User User `gorm:"foreignKey:UserID"`
+    // Relations
+	User User `gorm:"foreignKey:UserID;references:UserID"`
 }

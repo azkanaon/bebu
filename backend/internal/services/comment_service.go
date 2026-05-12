@@ -11,7 +11,7 @@ import (
 type CommentService interface {
 	AddComment(userID uint, req dto.CreateCommentRequest) (*models.PostComment, error)
 	ToggleLike(userID, commentID uint) (bool, error)
-	SoftDeleteComment(commentID uint, userID uint, postID uint) error
+	SoftDeleteComment(commentID uint, userID uint, postID uint) (int, error)
 }
 
 type commentService struct {
@@ -58,18 +58,23 @@ func (s *commentService) ToggleLike(userID, commentID uint) (bool, error) {
 	return s.repo.ToggleLikeComment(userID, commentID)
 }
 
-func (s *commentService) SoftDeleteComment(commentID uint, userID uint, postID uint) error {
-	replyCount, err := s.repo.CountReplies(commentID)
+func (s *commentService) SoftDeleteComment(commentID uint, userID uint, postID uint) (int, error) {
+    totalReplies, err := s.repo.CountAllRepliesRecursive(commentID)
     if err != nil {
-        return err
+        return 0, err
     }
     
-    totalToDelete := int(replyCount) + 1
+    totalToDelete := int(totalReplies) + 1
 
     err = s.repo.DeleteCommentRecursive(commentID, userID)
     if err != nil {
-        return err
+        return 0, err
     }
 
-    return s.postRepo.DecrementCommentCountByAmount(postID, totalToDelete)
+    err = s.postRepo.DecrementCommentCountByAmount(postID, totalToDelete)
+    if err != nil {
+        return 0, err
+    }
+
+    return totalToDelete, nil // Kembalikan angka ini
 }

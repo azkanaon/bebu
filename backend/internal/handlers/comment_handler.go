@@ -66,20 +66,23 @@ func (h *CommentHandler) DeleteComment(c *gin.Context) {
     commentID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
     userID := c.MustGet("userID").(uint)
     
-    // Kita butuh postID dari query string untuk update statistik
-    // Contoh: DELETE /v1/comments/12?post_id=5
+    // Ambil post_id
     postID, _ := strconv.ParseUint(c.Query("post_id"), 10, 32)
 
     if postID == 0 {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "post_id diperlukan"})
+        c.JSON(http.StatusBadRequest, gin.H{"error": "post_id diperlukan untuk update statistik"})
         return
     }
 
-    err := h.service.SoftDeleteComment(uint(commentID), userID, uint(postID))
+    // UBAH: Minta service mengembalikan jumlah total yang dihapus
+    deletedCount, err := h.service.SoftDeleteComment(uint(commentID), userID, uint(postID))
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
 
-    c.JSON(http.StatusOK, gin.H{"message": "Komentar dan balasannya berhasil dihapus"})
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Komentar dan balasannya berhasil dihapus",
+        "deleted_count": deletedCount,
+    })
 }

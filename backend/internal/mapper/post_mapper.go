@@ -10,12 +10,14 @@ func ToReviewPostResponse(p models.Post, currentUserID uint) dto.ReviewPostRespo
 	var res dto.ReviewPostResponse
 
 	res.ID = p.PostID
+	res.PostPublicID = p.PublicID
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
-	res.CreatedAt = p.CreatedAt.Format("2006-01-02")
+	res.CreatedAt = p.CreatedAt
 	res.Book.Rating = int(p.Rating)
 
 	if p.User != nil && p.User.Profile != nil {
+		res.User.PublicID = p.User.PublicID
 		res.User.Username = p.User.Username
 		res.User.DisplayName = p.User.Profile.DisplayName
 		res.User.Avatar = p.User.Profile.AvatarUrl
@@ -71,12 +73,14 @@ func ToAnalysisPostResponse(p models.Post, currentUserID uint) dto.AnalysisPostR
 	var res dto.AnalysisPostResponse
 
 	res.ID = p.PostID
+	res.PostPublicID = p.PublicID
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
 	res.Image = p.ImgURL
-	res.CreatedAt = p.CreatedAt.Format("2006-01-02")
+	res.CreatedAt = p.CreatedAt
 
 	if p.User != nil && p.User.Profile != nil {
+		res.User.PublicID = p.User.PublicID
 		res.User.DisplayName = p.User.Profile.DisplayName
 		res.User.Avatar = p.User.Profile.AvatarUrl
 	}
@@ -100,6 +104,14 @@ func ToAnalysisPostResponse(p models.Post, currentUserID uint) dto.AnalysisPostR
 		commentDTO := ToCommentResponse(commentModel, currentUserID)
 		res.CommentList = append(res.CommentList, commentDTO)
 	}
+
+	res.Categories = []dto.CategoryResponse{}
+    for _, cat := range p.Categories {
+        res.Categories = append(res.Categories, dto.CategoryResponse{
+            ID:   cat.CategoryID,
+            Name: cat.CategoryName,
+        })
+    }
 
 	return res
 }

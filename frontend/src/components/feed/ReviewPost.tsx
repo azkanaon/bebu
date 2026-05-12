@@ -2,13 +2,29 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { usePostStore } from "@/stores/usePostStore";
-import { ReviewPostType } from "@/types/post";
-import { ThumbsUp, MessageCircle, Share2, Bookmark, Star } from "lucide-react";
+import { ReviewPostType, CommentType, } from "@/types/post";
+import {
+	ThumbsUp,
+	MessageCircle,
+	Share2,
+	Bookmark,
+	MoreVertical,
+	Trash2,
+	Flag,
+	AlertTriangle,
+} from "lucide-react";
 import PostMenu from "./PostMenu";
-import { toggleLikeAPI, toggleSaveAPI, createCommentAPI } from "@/lib/api";
+import {
+	toggleLikeAPI,
+	toggleSaveAPI,
+	createCommentAPI,
+	deleteCommentAPI,
+} from "@/lib/api";
 import { useState, useEffect } from "react";
 import CommentModal from "./CommentModal";
 import ShareModal from "./ShareModal";
+import { timeAgo } from "@/lib/utils";
+import ReportModal from "./ReportModal";
 
 type Props = {
 	post: ReviewPostType;
@@ -117,18 +133,139 @@ export default function ReviewPost({ post, isModalView = false }: Props) {
 		addShareCountStore(post.id, count);
 	};
 
+	// Change rating color sesuai rating number
+	const getRatingStyle = (rating: number) => {
+		if (rating >= 4.5) {
+			return {
+				bg: "bg-cyan-500/10",
+				border: "border-cyan-400/20",
+				text: "text-cyan-300",
+				glow: "shadow-[0_0_18px_rgba(34,211,238,0.12)]",
+			};
+		}
+
+		if (rating >= 4.0) {
+			return {
+				bg: "bg-emerald-500/10",
+				border: "border-emerald-400/20",
+				text: "text-emerald-300",
+				glow: "shadow-[0_0_18px_rgba(74,222,128,0.10)]",
+			};
+		}
+
+		if (rating >= 3.0) {
+			return {
+				bg: "bg-yellow-500/10",
+				border: "border-yellow-400/20",
+				text: "text-yellow-300",
+				glow: "shadow-[0_0_18px_rgba(250,204,21,0.10)]",
+			};
+		}
+
+		if (rating >= 2.0) {
+			return {
+				bg: "bg-orange-500/10",
+				border: "border-orange-400/20",
+				text: "text-orange-300",
+				glow: "shadow-[0_0_18px_rgba(251,146,60,0.10)]",
+			};
+		}
+
+		return {
+			bg: "bg-red-500/10",
+			border: "border-red-400/20",
+			text: "text-red-300",
+			glow: "shadow-[0_0_18px_rgba(248,113,113,0.10)]",
+		};
+	};
+
+	const ratingStyle = getRatingStyle(post.book.rating);
+
+	const authStorage = localStorage.getItem("bebu-auth-storage");
+	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
+
+	const user = parsedStorage?.state?.user?.data;
+	const currentUserId = user?.user_public_id;
+	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+	const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+	const handleDelete = async (commentId: number, postId: number) => {
+		const previousComments = localCommentList;
+		const previousCount = localCommentsCount;
+
+		try {
+			setLocalCommentList((prev) => {
+				const removeRecursive = (
+					list: CommentType[],
+				): CommentType[] => {
+					return list
+						.filter((c) => c.id !== commentId)
+						.map((c) => ({
+							...c,
+							replies: removeRecursive(c.replies || []),
+						}));
+				};
+				return removeRecursive(prev);
+			});
+
+			setLocalCommentsCount((prev) => Math.max(prev - 1, 0));
+			setOpenMenuId(null);
+
+			const response = await deleteCommentAPI(commentId, postId);
+
+			const actualDeleted = response?.deleted_count;
+			if (actualDeleted > 1) {
+				const remainingToReduce = actualDeleted - 1;
+				setLocalCommentsCount((prev) =>
+					Math.max(prev - remainingToReduce, 0),
+				);
+			}
+		} catch (err) {
+			console.error("Gagal menghapus:", err);
+			setLocalCommentList(previousComments);
+			setLocalCommentsCount(previousCount);
+			alert("Gagal menghapus komentar.");
+		}
+	};
+
+	const [reportTarget, setReportTarget] = useState<{
+		id: number;
+		type: "post" | "comment";
+	} | null>(null);
+
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+
+			// kalau klik masih di area dropdown/menu
+			if (target.closest("[data-comment-menu]")) {
+				return;
+			}
+
+			setOpenMenuId(null);
+			setConfirmDeleteId(null);
+		};
+
+		document.addEventListener("mousedown", handleClickOutside);
+
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, []);
+
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: 10 }}
 			animate={{ opacity: 1, y: 0 }}
-			whileHover={isModalView ? {} : { y: -2 }}
+			whileHover={isModalView ? {} : { y: -1.5 }}
 			transition={{ duration: 0.2 }}
 			className={`
 				bg-gradient-to-b from-gray-900 to-gray-950
 				border border-gray-800
 				rounded-2xl
 				p-4
-				space-y-4
+				space-y-3
 				shadow-[0_6px_30px_rgba(0,0,0,0.4)]
 				${
 					isModalView
@@ -139,77 +276,147 @@ export default function ReviewPost({ post, isModalView = false }: Props) {
 		>
 			{/* Header */}
 			<div className="flex items-start justify-between">
-				<div className="flex gap-3">
+				<div className="flex gap-2.5 cursor-pointer group">
 					<img
-						src={post.user.avatar}
-						className="w-11 h-11 rounded-full ring-2 ring-gray-700"
+						src={
+							post.user.avatar ||
+							"https://ui-avatars.com/api/?name=" +
+								post.user.username
+						}
+						className="
+							w-10 h-10 rounded-full
+							ring-2 ring-gray-700
+							transition
+							group-hover:ring-blue-500/50
+							group-hover:scale-[1.03]
+						"
 					/>
 
 					<div>
-						<div className="font-semibold text-white leading-tight">
-							{post.user.displayName}
-						</div>
-						<div className="text-xs text-gray-400">
-							@{post.user.username} • {post.createdAt}
+						<div className="pt-[1px]">
+							<div
+								className="
+									font-semibold text-white leading-snug
+									transition-colors
+									group-hover:text-blue-100
+								"
+							>
+								{post.user.displayName}
+							</div>
+
+							<div className="flex items-center gap-1 text-xs">
+								<span className="text-gray-400">
+									@{post.user.username}
+								</span>
+
+								<span className="text-gray-600">•</span>
+
+								<span className="text-gray-500">
+									{timeAgo(post.createdAt)}
+								</span>
+							</div>
 						</div>
 					</div>
 				</div>
 
-				<PostMenu postId={post.id} />
+				<PostMenu
+					postId={post.id}
+					userPublicID={post.user.publicID}
+					postPublicID={post.post_public_id}
+				/>
 			</div>
 
 			{/* Content */}
-			<p className="text-gray-200 leading-relaxed">{post.content}</p>
+			<p className="text-[#d7dbe4] leading-relaxed max-w-[95%] font-[425] antialiased">
+				{post.content}
+			</p>
 
 			{/* Book Card */}
 			<motion.div
-				whileHover={{ scale: 1.01 }}
+				whileHover={{ y: -1 }}
+				transition={{ duration: 0.18 }}
 				className="
-					relative flex gap-4
-					bg-gradient-to-br from-gray-800/80 to-gray-900/80
-					border border-gray-700/50
-					backdrop-blur-md
-					p-3
-					rounded-xl
-					overflow-hidden
-					bg-right-bar
-				"
+		relative flex gap-4
+		bg-gradient-to-br from-gray-800/70 to-gray-900/80
+		border border-gray-700/40
+		backdrop-blur-md
+		p-3
+		rounded-2xl
+		overflow-hidden
+	"
 			>
-				{/* Glow effect */}
-				<div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 pointer-events-none" />
+				{/* Subtle ambient glow */}
+				<div className="absolute inset-0 bg-gradient-to-r from-blue-500/[0.03] to-purple-500/[0.03] pointer-events-none" />
+
+				{/* Left accent glow */}
+				<div className="absolute left-0 top-0 h-full w-24 bg-gradient-to-r from-white/[0.03] to-transparent pointer-events-none" />
+
+				{/* Soft texture overlay */}
+				<div className="absolute inset-0 bg-white/[0.015] pointer-events-none" />
 
 				{/* Cover */}
-				<img
-					src={post.book.cover}
-					className="w-20 h-28 object-cover rounded-md shadow-md"
-				/>
+				<div className="relative shrink-0">
+					<img
+						src={post.book.cover}
+						alt={post.book.title}
+						className="
+				w-20 h-28
+				object-cover
+				rounded-lg
+				border border-white/10
+				ring-1 ring-white/5
+				shadow-[0_8px_24px_rgba(0,0,0,0.35)]
+			"
+					/>
+				</div>
 
 				{/* Info */}
-				<div className="flex-1 space-y-1 pr-16">
-					<div className="font-semibold text-white">
+				<div className="flex-1 min-w-0 space-y-0.5 pr-16">
+					{/* Title */}
+					<div
+						className="
+				font-semibold
+				tracking-tight
+				text-white
+				text-[15px]
+				leading-snug
+				line-clamp-2
+			"
+					>
 						{post.book.title}
 					</div>
 
-					<div className="text-sm text-gray-400">
+					{/* Author */}
+					<div
+						className="
+				text-sm
+				font-medium
+				text-gray-300
+				truncate
+			"
+					>
 						{post.book.author}
 					</div>
 
-					<div className="text-xs text-gray-400">
+					{/* Meta */}
+					<div className="text-xs text-gray-500">
 						{post.book.pages} halaman
 					</div>
 
-					<div className="flex flex-wrap gap-1 pt-1">
+					{/* Genres */}
+					<div className="flex flex-wrap gap-1.5 pt-1">
 						{post.book.genres?.map((g) => (
 							<span
 								key={g}
 								className="
-									text-[11px]
-									bg-gray-700/70
-									border border-gray-600/50
-									px-2 py-[2px]
-									rounded-full
-									text-gray-300
-								"
+						text-[11px]
+						bg-gray-700/40
+						backdrop-blur-sm
+						border border-gray-600/30
+						px-2 py-[3px]
+						rounded-full
+						text-gray-300
+					"
 							>
 								{g}
 							</span>
@@ -218,130 +425,510 @@ export default function ReviewPost({ post, isModalView = false }: Props) {
 				</div>
 
 				{/* Rating */}
-				<div className="absolute top-3 right-3 flex gap-[2px]">
-					{Array.from({ length: post.book.rating }).map((_, i) => (
-						<Star
-							key={i}
-							className="w-4 h-4 fill-yellow-400 text-yellow-400 drop-shadow"
-						/>
-					))}
+				<div
+					className={`
+						absolute top-4 right-4
+						flex items-center gap-1
+						px-2.5 py-1
+						rounded-full
+						backdrop-blur-sm
+						border
+						text-xs font-semibold
+						tabular-nums
+						transition-all duration-300
+						${ratingStyle.bg}
+						${ratingStyle.border}
+						${ratingStyle.text}
+						${ratingStyle.glow}
+						ring-1 ring-white/[0.03]
+					`}
+				>
+					<span className="text-[10px] opacity-80">★</span>
+
+					<span>{post.book.rating.toFixed(1)}</span>
 				</div>
 			</motion.div>
 
 			{/* Actions */}
-			<div className="flex items-center justify-between pt-2 border-t border-gray-800">
-				<div className="flex gap-6 text-sm text-gray-400">
+			<div className="flex items-center justify-between">
+				<div className="flex gap-1 text-sm">
+					{/* Like */}
 					<motion.button
-						whileTap={{ scale: 0.9 }}
-						onClick={handleLike} // <-- Hubungkan di sini
+						whileTap={{ scale: 0.97 }}
+						onClick={handleLike}
 						disabled={isLoading}
-						className={`flex items-center gap-1 transition ${
-							currentData.is_liked
-								? "text-blue-500"
-								: "hover:text-blue-400 text-gray-500"
-						}`}
+						className={`
+				flex items-center gap-1.5
+				px-2 py-1.5
+				rounded-full
+				transition-all duration-200
+				hover:bg-white/[0.03]
+				${
+					currentData.is_liked
+						? "text-blue-400 bg-blue-500/10"
+						: "text-gray-400 hover:text-blue-400"
+				}
+			`}
 					>
 						<ThumbsUp
 							size={18}
+							strokeWidth={2.3}
 							fill={
 								currentData.is_liked ? "currentColor" : "none"
 							}
 						/>
-						<span className="font-medium">{currentData.likes}</span>
+
+						<span className="font-medium tabular-nums">
+							{currentData.likes}
+						</span>
 					</motion.button>
 
+					{/* Comment */}
 					<motion.button
-						whileTap={{ scale: 0.9 }}
+						whileTap={{ scale: 0.97 }}
 						onClick={() => !isModalView && setShowComments(true)}
-						className="flex items-center gap-1 hover:text-green-400 transition"
+						className="
+				flex items-center gap-1.5
+				px-2 py-1.5
+				rounded-full
+				text-gray-500
+				transition-all duration-200
+				hover:bg-white/[0.03]
+				hover:text-green-400
+			"
 					>
-						<MessageCircle size={18} />
-						<span>{localCommentsCount}</span>
+						<MessageCircle size={18} strokeWidth={2.3} />
+
+						<span className="font-medium tabular-nums">
+							{localCommentsCount}
+						</span>
 					</motion.button>
 
+					{/* Share */}
 					<motion.button
-						whileTap={{ scale: 0.9 }}
+						whileTap={{ scale: 0.97 }}
 						onClick={() => setIsShareOpen(true)}
-						className="flex items-center gap-1 hover:text-purple-400 transition"
+						className="
+				flex items-center gap-1.5
+				px-2 py-1.5
+				rounded-full
+				text-gray-500
+				transition-all duration-200
+				hover:bg-white/[0.03]
+				hover:text-violet-400
+			"
 					>
-						<Share2 size={18} />
-						<span>{currentData.shares}</span>
+						<Share2 size={18} strokeWidth={2.3} />
+
+						<span className="font-medium tabular-nums">
+							{currentData.shares}
+						</span>
 					</motion.button>
 				</div>
 
+				{/* Save */}
 				<motion.button
-					whileTap={{ scale: 0.8 }}
+					whileTap={{ scale: 0.95 }}
 					onClick={handleSave}
 					disabled={isSaveLoading}
-					className={`transition-colors p-2 rounded-full ${
-						currentData.is_saved
-							? "text-yellow-500 bg-yellow-500/10"
-							: "text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10"
-					}`}
+					className={`
+			p-2 rounded-full
+			bg-white/[0.02]
+			transition-all duration-200
+			${
+				currentData.is_saved
+					? `
+						text-yellow-400
+						bg-yellow-500/10
+						shadow-[0_0_16px_rgba(250,204,21,0.10)]
+					`
+					: `
+						text-gray-500
+						hover:text-yellow-400
+						hover:bg-yellow-500/10
+					`
+			}
+		`}
 				>
 					<Bookmark
 						size={18}
-						// Efek fill (isi warna) jika di-save
+						strokeWidth={2.3}
 						fill={currentData.is_saved ? "currentColor" : "none"}
 					/>
 				</motion.button>
 			</div>
 
 			{!isModalView && (
-				<div className="mt-4 pt-4 border-t border-gray-800 space-y-3">
-					{post.comment_list?.map((c) => (
+				<div className="mt-2 pt-4 border-t border-gray-800 space-y-2">
+					{localCommentList?.map((c) => (
 						<div
 							key={c.id}
-							className="flex gap-2 items-start text-sm"
+							className={`
+		group/comment relative
+		flex gap-3 items-start
+		px-2 pb-1
+		rounded-xl
+		transition-all duration-200
+		hover:bg-white/[0.02]
+
+		${openMenuId === c.id ? "z-50 bg-white/[0.025]" : "z-0"}
+	`}
 						>
+							{/* Avatar */}
 							<img
 								src={
 									c.avatar ||
 									"https://ui-avatars.com/api/?name=" +
 										c.username
 								}
-								className="w-6 h-6 rounded-full object-cover mt-0.5"
+								className="
+							w-7 h-7
+							rounded-full
+							object-cover
+							mt-0.5
+							ring-1 ring-white/5
+						"
 							/>
-							<div className="flex-1">
-								<span className="font-bold text-gray-200 mr-2">
-									{c.username}
-								</span>
-								<span className="text-gray-400">
+
+							{/* Content */}
+							<div className="flex-1 min-w-0">
+								<div className="flex items-baseline gap-2 flex-wrap">
+									<span
+										className="
+									font-medium
+									text-gray-200
+									text-sm
+								"
+									>
+										{c.username}
+									</span>
+
+									<span className="text-[11px] text-gray-600">
+										{timeAgo(post.createdAt)}
+									</span>
+								</div>
+
+								<p
+									className="
+								text-sm
+								text-gray-400
+								leading-relaxed
+								antialiased
+								break-words
+							"
+								>
 									{c.comment}
-								</span>
+								</p>
+							</div>
+
+							{/* Action Menu */}
+							<div className="absolute top-2 right-1 z-20">
+								<div data-comment-menu className="relative">
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+
+											setOpenMenuId(
+												openMenuId === c.id
+													? null
+													: c.id,
+											);
+										}}
+										className="
+				p-1.5
+				rounded-full
+				text-gray-600
+				hover:text-gray-300
+				hover:bg-white/[0.04]
+				transition-all duration-200
+			"
+									>
+										<MoreVertical
+											size={15}
+											strokeWidth={2.2}
+										/>
+									</button>
+
+									{/* Dropdown */}
+									<AnimatePresence>
+										{openMenuId === c.id && (
+											<motion.div
+												onClick={(e) =>
+													e.stopPropagation()
+												}
+												initial={{
+													opacity: 0,
+													y: -4,
+													scale: 0.96,
+												}}
+												animate={{
+													opacity: 1,
+													y: 0,
+													scale: 1,
+												}}
+												exit={{
+													opacity: 0,
+													y: -4,
+													scale: 0.96,
+												}}
+												transition={{
+													duration: 0.16,
+												}}
+												className="
+						absolute right-0 top-9
+						w-46
+						z-[999]
+					"
+											>
+												<div
+													className="
+		overflow-hidden
+		rounded-2xl
+		border border-white/[0.06]
+		bg-gray-900/95
+		backdrop-blur-xl
+		shadow-[0_12px_40px_rgba(0,0,0,0.45)]
+	"
+												>
+													{String(
+														c.user_public_id,
+													) ===
+													String(currentUserId) ? (
+														confirmDeleteId ===
+														c.id ? (
+															<div className="w-44 p-3 space-y-2">
+																{/* Header */}
+																<div className="flex items-start gap-2">
+																	<div
+																		className="
+							mt-[1px]
+							text-red-400
+						"
+																	>
+																		<AlertTriangle
+																			size={
+																				13
+																			}
+																			strokeWidth={
+																				2.3
+																			}
+																		/>
+																	</div>
+
+																	<div>
+																		<p
+																			className="
+								text-xs
+								font-medium
+								text-gray-200
+							"
+																		>
+																			Hapus
+																			komentar?
+																		</p>
+
+																		<p
+																			className="
+								text-[11px]
+								text-gray-500
+								mt-0.5
+								leading-relaxed
+							"
+																		>
+																			Tindakan
+																			ini
+																			tidak
+																			dapat
+																			dibatalkan.
+																		</p>
+																	</div>
+																</div>
+
+																{/* Actions */}
+																<div className="flex justify-end">
+																	<button
+																		onClick={(
+																			e,
+																		) => {
+																			e.stopPropagation();
+
+																			setConfirmDeleteId(
+																				c.id,
+																			);
+																		}}
+																		className="
+							px-2.5 py-1
+							text-[11px]
+							text-gray-400
+							hover:text-white
+							transition-colors
+						"
+																	>
+																		Batal
+																	</button>
+
+																	<button
+																		onClick={() => {
+																			handleDelete(
+																				c.id,
+																				post.id,
+																			);
+
+																			setConfirmDeleteId(
+																				null,
+																			);
+
+																			setOpenMenuId(
+																				null,
+																			);
+																		}}
+																		className="
+							px-2.5 py-1
+							text-[11px]
+							font-medium
+							text-red-400
+							hover:text-red-300
+							transition-colors
+						"
+																	>
+																		Hapus
+																	</button>
+																</div>
+															</div>
+														) : (
+															<button
+																onClick={() =>
+																	setConfirmDeleteId(
+																		c.id,
+																	)
+																}
+																className="
+					w-full
+					flex items-center gap-2
+					px-4 py-2.5
+					text-xs
+					text-red-400
+					hover:bg-red-500/10
+					transition-colors
+				"
+															>
+																<Trash2
+																	size={13}
+																	strokeWidth={
+																		2.2
+																	}
+																/>
+																Hapus
+															</button>
+														)
+													) : (
+														<button
+															onClick={() => {
+																setReportTarget(
+																	{
+																		id: c.id,
+																		type: "comment",
+																	},
+																);
+
+																setOpenMenuId(
+																	null,
+																);
+															}}
+															className="
+				w-full
+				flex items-center gap-2
+				px-4 py-2.5
+				text-xs
+				text-gray-300
+				hover:bg-white/[0.04]
+				transition-colors
+			"
+														>
+															<Flag
+																size={13}
+																strokeWidth={
+																	2.2
+																}
+															/>
+															Laporkan
+														</button>
+													)}
+												</div>
+											</motion.div>
+										)}
+									</AnimatePresence>
+								</div>
 							</div>
 						</div>
 					))}
 
-					{post.comments > 2 && (
+					{/* View All Comments */}
+					{localCommentsCount > 2 && (
 						<button
 							onClick={() => setShowComments(true)}
-							className="text-xs text-gray-500 hover:text-gray-400 ml-8 font-medium"
+							className="
+					text-xs
+					font-medium
+					text-gray-400
+					hover:text-gray-300
+					transition-colors
+					pl-12
+				"
 						>
-							Lihat semua {post.comments} komentar
+							Lihat semua {localCommentsCount} komentar
 						</button>
 					)}
 
-					{/* QUICK INPUT */}
+					{/* Quick Comment Input */}
 					<form
 						onSubmit={handlePostComment}
-						className="flex items-center gap-2 mt-2"
+						className="flex items-center gap-3 pt-1"
 					>
+						{/* Current User Avatar */}
 						<img
-							src={post.user.avatar}
-							className="w-6 h-6 rounded-full object-cover"
-						/>
-						<input
-							disabled={isSubmitting}
-							value={commentText}
-							onChange={(e) => setCommentText(e.target.value)}
-							placeholder={
-								isSubmitting
-									? "Mengirim..."
-									: "Tulis komentar..."
+							src={
+								post.user.avatar ||
+								"https://ui-avatars.com/api/?name=" +
+									post.user.username
 							}
-							className={`flex-1 bg-gray-800/50 border border-gray-700 rounded-full px-4 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 transition ${isSubmitting ? "opacity-50" : ""}`}
+							className="
+					w-7 h-7
+					rounded-full
+					object-cover
+					ring-1 ring-white/5
+				"
 						/>
+
+						{/* Input Wrapper */}
+						<div className="flex-1 relative">
+							<input
+								disabled={isSubmitting}
+								value={commentText}
+								onChange={(e) => setCommentText(e.target.value)}
+								placeholder={
+									isSubmitting
+										? "Mengirim..."
+										: "Bagikan pendapatmu..."
+								}
+								className={`
+						w-full
+						bg-white/[0.03]
+						border border-white/[0.05]
+						backdrop-blur-sm
+						rounded-full
+						px-4 py-2
+						text-sm
+						text-gray-200
+						placeholder:text-gray-500
+						transition-all duration-200
+						focus:outline-none
+						focus:border-blue-500/30
+						focus:bg-white/[0.045]
+						${isSubmitting ? "opacity-50" : ""}
+					`}
+							/>
+						</div>
 					</form>
 				</div>
 			)}
@@ -350,12 +937,29 @@ export default function ReviewPost({ post, isModalView = false }: Props) {
 				{showComments && (
 					<CommentModal
 						postId={post.id}
-						post={post}
+						post={{ ...post, comments: localCommentsCount }}
 						type="review"
 						onClose={() => setShowComments(false)}
-						onCommentAdded={() =>
-							setLocalCommentsCount((prev) => prev + 1)
-						}
+						onCommentAdded={(newComment) => {
+							setLocalCommentsCount((prev) => prev + 1);
+							if (newComment && !newComment.parent_comment_id) {
+								setLocalCommentList((prev) =>
+									[newComment, ...prev].slice(0, 2),
+								);
+							}
+						}}
+						onCommentDeleted={(deletedId, amount = 1) => {
+							// Kurangi count sesuai jumlah total (parent + children)
+							setLocalCommentsCount((prev) =>
+								Math.max(prev - amount, 0),
+							);
+
+							// Filter list luar (tetap filter berdasarkan ID yang dihapus saja
+							// karena children-nya otomatis hilang saat parent-nya difilter)
+							setLocalCommentList((prev) =>
+								prev.filter((c) => c.id !== deletedId),
+							);
+						}}
 					/>
 				)}
 			</AnimatePresence>
@@ -365,6 +969,13 @@ export default function ReviewPost({ post, isModalView = false }: Props) {
 				onClose={() => setIsShareOpen(false)}
 				postId={post.id}
 				onShareSuccess={handleShareSuccess}
+			/>
+
+			<ReportModal
+				isOpen={!!reportTarget}
+				onClose={() => setReportTarget(null)}
+				entityId={reportTarget?.id || 0}
+				entityType={reportTarget?.type || "comment"}
 			/>
 		</motion.div>
 	);

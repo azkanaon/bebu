@@ -6,11 +6,12 @@ type CommentResponse struct {
 	ID           uint              `json:"id"`
 	UserID       uint              `json:"user_id"`
 	UserPublicID string            `json:"user_public_id"`
+	ParentCommentID *uint 		   `json:"parent_comment_id"`
 	Username     string            `json:"username"`
 	Avatar       string            `json:"avatar"`
 	Comment      string            `json:"comment"`
 	LikeCount    int               `json:"likeCount"`
-	IsLiked      bool              `json:"isLiked"`
+	IsLiked      bool              `json:"is_liked"`
 	Replies      []CommentResponse `json:"replies"`
 	CreatedAt    time.Time         `json:"created_at"`
 }

@@ -27,18 +27,14 @@ export async function createPost(payload: CreatePostPayload) {
 		formData.append("image", payload.file);
 	}
 
-	const res = await fetch("http://localhost:8080/api/v1/posts", {
-		method: "POST",
-		body: formData,
-	});
+	const res = await api.post("v1/posts", formData);
 
-	const data = await res.json();
+	return res.data;
+}
 
-	if (!res.ok) {
-		throw new Error(data.error || "Failed");
-	}
-
-	return data;
+export async function deletePostAPI(publicID: string) {
+	const res = await api.delete(`/v1/posts/${publicID}`);
+	return res.data;
 }
 
 export async function followUserAPI(username: string) {

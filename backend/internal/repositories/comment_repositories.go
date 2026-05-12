@@ -3,7 +3,6 @@ package repositories
 import (
 	"backend-bebu/internal/models"
 	"gorm.io/gorm"
-	"errors"
 )
 
 type CommentRepository interface {
@@ -13,6 +12,7 @@ type CommentRepository interface {
 	ToggleLikeComment(userID, commentID uint) (bool, error)
 	DeleteCommentRecursive(commentID uint, userID uint) error
 	CountReplies(commentID uint) (int64, error)
+	CountAllRepliesRecursive(commentID uint) (int64, error)
 }
 
 type commentRepository struct {
@@ -79,26 +79,40 @@ func (r *commentRepository) CountReplies(commentID uint) (int64, error) {
 
 func (r *commentRepository) DeleteCommentRecursive(commentID uint, userID uint) error {
     return r.db.Transaction(func(tx *gorm.DB) error {
-        // 1. Cari komentar untuk memastikan kepemilikan
-        var comment models.PostComment
-        if err := tx.Where("post_comment_id = ? AND user_id = ?", commentID, userID).First(&comment).Error; err != nil {
-            if errors.Is(err, gorm.ErrRecordNotFound) {
-                return errors.New("komentar tidak ditemukan atau Anda tidak memiliki akses")
-            }
-            return err
-        }
+        var idsToDelete []uint
+        query := `
+            WITH RECURSIVE reply_tree AS (
+                SELECT post_comment_id FROM post_comments WHERE parent_comment_id = ?
+                UNION ALL
+                SELECT c.post_comment_id FROM post_comments c
+                JOIN reply_tree rt ON c.parent_comment_id = rt.post_comment_id
+            )
+            SELECT post_comment_id FROM reply_tree`
+        
+        tx.Raw(query, commentID).Scan(&idsToDelete)
 
-        // 2. Hapus semua balasan (Replies) secara rekursif
-        // Kita mencari semua yang parent_id-nya adalah commentID ini
-        if err := tx.Where("parent_comment_id = ?", commentID).Delete(&models.PostComment{}).Error; err != nil {
-            return err
-        }
+        idsToDelete = append(idsToDelete, commentID)
 
-        // 3. Hapus komentar utamanya
-        if err := tx.Delete(&comment).Error; err != nil {
+        if err := tx.Where("post_comment_id IN ?", idsToDelete).Delete(&models.PostComment{}).Error; err != nil {
             return err
         }
 
         return nil
     })
+}
+
+func (r *commentRepository) CountAllRepliesRecursive(commentID uint) (int64, error) {
+    var count int64
+
+    query := `
+        WITH RECURSIVE reply_tree AS (
+            SELECT post_comment_id FROM post_comments WHERE parent_comment_id = ?
+            UNION ALL
+            SELECT c.post_comment_id FROM post_comments c
+            JOIN reply_tree rt ON c.parent_comment_id = rt.post_comment_id
+        )
+        SELECT COUNT(*) FROM reply_tree`
+    
+    err := r.db.Raw(query, commentID).Scan(&count).Error
+    return count, err
 }

@@ -178,6 +178,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		{
 			posts.POST("", authMiddleware.RequiredAuth(), postHandler.CreatePost)
 			posts.GET("", authMiddleware.OptionalAuth(), postHandler.GetPosts)
+			posts.DELETE("/:id", authMiddleware.RequiredAuth(), postHandler.DeletePost)
 			posts.GET("/:id/comments", authMiddleware.OptionalAuth(), postHandler.GetPostComments)
 			posts.POST("/:id/save", authMiddleware.RequiredAuth(), postHandler.ToggleSave)
 			posts.POST("/:id/like", authMiddleware.RequiredAuth(), postHandler.ToggleLike)

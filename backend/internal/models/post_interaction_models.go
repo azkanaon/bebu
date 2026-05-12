@@ -52,7 +52,7 @@ type PostComment struct {
 
 	Post          Post              `gorm:"foreignKey:PostID;references:PostID"`
 	User          User              `gorm:"foreignKey:UserID;references:UserID"`
-	ParentComment *PostComment      `gorm:"foreignKey:ParentCommentID;references:PostCommentID"`
+	ParentComment *PostComment      `gorm:"foreignKey:ParentCommentID;references:PostCommentID;constraint:OnDelete:CASCADE;"`
 	Replies       []PostComment     `gorm:"foreignKey:ParentCommentID"`
 	Likes         []PostCommentLike `gorm:"foreignKey:PostCommentID"`
 

@@ -27,7 +27,7 @@ type UserService interface {
 	BlockUser(sourceUserID uint, targetUsername string) error
 	UnblockUser(sourceUserID uint, targetUsername string) error
 	GetMyProfile(id uint) (*models.User, error)
-	SearchUsers(query string) ([]dto.UserSearchResponse, error)
+	SearchUsers(query string, currentUserID uint) ([]dto.UserSearchResponse, error)
 
 	GetFollowerList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error)
 	GetFollowingList(viewerID *uint, targetUsername string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error)
@@ -642,8 +642,8 @@ func (s *userService) GetMyProfile(id uint) (*models.User, error) {
     return user, nil
 }
 
-func (s *userService) SearchUsers(query string) ([]dto.UserSearchResponse, error) {
-    users, err := s.userRepo.SearchUsers(query, 20) // Limit 20 hasil pencarian
+func (s *userService) SearchUsers(query string, currentUserID uint) ([]dto.UserSearchResponse, error) {
+    users, err := s.userRepo.SearchUsers(query, currentUserID, 20)
     if err != nil {
         return nil, err
     }
