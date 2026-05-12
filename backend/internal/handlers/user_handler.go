@@ -426,12 +426,22 @@ func (h *UserHandler) UnblockUser(c *gin.Context) {
 
 func (h *UserHandler) SearchUsers(c *gin.Context) {
     query := c.Query("q")
+    
+    // Ambil ID user yang sedang login dari context
+    val, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+    currentUserID := val.(uint)
+
     if query == "" {
         c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
         return
     }
 
-    users, err := h.userService.SearchUsers(query)
+    // Kirim currentUserID ke service
+    users, err := h.userService.SearchUsers(query, currentUserID)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mencari user"})
         return

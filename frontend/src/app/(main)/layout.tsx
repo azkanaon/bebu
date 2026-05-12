@@ -9,7 +9,6 @@ import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  // INI PERUBAHAN TERAKHIR
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
   const disableSidebarScroll = useRef(false)
@@ -85,6 +84,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       setOffset(0)
     })
   }, [currentTab])
+
+  if (!user) return <div>Loading...</div>
 
   return (
     <>

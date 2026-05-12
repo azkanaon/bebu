@@ -1,18 +1,24 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type ReviewPostResponse struct {
 	ID   uint `json:"id"`
+	PostPublicID string `json:"post_public_id"`
 	Type string `json:"type"`
 
 	User struct {
+		PublicID    uuid.UUID `json:"publicID"`
 		Username    string `json:"username"`
 		DisplayName string `json:"displayName"`
 		Avatar      string `json:"avatar"`
 	} `json:"user"`
 
-	CreatedAt string `json:"createdAt"`
+	CreatedAt time.Time `json:"createdAt"`
 	Content   string `json:"content"`
 
 	IsLiked   bool   `json:"is_liked"`
@@ -37,10 +43,11 @@ type ReviewPostResponse struct {
 
 type AnalysisPostResponse struct {
 	ID        uint `json:"id"`
+	PostPublicID string `json:"post_public_id"`
 	Type      string `json:"type"`
 	Content   string `json:"content"`
 	Image     string `json:"image"`
-	CreatedAt string `json:"createdAt"`
+	CreatedAt time.Time `json:"createdAt"`
 
 	Likes    int `json:"likes"`
 	Comments int `json:"comments"`
@@ -52,6 +59,7 @@ type AnalysisPostResponse struct {
 	IsSaved   bool   `json:"is_saved"`
 
 	User struct {
+		PublicID    uuid.UUID `json:"publicID"`
 		DisplayName string `json:"displayName"`
 		Avatar      string `json:"avatar"`
 	} `json:"user"`
@@ -60,6 +68,8 @@ type AnalysisPostResponse struct {
 		Title string `json:"title"`
 		Cover string `json:"cover"`
 	} `json:"book"`
+
+	Categories []CategoryResponse `json:"categories"`
 }
 
 type CreatePostRequest struct {

@@ -1,14 +1,15 @@
 export interface CommentType {
-  id: number;
-  user_id: number;
-  user_public_id: string;
-  username: string;
-  avatar: string;
-  comment: string;
-  likeCount: number;
-  isLiked: boolean;
-  replies?: CommentType[] | null;
-  created_at: string;
+	id: number;
+	user_id: number;
+	user_public_id: string;
+	username: string;
+	avatar: string;
+	comment: string;
+	likeCount: number;
+	is_liked: boolean;
+	replies?: CommentType[] | null;
+	created_at: string;
+	parent_comment_id?: number | null;
 }
 
 export interface CreateCommentRequest {
@@ -21,11 +22,13 @@ export type PostType = "review" | "analysis";
 
 export interface BasePost {
   id: number;
+  post_public_id: string;
   type: PostType;
   user: {
     username: string;
     displayName: string;
     avatar: string;
+    publicID: string;
   };
   createdAt: string;
   content: string;
@@ -51,16 +54,22 @@ export interface ReviewPostType extends BasePost {
   is_saved: boolean;
 }
 
+export interface CategoryResponse {
+  id: number;
+  name: string;
+}
+
 export interface AnalysisPostType extends BasePost {
-  type: "analysis";
-  book: {
-    title: string;
-    cover: string;
-  };
-  image?: string;
-  likes: number;
-  is_liked: boolean;
-  is_saved: boolean;
+	type: "analysis";
+	book: {
+		title: string;
+		cover: string;
+	};
+	image?: string;
+	likes: number;
+	is_liked: boolean;
+	is_saved: boolean;
+	categories: CategoryResponse[];
 }
 
 export type CreatePostPayload = {

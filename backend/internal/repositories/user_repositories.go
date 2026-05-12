@@ -43,7 +43,7 @@ type UserRepository interface {
 	UnblockUser(blockingUserID, blockedUserID uint) error
 	UpdateUserStat(db *gorm.DB, userID uint, columnName string, amount int) error
     GetUserStats(userID uint) (*models.UserStat, error)
-	SearchUsers(query string, limit int) ([]models.User, error)
+	SearchUsers(query string, excludeID uint, limit int) ([]models.User, error)
 
 	GetFollowers(viewerID *uint, targetUserID uint, page, limit int) ([]models.User, int64, error)
     GetFollowing(viewerID *uint, targetUserID uint, page, limit int) ([]models.User, int64, error)
@@ -446,14 +446,13 @@ func (r *userRepository) GetUserStats(userID uint) (*models.UserStat, error) {
     return &stats, result.Error
 }
 
-func (r *userRepository) SearchUsers(query string, limit int) ([]models.User, error) {
+func (r *userRepository) SearchUsers(query string, excludeID uint, limit int) ([]models.User, error) {
     var users []models.User
     
-    // Cari berdasarkan username atau display name
     err := r.db.Preload("Profile").
         Joins("JOIN user_profiles ON user_profiles.user_id = users.user_id").
-        Where("users.username ILIKE ? OR user_profiles.display_name ILIKE ?", 
-            "%"+query+"%", "%"+query+"%").
+        Where("(users.username ILIKE ? OR user_profiles.display_name ILIKE ?) AND users.user_id <> ?", 
+            "%"+query+"%", "%"+query+"%", excludeID).
         Limit(limit).
         Find(&users).Error
         

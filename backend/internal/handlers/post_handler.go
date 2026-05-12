@@ -24,8 +24,6 @@ func prettyPrint(data interface{}) {
 	fmt.Println(string(b))
 }
 
-// --- 2. Ubah "Pabrik" Handler ---
-// NewPostHandler sekarang menerima interface PostService.
 func NewPostHandler(service services.PostService) *PostHandler {
 	return &PostHandler{service: service}
 }
@@ -107,6 +105,30 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Post created successfully",
 	})
+}
+
+func (h *PostHandler) DeletePost(c *gin.Context) {
+    postPublicID := c.Param("id") 
+
+    userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
+    err := h.service.DeletePost(postPublicID, userID.(uint))
+    if err != nil {
+        status := http.StatusInternalServerError
+        if err.Error() == "post not found or you're not authorized" {
+            status = http.StatusForbidden
+        }
+        c.JSON(status, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Post deleted successfully",
+    })
 }
 
 // GetUserPosts adalah handler untuk GET /users/:username/posts

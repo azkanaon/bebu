@@ -4,18 +4,20 @@ import (
 	"errors"
 
 	"backend-bebu/internal/dto"
+	"backend-bebu/internal/mapper"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/internal/utils"
-	"backend-bebu/internal/mapper"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
 )
 
 type PostService interface {
 	GetPosts(userID uint) ([]interface{}, error)
 	CreatePost(req dto.CreatePostRequest) error
+	DeletePost(publicID string, userID uint) error
 	GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
 	GetUserLikedPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
 	GetUserSavedPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
@@ -59,15 +61,12 @@ func (s *postService) GetPosts(userID uint) ([]interface{}, error) {
 }
 
 func (s *postService) CreatePost(req dto.CreatePostRequest) error {
-	// 1. Mulai Transaksi
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return tx.Error
 	}
-	// Defer Rollback akan membatalkan transaksi jika terjadi error/panic di mana pun.
 	defer tx.Rollback()
 
-	// 2. Siapkan model Post
 	post := &models.Post{
 		PublicID:      uuid.New().String(), // Asumsi PublicID Anda string
 		UserID:        req.UserID,
@@ -76,20 +75,27 @@ func (s *postService) CreatePost(req dto.CreatePostRequest) error {
 		PostType:      req.PostType,
 		Rating:        req.Rating,
 		ImgURL:        req.ImgURL,
-		PublishStatus: "draft", // Default status saat dibuat
+		PublishStatus: "published", // Default status saat dibuat
 	}
 
-	// 3. Buat Post utama menggunakan repository yang terikat transaksi
-	// Anda perlu menambahkan WithTx ke PostRepository
 	txRepo := s.postRepo.WithTx(tx)
 	createdPost, err := txRepo.CreatePost(post)
 	if err != nil {
 		return err // Rollback akan dijalankan oleh defer
 	}
 
+	postStat := models.PostStat{
+        PostID:       createdPost.PostID,
+        LikeCount:    0,
+        CommentCount: 0,
+        SaveCount:    0,
+        ShareCount:   0,
+        HotScore:     0,
+    }
+    if err := tx.Create(&postStat).Error; err != nil {
+        return err // Rollback jika gagal buat stats
+    }
 
-	// --- BAGIAN YANG DILENGKAPI ---
-	// 4. Proses Kategori jika post-nya adalah tipe 'analysis'
 	if req.PostType == "analysis" && req.Categories != nil {
 		for _, categoryName := range req.Categories {
 			// Normalisasi nama kategori untuk pencarian yang konsisten
@@ -130,11 +136,24 @@ func (s *postService) CreatePost(req dto.CreatePostRequest) error {
 			}
 		}
 	}
-	// --- AKHIR BAGIAN YANG DILENGKAPI ---
-
-
-	// 5. Jika semua operasi di atas berhasil, Commit transaksi
+	
 	return tx.Commit().Error
+}
+
+func (s *postService) DeletePost(publicID string, userID uint) error {
+    var post models.Post
+    err := s.db.Where("public_id = ?", publicID).First(&post).Error
+    if err != nil {
+        return errors.New("post not found")
+    }
+
+    // 2. Panggil repo untuk delete
+    err = s.postRepo.DeletePost(post.PostID, userID)
+    if err != nil {
+        return err
+    }
+
+    return nil
 }
 
 func (s *postService) GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error) {
@@ -315,10 +334,34 @@ func (s *postService) ToggleSave(userID uint, postID uint) (bool, error) {
 }
 
 func (s *postService) GetComments(postID uint, userID uint) ([]dto.CommentResponse, error) {
-    comments, err := s.postRepo.GetCommentsByPostID(postID, userID)
+    flatComments, err := s.postRepo.GetCommentsByPostID(postID, userID)
     if err != nil {
         return nil, err
     }
 
-    return mapper.ToCommentResponseList(comments, userID), nil
+    commentMap := make(map[uint]*dto.CommentResponse)
+    for i := range flatComments {
+        resp := mapper.ToSingleCommentResponse(flatComments[i], userID)
+        commentMap[resp.ID] = &resp
+    }
+
+    for i := len(flatComments) - 1; i >= 0; i-- {
+        c := flatComments[i]
+        node := commentMap[c.PostCommentID]
+
+        if c.ParentCommentID != nil {
+            if parent, ok := commentMap[*c.ParentCommentID]; ok {
+                parent.Replies = append([]dto.CommentResponse{*node}, parent.Replies...)
+            }
+        }
+    }
+
+    var finalResult []dto.CommentResponse
+    for i := range flatComments {
+        if flatComments[i].ParentCommentID == nil {
+            finalResult = append(finalResult, *commentMap[flatComments[i].PostCommentID])
+        }
+    }
+
+    return finalResult, nil
 }

@@ -49,7 +49,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 				setIsSearching(true);
 				try {
 					const res = await searchUsersAPI(query);
-					setDisplayUsers(res.data);
+					setDisplayUsers(res.data ?? []);
 				} catch (error) {
 					console.error("Search failed", error);
 				} finally {
@@ -85,8 +85,9 @@ const ShareModal: React.FC<ShareModalProps> = ({
 				try {
 					const res = await getRecentRecipientsAPI();
 					if (isSubscribed) {
-						setRecentUsers(res.data);
-						setDisplayUsers(res.data);
+						const data = res.data ?? [];
+						setRecentUsers(data);
+						setDisplayUsers(data);
 					}
 				} catch (error) {
 					console.error("Failed to fetch recent users", error);
@@ -188,8 +189,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
 				</div>
 
 				{/* List Container */}
-				<div className="flex-1 max-h-[300px] overflow-y-auto p-2">
-					{!searchQuery && displayUsers.length > 0 && (
+				<div className="flex-1 max-h-[300px] overflow-y-auto p-2 custom-scrollbar">
+					{!searchQuery && displayUsers?.length > 0 && (
 						<p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold px-3 mb-2">
 							Terakhir dikirim
 						</p>
@@ -254,7 +255,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 				<div className="p-4 border-t border-gray-800 bg-gray-900/50">
 					<textarea
 						placeholder="Tulis pesan (opsional)..."
-						className="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-2 text-sm text-gray-300 resize-none focus:outline-none focus:border-gray-600 transition"
+						className="custom-scrollbar w-full bg-gray-800/50 border border-gray-700 rounded-lg p-2 text-sm text-gray-300 resize-none focus:outline-none focus:border-gray-600 transition"
 						rows={2}
 						value={optionalMessage}
 						onChange={(e) => setOptionalMessage(e.target.value)}

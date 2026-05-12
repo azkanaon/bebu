@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { X, Send, Heart, MoreVertical, Trash2, Flag } from "lucide-react";
+import { X, Send } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -19,11 +19,13 @@ import {
 import ReportModal from "./ReportModal";
 import AnalysisPost from "./AnalysisPost";
 import ReviewPost from "./ReviewPost";
+import CommentItem from "./CommentItem";
 
 type Props = {
 	postId: number;
 	onClose: () => void;
-	onCommentAdded?: () => void;
+	onCommentAdded?: (newComment: CommentType) => void;
+	onCommentDeleted?: (commentId: number, amount?: number) => void;
 	post: AnalysisPostType | ReviewPostType;
 	type: "analysis" | "review";
 };
@@ -32,6 +34,7 @@ export default function CommentModal({
 	postId,
 	onClose,
 	onCommentAdded,
+	onCommentDeleted,
 	post,
 	type,
 }: Props) {
@@ -61,6 +64,15 @@ export default function CommentModal({
 	const [replyTo, setReplyTo] = useState<CommentType | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 
+	const [prevPost, setPrevPost] = useState(post);
+	const [currentPost, setCurrentPost] = useState(post);
+
+	// 2. Cek perubahan saat render (bukan di useEffect)
+	if (post.comments !== prevPost.comments) {
+		setPrevPost(post);
+		setCurrentPost(post);
+	}
+
 	const handleSendComment = async () => {
 		if (!commentText.trim() || submitting) return;
 
@@ -73,30 +85,112 @@ export default function CommentModal({
 			};
 
 			const response = await createCommentAPI(payload);
-			if (onCommentAdded) onCommentAdded();
-			const newComment = response.data; // Data dari mapper ToCommentResponse
-
-			if (replyTo) {
-				// JIKA BALASAN: Masukkan ke dalam array replies parent-nya
-				setComments((prevComments) =>
-					prevComments.map((c) =>
-						c.id === replyTo.id
-							? {
-									...c,
-									replies: [...(c.replies || []), newComment],
-								}
-							: c,
-					),
-				);
-			} else {
-				// JIKA KOMENTAR UTAMA: Masukkan ke paling atas list
-				setComments((prevComments) => [newComment, ...prevComments]);
+			const newComment = response.data;
+			
+			// Tambah comment count
+			setCurrentPost((prev) => ({
+				...prev,
+				comments: (prev.comments || 0) + 1,
+			}));
+			
+			// Update Parent (...Post.tsx)
+			if (onCommentAdded) {
+				// Jika kita mengirim komentar utama (bukan reply), kirim objeknya ke parent
+				if (!replyTo) {
+					onCommentAdded(newComment);
+				} else {
+					// Jika reply, panggil tanpa parameter (hanya untuk trigger count)
+					onCommentAdded(newComment);
+				}
 			}
 
+			if (replyTo) {
+				// UPDATE STATE SECARA REKURSIF
+				setComments((prevComments) => {
+					const currentComments = Array.isArray(prevComments)
+						? prevComments
+						: [];
+
+					const insertReplyRecursive = (
+						list: CommentType[],
+					): CommentType[] => {
+						return list.map((c) => {
+							// Jika ID cocok dengan yang sedang kita balas
+							if (c.id === replyTo.id) {
+								return {
+									...c,
+									// Masukkan komentar baru ke awal atau akhir list replies
+									replies: [newComment, ...(c.replies || [])],
+								};
+							}
+
+							// Jika tidak cocok, tapi comment ini punya anak, cari ke dalam anaknya
+							if (c.replies && c.replies.length > 0) {
+								return {
+									...c,
+									replies: insertReplyRecursive(c.replies),
+								};
+							}
+
+							return c;
+						});
+					};
+
+					return insertReplyRecursive(currentComments);
+				});
+			} else {
+				// JIKA KOMENTAR UTAMA
+				setComments((prevComments) => {
+					const currentComments = Array.isArray(prevComments)
+						? prevComments
+						: [];
+					return [newComment, ...currentComments];
+				});
+			}
+
+			if (focusedComment) {
+				setFocusedComment((prev) => {
+					if (!prev) return null;
+
+					if (prev.id === replyTo?.id) {
+						return {
+							...prev,
+							replies: [newComment, ...(prev.replies || [])],
+						};
+					}
+
+					// Jika kita membalas salah satu anak di dalam thread fokus
+					const insertInFocusRecursive = (
+						list: CommentType[],
+					): CommentType[] => {
+						return list.map((r) => {
+							if (r.id === replyTo?.id) {
+								return {
+									...r,
+									replies: [newComment, ...(r.replies || [])],
+								};
+							}
+							if (r.replies && r.replies.length > 0) {
+								return {
+									...r,
+									replies: insertInFocusRecursive(r.replies),
+								};
+							}
+							return r;
+						});
+					};
+
+					return {
+						...prev,
+						replies: insertInFocusRecursive(prev.replies || []),
+					};
+				});
+			}
+			
 			// Reset Form
 			setCommentText("");
 			setReplyTo(null);
-		} catch (err) {
+		} catch (err: unknown) {
 			console.error("Gagal mengirim komentar:", err);
 		} finally {
 			setSubmitting(false);
@@ -140,10 +234,10 @@ export default function CommentModal({
 				): CommentType[] => {
 					return list.map((c: CommentType) => {
 						if (c.id === commentId) {
-							const currentlyLiked = c.isLiked;
+							const currentlyLiked = c.is_liked;
 							return {
 								...c,
-								isLiked: !currentlyLiked,
+								is_liked: !currentlyLiked,
 								likeCount: currentlyLiked
 									? c.likeCount - 1
 									: c.likeCount + 1,
@@ -161,6 +255,56 @@ export default function CommentModal({
 				return updateRecursive(prevComments);
 			});
 
+			if (focusedComment) {
+				setFocusedComment((prev) => {
+					if (!prev) return null;
+
+					// Jika yang di-like adalah "Kepala" thread fokus
+					if (prev.id === commentId) {
+						const currentlyLiked = prev.is_liked;
+						return {
+							...prev,
+							is_liked: !currentlyLiked,
+							likeCount: currentlyLiked
+								? prev.likeCount - 1
+								: prev.likeCount + 1,
+						};
+					}
+
+					// Jika yang di-like adalah salah satu balasan di dalam thread fokus
+					const updateRepliesRecursive = (
+						list: CommentType[],
+					): CommentType[] => {
+						return list.map((r) => {
+							if (r.id === commentId) {
+								const currentlyLiked = r.is_liked;
+								return {
+									...r,
+									is_liked: !currentlyLiked,
+									likeCount: currentlyLiked
+										? r.likeCount - 1
+										: r.likeCount + 1,
+								};
+							}
+							if ((r.replies ?? []).length > 0) {
+								return {
+									...r,
+									replies: updateRepliesRecursive(
+										r.replies ?? [],
+									),
+								};
+							}
+							return r;
+						});
+					};
+
+					return {
+						...prev,
+						replies: updateRepliesRecursive(prev.replies ?? []),
+					};
+				});
+			}
+
 			await toggleLikeCommentAPI(commentId);
 		} catch (err) {
 			console.error("Gagal like:", err);
@@ -170,7 +314,39 @@ export default function CommentModal({
 	const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
 	const handleDelete = async (commentId: number, postId: number) => {
-		if (!confirm("Yakin ingin menghapus komentar ini?")) return;
+		const countItemsRecursive = (
+			list: CommentType[],
+			targetId: number,
+		): number => {
+			for (const item of list) {
+				if (item.id === targetId) {
+					// Hitung dirinya sendiri (1) + semua total replies di dalamnya
+					const countReplies = (replies: CommentType[]): number => {
+						return replies.reduce(
+							(acc, reply) =>
+								acc + 1 + countReplies(reply.replies || []),
+							0,
+						);
+					};
+					return 1 + countReplies(item.replies || []);
+				}
+				if (item.replies) {
+					const foundInReplies = countItemsRecursive(
+						item.replies,
+						targetId,
+					);
+					if (foundInReplies > 0) return foundInReplies;
+				}
+			}
+			return 0;
+		};
+
+		// Hitung berapa banyak yang akan berkurang
+		const totalToReduce = countItemsRecursive(comments, commentId);
+
+		const previousComments = comments;
+		const previousFocused = focusedComment;
+		const previousPostData = currentPost;
 
 		try {
 			// Optimistic Update: Hapus dari state lokal
@@ -188,12 +364,55 @@ export default function CommentModal({
 				return removeRecursive(prev);
 			});
 
+			if (focusedComment) {
+				if (focusedComment.id === commentId) {
+					setFocusedComment(null); // Jika kepala thread dihapus, keluar dari mode fokus
+				} else {
+					setFocusedComment((prev) => {
+						if (!prev) return null;
+						const removeRepliesRecursive = (
+							list: CommentType[],
+						): CommentType[] => {
+							return list
+								.filter((r) => r.id !== commentId)
+								.map((r) => ({
+									...r,
+									replies: removeRepliesRecursive(
+										r.replies || [],
+									),
+								}));
+						};
+						return {
+							...prev,
+							replies: removeRepliesRecursive(prev.replies || []),
+						};
+					});
+				}
+			}
+
 			await deleteCommentAPI(commentId, postId);
+
+			// Update Local Comment Count
+			setCurrentPost((prev) => ({
+				...prev,
+				comments: Math.max(0, (prev.comments || 0) - totalToReduce),
+			}));
+
+			// Update Data Parent (...Post.tsx)
+			if (onCommentDeleted) {
+				onCommentDeleted(commentId, totalToReduce);
+			}
+
 			setOpenMenuId(null);
 		} catch (err) {
 			console.error("Gagal menghapus:", err);
+
+			// Rollback
+			setComments(previousComments);
+			setFocusedComment(previousFocused);
+			setCurrentPost(previousPostData);
+
 			alert("Gagal menghapus komentar.");
-			// Opsi: Fetch ulang data jika gagal agar sinkron kembali
 		}
 	};
 
@@ -201,6 +420,17 @@ export default function CommentModal({
 		id: number;
 		type: "post" | "comment";
 	} | null>(null);
+
+	// Buat Fokus Child Comment agar tidak kepanjangan ke kanan
+	const [focusedComment, setFocusedComment] = useState<CommentType | null>(
+		null,
+	);
+	const handleFocusThread = (comment: CommentType) => {
+		setFocusedComment(comment);
+	};
+	const handleExitFocus = () => {
+		setFocusedComment(null);
+	};
 
 	const modalContent = (
 		<div className="fixed inset-0 z-[999] flex items-center justify-center p-0 sm:p-4">
@@ -251,16 +481,34 @@ export default function CommentModal({
 						{type === "analysis" ? (
 							// Pastikan AnalysisPost sudah di-import di atas
 							<AnalysisPost
-								post={post as AnalysisPostType}
+								key={`analysis-${currentPost.comments}`}
+								post={currentPost as AnalysisPostType}
 								isModalView={true}
 							/>
 						) : (
 							<ReviewPost
-								post={post as ReviewPostType}
+								key={`review-${currentPost.comments}`}
+								post={currentPost as ReviewPostType}
 								isModalView={true}
 							/>
 						)}
 					</div>
+
+					{/* FOCUS MODE */}
+					{focusedComment && (
+						<div className="p-4 bg-blue-500/5 border-b border-gray-800 flex items-center justify-between">
+							<button
+								onClick={handleExitFocus}
+								className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-2 font-bold"
+							>
+								← Kembali ke diskusi utama
+							</button>
+							<span className="text-[10px] text-gray-500 italic">
+								Melihat sub-diskusi
+							</span>
+						</div>
+					)}
+
 					<div className="p-5 space-y-6">
 						{loading ? (
 							<div className="flex flex-col items-center justify-center h-full space-y-3">
@@ -281,301 +529,36 @@ export default function CommentModal({
 									Mulai percakapan pertama Anda!
 								</p>
 							</div>
+						) : focusedComment ? (
+							/* MODE FOKUS: Render satu dahan saja */
+							<CommentItem
+								key={focusedComment.id}
+								comment={focusedComment}
+								postId={postId}
+								currentUserId={currentUserId}
+								depth={0} // Reset depth jadi 0 agar menempel ke kiri
+								isReply={false} // Hilangkan garis vertikal parent
+								handleDelete={handleDelete}
+								handleToggleLike={handleToggleLike}
+								handleReplyClick={handleReplyClick}
+								setReportTarget={setReportTarget}
+								onFocusThread={handleFocusThread} // Oper fungsi focus
+							/>
 						) : (
+							/* MODE UTAMA: Render semua komentar seperti biasa */
 							comments.map((c) => (
-								<div
+								<CommentItem
 									key={c.id}
-									className="flex flex-col gap-3 group"
-								>
-									{/* KOMENTAR UTAMA */}
-									<div className="flex gap-3 items-start group/main relative">
-										<img
-											src={
-												c.avatar ||
-												"https://ui-avatars.com/api/?name=" +
-													c.username
-											}
-											alt={c.username}
-											className="w-9 h-9 rounded-full object-cover ring-1 ring-gray-800"
-										/>
-										<div className="flex-1">
-											<div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-3 group-hover:bg-gray-900 transition-colors relative">
-												<div className="flex justify-between items-center mb-1 pr-6">
-													{" "}
-													{/* Beri padding kanan agar tidak tabrakan dengan titik tiga */}
-													<p className="text-sm font-bold text-blue-400">
-														@{c.username}
-													</p>
-													{/* --- MENU ACTIONS (TITIK TIGA) --- */}
-													<div className="absolute right-3 top-3">
-														<div className="relative group/menu">
-															<button className="p-1 text-gray-500 hover:text-white transition-colors rounded-full hover:bg-gray-800">
-																{/* Menggunakan MoreVertical agar titik tiganya berdiri */}
-																<MoreVertical
-																	size={16}
-																/>
-															</button>
-
-															<div className="invisible group-hover/menu:visible opacity-0 group-hover/menu:opacity-100 absolute right-0 mt-1 w-32 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl z-50 transition-all duration-200 overflow-hidden">
-																{String(
-																	c.user_public_id,
-																) ===
-																String(
-																	currentUserId,
-																) ? (
-																	<button
-																		onClick={() =>
-																			handleDelete(
-																				c.id,
-																				postId,
-																			)
-																		}
-																		className="w-full px-4 py-2 text-left text-[11px] text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors"
-																	>
-																		<Trash2
-																			size={
-																				12
-																			}
-																		/>{" "}
-																		Hapus
-																	</button>
-																) : (
-																	<button
-																		onClick={() =>
-																			setReportTarget(
-																				{
-																					id: c.id,
-																					type: "comment",
-																				},
-																			)
-																		}
-																		className="w-full px-4 py-2 text-left text-[11px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
-																	>
-																		<Flag
-																			size={
-																				12
-																			}
-																		/>
-																		Laporkan
-																	</button>
-																)}
-															</div>
-														</div>
-													</div>
-													<span className="text-[10px] text-gray-500">
-														{c.created_at}
-													</span>
-												</div>
-												<p className="text-sm text-gray-200 leading-relaxed">
-													{c.comment}
-												</p>
-											</div>
-
-											{/* Tombol Aksi */}
-											<div className="flex gap-4 mt-2 ml-2">
-												<button
-													onClick={() =>
-														handleToggleLike(c.id)
-													}
-													className={`flex items-center gap-1 text-[10px] transition-all duration-200 font-bold uppercase tracking-wider ${
-														c.isLiked
-															? "text-red-500 scale-110"
-															: "text-gray-500 hover:text-red-400"
-													}`}
-												>
-													{/* Gunakan Heart fill jika isLiked true */}
-													<Heart
-														size={12}
-														fill={
-															c.isLiked
-																? "currentColor"
-																: "none"
-														}
-														className={
-															c.isLiked
-																? "animate-pulse"
-																: ""
-														}
-													/>
-
-													{/* Tampilkan angka jika > 0, jika 0 tampilkan teks "Suka" saja */}
-													{c.likeCount > 0 ? (
-														<span>
-															{c.likeCount}
-														</span>
-													) : (
-														"Suka"
-													)}
-												</button>
-												<button
-													onClick={() =>
-														handleReplyClick(c)
-													}
-													className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-400 transition font-bold uppercase tracking-wider"
-												>
-													Balas
-												</button>
-											</div>
-
-											{/* --- RENDER BALASAN (REPLIES) --- */}
-											{c.replies &&
-												Array.isArray(c.replies) &&
-												c.replies.length > 0 && (
-													<div className="mt-4 ml-4 border-l border-gray-800 pl-4 space-y-4">
-														{c.replies?.map(
-															(reply) => (
-																<div
-																	key={
-																		reply.id
-																	}
-																	className="flex gap-2 items-start relative group/reply"
-																>
-																	<img
-																		src={
-																			c.avatar ||
-																			"https://ui-avatars.com/api/?name=" +
-																				c.username
-																		}
-																		alt={
-																			reply.username
-																		}
-																		className="w-7 h-7 rounded-full object-cover ring-1 ring-gray-800"
-																	/>
-																	<div className="flex-1">
-																		<div className="bg-gray-800/30 border border-gray-800/50 rounded-xl p-2.5 relative">
-																			<div className="flex justify-between items-center mb-0.5 pr-5">
-																				<p className="text-xs font-bold text-blue-400">
-																					@
-																					{
-																						reply.username
-																					}
-																				</p>
-
-																				{/* Titik Tiga untuk Reply */}
-																				<div className="absolute right-2 top-2.5 group/replymenu">
-																					<button className="p-0.5 text-gray-600 hover:text-white transition-colors">
-																						<MoreVertical
-																							size={
-																								14
-																							}
-																						/>
-																					</button>
-																					<div className="invisible group-hover/replymenu:visible opacity-0 group-hover/replymenu:opacity-100 absolute right-0 mt-1 w-28 bg-gray-900 border border-gray-800 rounded-lg shadow-2xl z-50 transition-all overflow-hidden">
-																						{currentUserId &&
-																						reply.user_public_id &&
-																						String(
-																							reply.user_public_id,
-																						) ===
-																							String(
-																								currentUserId,
-																							) ? (
-																							<button
-																								onClick={() =>
-																									handleDelete(
-																										reply.id, // ID komentar/balasan yang akan dihapus
-																										postId, // ID postingan asal
-																									)
-																								}
-																								className="w-full px-3 py-1.5 text-left text-[10px] text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors"
-																							>
-																								<Trash2
-																									size={
-																										10
-																									}
-																								/>
-																								Hapus
-																							</button>
-																						) : (
-																							<button
-																								onClick={() =>
-																									setReportTarget(
-																										{
-																											id: c.id,
-																											type: "comment",
-																										},
-																									)
-																								}
-																								className="w-full px-3 py-1.5 text-left text-[10px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
-																							>
-																								<Flag
-																									size={
-																										10
-																									}
-																								/>
-																								Laporkan
-																							</button>
-																						)}
-																					</div>
-																				</div>
-
-																				<span className="text-[9px] text-gray-600">
-																					{
-																						reply.created_at
-																					}
-																				</span>
-																			</div>
-																			<p className="text-xs text-gray-300 leading-relaxed">
-																				{
-																					reply.comment
-																				}
-																			</p>
-																		</div>
-																		<div className="flex gap-3 mt-1.5 ml-1">
-																			<button
-																				onClick={() =>
-																					handleToggleLike(
-																						reply.id,
-																					)
-																				}
-																				className={`text-[9px] font-bold uppercase transition-all duration-200 ${
-																					reply.isLiked
-																						? "text-red-500 scale-110"
-																						: "text-gray-500 hover:text-red-400"
-																				}`}
-																			>
-																				{/* Tampilkan angka jika ada yang like, jika tidak tampilkan teks "Suka" */}
-																				{reply.isLiked ||
-																				reply.likeCount >
-																					0 ? (
-																					<span className="flex items-center gap-1">
-																						<Heart
-																							size={
-																								8
-																							}
-																							fill={
-																								reply.isLiked
-																									? "currentColor"
-																									: "none"
-																							}
-																						/>
-																						{
-																							reply.likeCount
-																						}
-																					</span>
-																				) : (
-																					"Suka"
-																				)}
-																			</button>
-																			<button
-																				onClick={() =>
-																					handleReplyClick(
-																						reply,
-																					)
-																				}
-																				className="text-[9px] text-gray-500 hover:text-blue-400 font-bold uppercase transition-colors"
-																			>
-																				Balas
-																			</button>
-																		</div>
-																	</div>
-																</div>
-															),
-														)}
-													</div>
-												)}
-										</div>
-									</div>
-								</div>
+									comment={c}
+									postId={postId}
+									currentUserId={currentUserId}
+									depth={0}
+									handleDelete={handleDelete}
+									handleToggleLike={handleToggleLike}
+									handleReplyClick={handleReplyClick}
+									setReportTarget={setReportTarget}
+									onFocusThread={handleFocusThread}
+								/>
 							))
 						)}
 					</div>

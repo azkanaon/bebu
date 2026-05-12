@@ -5,6 +5,7 @@ import FeedTabs from "@/components/feed/FeedTabs";
 import CreatePostBox from "@/components/feed/CreatePostBox";
 import FeedList from "@/components/feed/FeedList";
 import { ReviewPostType } from "@/types/post";
+import api from "@/lib/axios";
 
 export default function HomePage() {
 	const [tab, setTab] = useState<"recommended" | "following">("recommended");
@@ -23,26 +24,20 @@ export default function HomePage() {
 	useEffect(() => {
 		const fetchPosts = async () => {
 			setLoading(true);
-
 			try {
-				// nanti bisa beda endpoint
+				// Gunakan path relatif karena baseURL sudah di-set di axios.ts
 				const endpoint =
-					tab === "recommended"
-						? "http://localhost:8080/api/v1/posts"
-						: "http://localhost:8080/api/v1/posts"; // sementara sama
+					tab === "recommended" ? "v1/posts" : "v1/posts";
 
-				const res = await fetch(endpoint, {
-					method: "GET",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					credentials: "include",
-				});
-				const data = await res.json();
+				const res = await api.get(endpoint);
 
-				setPosts(data);
-			} catch (err) {
-				console.error("Failed to fetch posts:", err);
+				// Axios otomatis mem-parsing JSON, datanya ada di res.data
+				setPosts(res.data);
+			} catch (err: any) {
+				console.error(
+					"Failed to fetch posts:",
+					err.response?.data || err.message,
+				);
 			} finally {
 				setLoading(false);
 			}

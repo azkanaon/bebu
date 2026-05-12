@@ -25,6 +25,7 @@ func ToCommentResponse(c models.PostComment, currentUserID uint) dto.CommentResp
 		ID:        c.PostCommentID,
 		UserID:    c.UserID,
 		UserPublicID: userPublicID,
+        ParentCommentID: c.ParentCommentID,
 		Username:  username,
 		Avatar:    avatar,
 		Comment:   c.Comment,
@@ -50,4 +51,39 @@ func ToCommentResponseList(comments []models.PostComment, currentUserID uint) []
         responses = append(responses, ToCommentResponse(c, currentUserID))
     }
     return responses
+}
+
+func ToSingleCommentResponse(c models.PostComment, currentUserID uint) dto.CommentResponse {
+    var avatar string
+    var username string
+    var userPublicID string
+
+    if c.User.Profile != nil {
+        avatar = c.User.Profile.AvatarUrl
+        username = c.User.Username
+        userPublicID = c.User.PublicID.String()
+    }
+
+    isLiked := false
+    // Cek apakah user saat ini ada di dalam list Likes yang di-preload
+    for _, like := range c.Likes {
+        if like.UserID == currentUserID {
+            isLiked = true
+            break
+        }
+    }
+
+    return dto.CommentResponse{
+        ID:           c.PostCommentID,
+        UserID:       c.UserID,
+        UserPublicID: userPublicID,
+        ParentCommentID: c.ParentCommentID,
+        Username:     username,
+        Avatar:       avatar,
+        Comment:      c.Comment,
+        CreatedAt:    c.CreatedAt,
+        LikeCount:    c.LikeCount,
+        IsLiked:      isLiked,
+        Replies:      []dto.CommentResponse{},
+    }
 }
