@@ -31,57 +31,70 @@ func NewGamificationService(db *gorm.DB, gRepo repositories.GamificationReposito
 	}
 }
 
-func (s *gamificationService) GetBadgeList(viewerID *uint, username string, page, limit int) ([]dto.BadgeDTO, *dto.PaginationDTO, error){
-    // 1. Cek akses (Gunakan helper yang sudah ada)
-    targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, username)
-    if err != nil || !hasAccess {
-        return make([]dto.BadgeDTO, 0), dto.NewPaginationDTO(0, page, limit), err
-    }
+func (s *gamificationService) GetBadgeList(viewerID *uint, username string, page, limit int) ([]dto.BadgeDTO, *dto.PaginationDTO, error) {
+	targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, username)
+	if err != nil || !hasAccess {
+		return []dto.BadgeDTO{}, dto.NewPaginationDTO(0, page, limit), err
+	}
 
-    // 2. Ambil data dari repo
-    userBadges, total, err := s.gamificationRepo.GetUserBadges(targetUser.UserID, page, limit)
-    if err != nil {
-        return nil, nil, err
-    }
+	userBadges, total, err := s.gamificationRepo.GetUserBadges(targetUser.UserID, page, limit)
+	if err != nil {
+		return nil, nil, err
+	}
 
-    // 3. Mapping ke DTO
-    dtos := make([]dto.BadgeDTO, 0, len(userBadges))
-    for _, ub := range userBadges {
-        dtos = append(dtos, dto.BadgeDTO{
-            BadgeName:   ub.Badge.BadgeName,
-            LogoURL:     *ub.Badge.LogoURL,
-            Description: *ub.Badge.Description,
-        })
-    }
+	dtos := make([]dto.BadgeDTO, 0, len(userBadges))
+	for _, ub := range userBadges {
+		item := dto.BadgeDTO{
+			BadgeName:    ub.Badge.BadgeName,
+			DisplayOrder: ub.DisplayOrder, // Langsung assign pointer ke pointer
+			BadgeID: 	ub.BadgeID, 
+		}
 
-    return dtos, dto.NewPaginationDTO(total, page, limit), nil
+		// Pengecekan aman untuk pointer string agar tidak crash
+		if ub.Badge.LogoURL != nil {
+			item.LogoURL = *ub.Badge.LogoURL
+		}
+		if ub.Badge.Description != nil {
+			item.Description = *ub.Badge.Description
+		}
+
+		dtos = append(dtos, item)
+	}
+
+	return dtos, dto.NewPaginationDTO(total, page, limit), nil
 }
 
 func (s *gamificationService) GetAchievementList(viewerID *uint, username string, page, limit int) ([]dto.AchievementDTO, *dto.PaginationDTO, error) {
-    // 1. Cek akses
-    targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, username)
-    if err != nil || !hasAccess {
-        return make([]dto.AchievementDTO, 0), dto.NewPaginationDTO(0, page, limit), err
-    }
+	targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, username)
+	if err != nil || !hasAccess {
+		return []dto.AchievementDTO{}, dto.NewPaginationDTO(0, page, limit), err
+	}
 
-    // 2. Ambil data dari repo
-    userAchievements, total, err := s.gamificationRepo.GetUserAchievements(targetUser.UserID, page, limit)
-    if err != nil {
-        return nil, nil, err
-    }
+	userAchievements, total, err := s.gamificationRepo.GetUserAchievements(targetUser.UserID, page, limit)
+	if err != nil {
+		return nil, nil, err
+	}
 
-    // 3. Mapping ke DTO
-    dtos := make([]dto.AchievementDTO, 0, len(userAchievements))
-    for _, ua := range userAchievements {
-        dtos = append(dtos, dto.AchievementDTO{
-            AchievementName: ua.Achievement.AchievementName,
-            LogoURL:         *ua.Achievement.LogoURL,
-            Description:     *ua.Achievement.Description,
-            EarnedAt:        ua.EarnedAt,
-        })
-    }
+	dtos := make([]dto.AchievementDTO, 0, len(userAchievements))
+	for _, ua := range userAchievements {
+		item := dto.AchievementDTO{
+			AchievementID:   ua.AchievementID,
+			AchievementName: ua.Achievement.AchievementName,
+			EarnedAt:        ua.EarnedAt,
+			DisplayOrder:    ua.DisplayOrder, // Langsung assign pointer
+		}
 
-    return dtos, dto.NewPaginationDTO(total, page, limit), nil
+		if ua.Achievement.LogoURL != nil {
+			item.LogoURL = *ua.Achievement.LogoURL
+		}
+		if ua.Achievement.Description != nil {
+			item.Description = *ua.Achievement.Description
+		}
+
+		dtos = append(dtos, item)
+	}
+
+	return dtos, dto.NewPaginationDTO(total, page, limit), nil
 }
 
 func (s *gamificationService) UpdateFavoriteBadges(userID uint, req []dto.UpdateFavoriteItemDTO) error {

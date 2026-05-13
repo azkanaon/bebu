@@ -160,9 +160,11 @@ func (s *userService) mapToPublicProfileDTO(
 	favBadges := make([]dto.BadgeDTO, 0, len(user.FavoriteUserBadges))
     for _, ub := range user.FavoriteUserBadges {
         favBadges = append(favBadges, dto.BadgeDTO{
+			BadgeID:     ub.BadgeID,
             BadgeName:   ub.Badge.BadgeName,
             LogoURL:     *ub.Badge.LogoURL,
             Description: *ub.Badge.Description,
+			DisplayOrder: ub.DisplayOrder,
         })
     }
     
@@ -170,9 +172,11 @@ func (s *userService) mapToPublicProfileDTO(
     favAchievements := make([]dto.AchievementDTO, 0, len(user.FavoriteUserAchievements))
     for _, ua := range user.FavoriteUserAchievements {
         favAchievements = append(favAchievements, dto.AchievementDTO{
+            AchievementID: ua.AchievementID,
             AchievementName: ua.Achievement.AchievementName,
             LogoURL:         *ua.Achievement.LogoURL,
             Description:     *ua.Achievement.Description,
+			DisplayOrder: ua.DisplayOrder,
             EarnedAt:        ua.EarnedAt,
         })
     }

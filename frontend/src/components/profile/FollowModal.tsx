@@ -16,6 +16,8 @@ import {
   useInfiniteFollowers,
   useInfiniteFollowing,
 } from '@/hooks/useInfiniteFollow'
+// 1. IMPORT AUTH STORE
+import { useAuthStore } from '@/stores/useAuthStore'
 
 type Props = {
   open: boolean
@@ -35,7 +37,6 @@ export default function FollowModal({
   )
   const [search, setSearch] = useState('')
 
-  // INFINITE HOOKS
   const {
     data: followersData,
     fetchNextPage: fetchFollowers,
@@ -52,7 +53,6 @@ export default function FollowModal({
     isLoading: loadingFollowing,
   } = useInfiniteFollowing(username)
 
-  // OBSERVER untuk Infinite Scroll
   const { ref, inView } = useInView()
 
   useEffect(() => {
@@ -73,7 +73,6 @@ export default function FollowModal({
     if (open) setActiveTab(initialTab)
   }, [open, initialTab])
 
-  // GABUNGKAN PAGES MENJADI SATU ARRAY
   const currentResponse =
     activeTab === 'followers' ? followersData : followingData
   const allUsers = useMemo(() => {
@@ -104,7 +103,6 @@ export default function FollowModal({
             onClick={onClose}
             className="fixed inset-0 z-100 bg-black backdrop-blur-sm"
           />
-
           <div className="fixed inset-0 z-110 flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
             <motion.div
               initial={{ y: '100dvh', opacity: 0 }}
@@ -174,9 +172,6 @@ export default function FollowModal({
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-20 text-gray-500 gap-2">
                     <Loader2 size={24} className="animate-spin text-blue-500" />
-                    <p className="text-[10px] uppercase tracking-widest font-medium">
-                      Loading data...
-                    </p>
                   </div>
                 ) : (
                   <div className="p-1">
@@ -189,8 +184,6 @@ export default function FollowModal({
                         activeTab={activeTab}
                       />
                     ))}
-
-                    {/* SENTINEL / INFINITE SCROLL TRIGGER */}
                     <div ref={ref} className="py-6 flex justify-center">
                       {isFetchingNext ? (
                         <Loader2
@@ -206,7 +199,6 @@ export default function FollowModal({
                         </p>
                       ) : null}
                     </div>
-
                     {filteredUsers.length === 0 && (
                       <div className="py-12 text-center text-xs text-gray-600 italic tracking-wide">
                         No {activeTab} found
@@ -214,16 +206,6 @@ export default function FollowModal({
                     )}
                   </div>
                 )}
-              </div>
-
-              {/* MOBILE CLOSE */}
-              <div className="p-3 pb-6 md:pb-3 md:hidden border-t border-white/5 shrink-0 bg-[#0B1220]">
-                <button
-                  onClick={onClose}
-                  className="w-full bg-white/5 text-gray-400 py-3 rounded-xl text-[10px] font-semibold uppercase tracking-wider"
-                >
-                  Close
-                </button>
               </div>
             </motion.div>
           </div>
@@ -246,7 +228,15 @@ function UserRow({
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { isFollowing, isOwnProfile, isPending } = user.viewerContext
+
+  // 2. AMBIL USER LOGIN DARI STORE
+  const { user: currentUser } = useAuthStore()
+
+  const {
+    isFollowing = false,
+    isOwnProfile = false,
+    isPending = false,
+  } = user.viewerContext || {}
   const { mutate: follow, isPending: fLoading } = useFollowUser()
   const { mutate: unfollow, isPending: uLoading } = useUnfollowUser()
 
@@ -255,22 +245,32 @@ function UserRow({
     router.push(`/${user.username}`)
   }
 
+  // 3. PERBAIKAN FUNGSI handleAction
   const handleAction = (e: React.MouseEvent) => {
     e.stopPropagation()
+
+    // Buat satu fungsi penanganan sukses yang lengkap
+    const mutationOptions = {
+      onSuccess: () => {
+        // Refresh daftar di dalam modal
+        queryClient.invalidateQueries({ queryKey: [activeTab, ownerUsername] })
+
+        // Refresh profile yang sedang dibuka (agar angka followers/following berubah)
+        queryClient.invalidateQueries({ queryKey: ['profile', ownerUsername] })
+
+        // Refresh profil kita sendiri (jika kita follow orang lain, Following kita bertambah)
+        if (currentUser?.username) {
+          queryClient.invalidateQueries({
+            queryKey: ['profile', currentUser.username],
+          })
+        }
+      },
+    }
+
     if (isFollowing || isPending) {
-      unfollow(user.username, {
-        onSuccess: () =>
-          queryClient.invalidateQueries({
-            queryKey: [activeTab, ownerUsername],
-          }),
-      })
+      unfollow(user.username, mutationOptions)
     } else {
-      follow(user.username, {
-        onSuccess: () =>
-          queryClient.invalidateQueries({
-            queryKey: [activeTab, ownerUsername],
-          }),
-      })
+      follow(user.username, mutationOptions)
     }
   }
 
@@ -308,12 +308,12 @@ function UserRow({
         <button
           disabled={fLoading || uLoading}
           onClick={handleAction}
-          className={`px-3.5 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all min-w-21.25 flex justify-center ${
+          className={`px-3.5 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all min-w-21.25 flex justify-center cursor-pointer ${
             isFollowing
-              ? 'bg-white/5 text-gray-400 border border-white/5'
+              ? 'bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10'
               : isPending
                 ? 'bg-white/5 text-gray-500 italic'
-                : 'bg-blue-600 text-white'
+                : 'bg-blue-600 text-white hover:bg-blue-500'
           }`}
         >
           {fLoading || uLoading ? (
