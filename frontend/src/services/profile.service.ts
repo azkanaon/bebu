@@ -1,11 +1,7 @@
 import api from '@/lib/axios'
 import { FollowListResponse, FollowResponse } from '@/types/follow'
 import { FollowRequestResponse } from '@/types/follow-request'
-import {
-  UpdateProfileRequest,
-  UpdateProfileResponse,
-  UserProfileResponse,
-} from '@/types/profile'
+import { UpdateProfileResponse, UserProfileResponse } from '@/types/profile'
 
 export const profileService = {
   getProfile: async (username: string): Promise<UserProfileResponse> => {
@@ -74,5 +70,29 @@ export const profileService = {
       },
     )
     return response.data
+  },
+
+  getAllAchievements: async (username: string, page: number): Promise<any> => {
+    const response = await api.get(
+      `/v1/users/${username}/achievements?page=${page}&limit=12`,
+    )
+    return response.data
+  },
+
+  getAllBadges: async (username: string, page: number): Promise<any> => {
+    const response = await api.get(
+      `/v1/users/${username}/badges?page=${page}&limit=12`,
+    )
+    return response.data
+  },
+
+  updateFavoriteBadges: async (items: { itemId: number; order: number }[]) => {
+    return (await api.put('/v1/profile/favorite-badges', items)).data
+  },
+
+  updateFavoriteAchievements: async (
+    items: { itemId: number; order: number }[],
+  ) => {
+    return (await api.put('/v1/profile/favorite-achievements', items)).data
   },
 }

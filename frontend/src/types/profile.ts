@@ -81,3 +81,20 @@ export interface UpdateProfileResponse {
   message: string
   data: any // Sesuaikan dengan response asli BE kamu
 }
+
+export interface FavoriteAchievement {
+  achievementId: number
+  achievementName: string
+  logoUrl: string
+  description: string
+  earnedAt?: string
+  displayOrder?: number
+}
+
+export interface FavoriteBadge {
+  badgeId: number
+  badgeName: string
+  logoUrl: string
+  description: string
+  displayOrder?: number
+}

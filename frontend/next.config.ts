@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'example.com', // ✅ tambahin ini
+      },
+      {
+        protocol: 'https',
         hostname: 'api.dicebear.com', // ✅ Tambahkan ini
         pathname: '/7.x/**', // Opsional: agar lebih spesifik
       },

@@ -52,22 +52,7 @@ type SocialLinkDTO struct {
 	PlatformSlug     string `json:"platformSlug"`
 }
 
-// BadgeDTO merepresentasikan satu badge yang telah diperoleh user.
-// Ini adalah gabungan data dari user_badges dan badges.
-type BadgeDTO struct {
-	BadgeName   string `json:"badgeName"`
-	LogoURL     string `json:"logoUrl"`
-	Description string `json:"description"`
-}
 
-// AchievementDTO merepresentasikan satu achievement yang telah diperoleh user.
-// Ini adalah gabungan data dari user_achievements dan achievements.
-type AchievementDTO struct {
-	AchievementName string    `json:"achievementName"`
-	LogoURL         string    `json:"logoUrl"`
-	Description     string    `json:"description"`
-	EarnedAt        time.Time `json:"earnedAt"`
-}
 
 // ViewerContextDTO berisi informasi kontekstual dari perspektif user yang sedang login (viewer).
 // Ini membantu frontend untuk menampilkan tombol yang tepat (e.g., "Follow" vs "Unfollow", "Edit Profile").

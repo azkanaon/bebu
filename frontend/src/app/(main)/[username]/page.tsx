@@ -71,11 +71,11 @@ export default function ProfilePage({ params }: Props) {
       </motion.div>
 
       <motion.div variants={item}>
-        <Achievements />
+        <Achievements items={data.favoriteAchievements} username={username} />
       </motion.div>
 
       <motion.div variants={item}>
-        <Badges />
+        <Badges items={data.favoriteBadges} username={username} />
       </motion.div>
 
       <motion.div variants={item}>
