@@ -93,8 +93,8 @@ type PasswordReset struct {
 
 type UserStat struct {
 	UserID         uint      `gorm:"primaryKey"`
-	TotalFollowers int       `gorm:"not null;default:0"`
-	TotalFollowing int       `gorm:"not null;default:0"`
+	TotalFollowers int       `gorm:"column:total_followers;not null;default:0"`
+	TotalFollowing int       `gorm:"column:total_following;not null;default:0"`
 	TotalPosts     int       `gorm:"not null;default:0"`
     TotalBadges        int `json:"totalBadges"`        
     TotalAchievements  int `json:"totalAchievements"`

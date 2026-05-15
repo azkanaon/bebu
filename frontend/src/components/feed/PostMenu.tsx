@@ -40,14 +40,10 @@ export default function PostMenu({ postId, postPublicID, userPublicID }: PostMen
 		return () =>
 			document.removeEventListener("mousedown", handleClickOutside);
 	}, []);
-
-	// Di dalam AnalysisPost.tsx
-	const authStorage =
-		typeof window !== "undefined"
-			? localStorage.getItem("bebu-auth-storage")
-			: null;
+	const authStorage = localStorage.getItem("bebu-auth-storage");
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
-	const currentUserId = parsedStorage?.state?.user?.data?.user_public_id;
+	const user = parsedStorage?.state?.user;
+	const currentUserId = user?.user_public_id;
 
 	// Cek apakah user yang login adalah pemilik postingan
 	const isOwner = String(userPublicID) === String(currentUserId);
@@ -111,7 +107,7 @@ export default function PostMenu({ postId, postPublicID, userPublicID }: PostMen
 									label="Copy link"
 									onClick={() => {
 										navigator.clipboard.writeText(
-											`${window.location.origin}/post/${postId}`,
+											`${window.location.origin}/post/${postPublicID}`,
 										);
 										setOpen(false);
 										setShowDeleteConfirm(false);

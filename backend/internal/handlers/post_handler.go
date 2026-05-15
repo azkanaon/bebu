@@ -29,15 +29,33 @@ func NewPostHandler(service services.PostService) *PostHandler {
 }
 
 func (h *PostHandler) GetPosts(c *gin.Context) {
-    // 1. Cek apakah ada userID dari middleware
     var currentUserID uint
     val, exists := c.Get("userID")
     if exists {
         currentUserID = val.(uint)
     }
-	
-    // 2. Panggil service dengan userID (akan 0 jika tidak login)
-    data, err := h.service.GetPosts(currentUserID)
+    
+    // Ambil parameter dari query string
+    tab := c.DefaultQuery("tab", "recommended")
+    
+    // String to Int (dengan default value)
+    cursorStr := c.DefaultQuery("cursor", "0")
+    cursor, _ := strconv.ParseUint(cursorStr, 10, 32)
+    
+    limitStr := c.DefaultQuery("limit", "10")
+    limit, _ := strconv.Atoi(limitStr)
+
+    // Proteksi tab following
+    if tab == "following" && !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Please login to see following posts"})
+        return
+    }
+
+    categoryIDStr := c.Query("category_id")
+    categoryID, _ := strconv.ParseUint(categoryIDStr, 10, 32)
+
+    // Kirim categoryID (akan bernilai 0 jika tidak ada di query string)
+    data, err := h.service.GetPosts(currentUserID, tab, uint(cursor), limit, uint(categoryID))
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch posts"})
         return

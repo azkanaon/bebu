@@ -28,41 +28,83 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 			window.removeEventListener("app-loading", handleLoadingEvent);
 	}, []);
 
+	const lastScrollY = useRef(0);
+
 	useEffect(() => {
-		let lastScrollY = window.scrollY;
+		lastScrollY.current = window.scrollY;
 
 		const handleScroll = () => {
 			const sidebar = document.getElementById("right-sidebar");
-			if (!sidebar || disableSidebarScroll.current || isAppLoading)
-				return;
+
+			if (!sidebar) return;
+			if (disableSidebarScroll.current) return;
+			if (isAppLoading) return;
 
 			const sidebarHeight = sidebar.offsetHeight;
 			const viewportHeight = window.innerHeight;
 			const currentScrollY = window.scrollY;
 
 			const padding = 16;
+
+			// Kalau sidebar lebih pendek dari viewport,
+			// tidak perlu custom scrolling
 			if (sidebarHeight + padding * 2 <= viewportHeight) {
 				setOffset(0);
-				lastScrollY = currentScrollY;
+				lastScrollY.current = currentScrollY;
 				return;
 			}
 
-			const delta = currentScrollY - lastScrollY;
-			const maxScrollTop = sidebarHeight + padding - (viewportHeight - padding);
-			
+			// Total maksimal scroll halaman
+			const maxPageScroll =
+				document.documentElement.scrollHeight - window.innerHeight;
+
+			// Sisa scroll menuju bawah halaman
+			const remainingScroll = maxPageScroll - currentScrollY;
+
+			// Perubahan scroll user
+			const delta = currentScrollY - lastScrollY.current;
+
+			// Maksimal sidebar boleh naik
+			const maxScrollTop =
+				sidebarHeight + padding - (viewportHeight - padding);
+
 			setOffset((prev) => {
 				let next = prev + delta;
-				if (next < 0) next = 0;
-				if (next > maxScrollTop) next = maxScrollTop;
+
+				// Minimum
+				if (next < 0) {
+					next = 0;
+				}
+
+				// Maksimum normal sidebar
+				if (next > maxScrollTop) {
+					next = maxScrollTop;
+				}
+
+				// Jangan melebihi sisa halaman
+				if (next > remainingScroll) {
+					next = remainingScroll;
+				}
+
+				// Safety tambahan
+				if (next < 0) {
+					next = 0;
+				}
+
 				return next;
 			});
 
-			lastScrollY = currentScrollY;
+			lastScrollY.current = currentScrollY;
 		};
 
-		window.addEventListener("scroll", handleScroll, { passive: true });
-		return () => window.removeEventListener("scroll", handleScroll);
-	}, [disableSidebarScroll, isAppLoading]);
+		window.addEventListener("scroll", handleScroll, {
+			passive: true,
+		});
+
+		return () => {
+			window.removeEventListener("scroll", handleScroll);
+		};
+	}, [isAppLoading]);
 
 	useEffect(() => {
 		let timer: NodeJS.Timeout;
@@ -108,7 +150,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 				</aside>
 
 				{/* Main Content */}
-				<main className="flex-1 w-full max-w-[600px] z-0 px-3 sm:px-0 min-h-[120vh]">
+				<main className="flex-1 w-full max-w-[600px] z-0 px-3 sm:px-0">
 					{children}
 				</main>
 

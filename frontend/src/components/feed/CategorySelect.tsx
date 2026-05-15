@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Category } from "@/types/category";
+import { searchCategoriesAPI } from "@/lib/api";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -28,10 +29,8 @@ export default function CategorySelect({
 	const debounced = useDebounce(query, 300);
 
 	const { data } = useSWR(
-		debounced
-			? `http://localhost:8080/api/v1/categories/search?search=${debounced}`
-			: null,
-		fetcher,
+		debounced ? ["/v1/categories/search", debounced] : null,
+		([, q]) => searchCategoriesAPI(q),
 	);
 
 	const suggestions: Category[] = data?.data || [];
@@ -96,6 +95,7 @@ export default function CategorySelect({
 		const newCat: Category = {
 			id: Date.now(),
 			name: query,
+			is_favorited: false,
 		};
 
 		onChange([...value, newCat]);

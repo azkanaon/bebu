@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
-
-type Category = {
-	id: number;
-	name: string;
-	is_favorited: boolean;
-};
+import { Category } from "@/types/category";
+import {
+	getAllCategoriesAPI,
+	favoriteCategoryAPI,
+	unfavoriteCategoryAPI,
+} from "@/lib/api";
 
 export function CategoryModal({
 	onClose,
@@ -24,10 +24,19 @@ export function CategoryModal({
 
 	// Fetch categories
 	useEffect(() => {
-		fetch("http://localhost:8080/api/v1/categories")
-			.then((res) => res.json())
-			.then((data) => setCategories(data))
-			.catch(() => toast.error("Failed to load categories"));
+		const loadCategories = async () => {
+			try {
+				const data = await getAllCategoriesAPI();
+				setCategories(data);
+			} catch (error: unknown) {
+				const errorMessage =
+					error instanceof Error
+						? error.message
+						: "Failed to load categories";
+				toast.error(errorMessage);
+			}
+		};
+		loadCategories();
 	}, []);
 
 	// ESC close
@@ -50,26 +59,31 @@ export function CategoryModal({
 	}, [search]);
 
 	const toggleFavorite = async (id: number, isFav: boolean) => {
-		const res = await fetch(
-			`http://localhost:8080/api/v1/categories/${id}/favorite`,
-			{
-				method: isFav ? "DELETE" : "POST",
-			},
-		);
+		try {
+			if (isFav) {
+				await unfavoriteCategoryAPI(id);
+				toast.success("Removed from favorites");
+			} else {
+				await favoriteCategoryAPI(id);
+				toast.success("Added to favorites");
+			}
 
-		if (!res.ok) {
-			const err = await res.json();
-			toast.error(err.error);
-			return;
+			// Update local state agar UI responsif
+			setCategories((prev) =>
+				prev.map((c) =>
+					c.id === id ? { ...c, is_favorited: !isFav } : c,
+				),
+			);
+
+			// Trigger refresh pada CategoryBubble di sidebar
+			onUpdate();
+		} catch (error: unknown) {
+			const errorMessage =
+				error instanceof Error
+					? error.message
+					: "Action Failder";
+			toast.error(errorMessage);
 		}
-
-		setCategories((prev) =>
-			prev.map((c) => (c.id === id ? { ...c, is_favorited: !isFav } : c)),
-		);
-
-		toast.success(isFav ? "Removed from favorites" : "Added to favorites");
-
-		onUpdate();
 	};
 
 	const filtered = categories.filter((c) =>

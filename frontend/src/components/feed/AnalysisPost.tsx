@@ -136,9 +136,9 @@ export default function AnalysisPost({ post, isModalView = false }: Props) {
 
 	const authStorage = localStorage.getItem("bebu-auth-storage");
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
-
-	const user = parsedStorage?.state?.user?.data;
+	const user = parsedStorage?.state?.user;
 	const currentUserId = user?.user_public_id;
+	
 	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
 	const [openMenuId, setOpenMenuId] = useState<number | null>(null);

@@ -47,3 +47,13 @@ export function timeAgo(date: string) {
 	const years = now.diff(target, "year");
 	return `${years}y`;
 }
+
+export function formatCompactNumber(number: number): string {
+	if (number === 0) return "0";
+
+	return Intl.NumberFormat("en-US", {
+		notation: "compact",
+		compactDisplay: "short",
+		maximumFractionDigits: 1,
+	}).format(number);
+}

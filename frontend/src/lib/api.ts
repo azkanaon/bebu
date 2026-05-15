@@ -2,6 +2,56 @@ import { CreatePostPayload, CreateCommentRequest, ShareRequest, ShareResponse, U
 import { ReportRequest, ReportResponse } from "@/types/report";
 import api from "@/lib/axios";
 
+export async function getPostsAPI(
+	tab: string,
+	cursor: number = 0,
+	limit: number = 10,
+	categoryId?: number | null,
+) {
+	const res = await api.get("/v1/posts", {
+		params: {
+			tab,
+			cursor,
+			limit,
+			category_id: categoryId || undefined, // Kirim jika ada
+		},
+	});
+	return res.data;
+}
+
+{/* CATEGORIES */}
+
+export async function getAllCategoriesAPI() {
+    const res = await api.get("/v1/categories");
+    return res.data;
+}
+
+export async function favoriteCategoryAPI(id: number) {
+    const res = await api.post(`/v1/categories/${id}/favorite`);
+    return res.data;
+}
+
+export async function unfavoriteCategoryAPI(id: number) {
+    const res = await api.delete(`/v1/categories/${id}/favorite`);
+    return res.data;
+}
+
+export async function getUserCategoriesAPI() {
+	const res = await api.get("/v1/categories/user");
+	return res.data;
+}
+
+export async function searchCategoriesAPI(query: string) {
+	if (!query) return [];
+	// Menggunakan instance 'api' agar interceptor token/base URL ikut terbawa
+	const res = await api.get(`/v1/categories/search`, {
+		params: { search: query },
+	});
+	return res.data;
+}
+
+{/* ---------- */}
+
 export async function getBooks() {
 	const res = await fetch("http://localhost:8080/api/v1/books", {
 		cache: "no-store",

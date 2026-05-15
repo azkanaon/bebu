@@ -11,11 +11,10 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-
 )
 
 type PostService interface {
-	GetPosts(userID uint) ([]interface{}, error)
+	GetPosts(userID uint, tab string, cursor uint, limit int, categoryID uint) ([]interface{}, error)
 	CreatePost(req dto.CreatePostRequest) error
 	DeletePost(publicID string, userID uint) error
 	GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
@@ -30,20 +29,23 @@ type PostService interface {
 type postService struct {
 	postRepo repositories.PostRepository
 	userRepo repositories.UserRepository
+	categoryRepo repositories.CategoryRepository
 	db       *gorm.DB
 }
 
 
-func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, db *gorm.DB) PostService {
+func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, categoryRepo repositories.CategoryRepository, db *gorm.DB) PostService {
 	return &postService{
 		postRepo: postRepo,
 		userRepo: userRepo,
+		categoryRepo: categoryRepo,
 		db:       db,
 	}
 }
 
-func (s *postService) GetPosts(userID uint) ([]interface{}, error) {
-    posts, err := s.postRepo.GetAllPosts(userID)
+func (s *postService) GetPosts(userID uint, tab string, cursor uint, limit int, categoryID uint) ([]interface{}, error) {
+    // Teruskan categoryID ke repo
+    posts, err := s.postRepo.GetPosts(userID, tab, cursor, limit, categoryID)
     if err != nil {
         return nil, err
     }
@@ -56,7 +58,6 @@ func (s *postService) GetPosts(userID uint) ([]interface{}, error) {
             result = append(result, mapper.ToAnalysisPostResponse(p, userID))
         }
     }
-
     return result, nil
 }
 
@@ -141,19 +142,39 @@ func (s *postService) CreatePost(req dto.CreatePostRequest) error {
 }
 
 func (s *postService) DeletePost(publicID string, userID uint) error {
-    var post models.Post
-    err := s.db.Where("public_id = ?", publicID).First(&post).Error
-    if err != nil {
-        return errors.New("post not found")
-    }
+	var post models.Post
+	if err := s.db.Where("public_id = ?", publicID).First(&post).Error; err != nil {
+		return errors.New("post not found")
+	}
 
-    // 2. Panggil repo untuk delete
-    err = s.postRepo.DeletePost(post.PostID, userID)
-    if err != nil {
-        return err
-    }
+	categoryIDs, err := s.postRepo.GetPostCategories(post.PostID)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Hapus Post (Soft Delete)
+		if err := s.postRepo.DeletePostWithTx(tx, post.PostID, userID); err != nil {
+			return err
+		}
+
+		// Hapus relasi di tabel pivot (Hard Delete) agar tidak menggantung
+		if err := s.postRepo.ClearPostCategories(tx, post.PostID); err != nil {
+			return err
+		}
+
+		// Kurangi usage_count kategori terkait
+		if err := s.postRepo.DecrementCategoryUsage(tx, categoryIDs); err != nil {
+			return err
+		}
+
+		// Bersihkan favorit yang sekarang sudah kosong
+		if err := s.categoryRepo.CleanEmptyFavoriteCategories(tx); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (s *postService) GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error) {

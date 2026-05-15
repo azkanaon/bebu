@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { followUserAPI, unfollowUserAPI } from "@/lib/api";
+import { formatCompactNumber } from "@/lib/utils";
 
 type User = {
 	id: number;
@@ -12,6 +13,9 @@ type User = {
 	avatar: string;
 	verified?: boolean;
 	mutualUsers?: string[];
+	bio?: string;
+	total_followers: number;
+	total_following: number;
 };
 
 export function FriendRecommendation() {
@@ -209,20 +213,23 @@ export function FriendRecommendation() {
 										</div>
 
 										<p className="text-xs text-gray-400 mt-2">
-											Lorem ipsum bio user. Passionate
-											reader & writer.
+											{u.bio}
 										</p>
 
 										<div className="flex justify-between text-xs text-gray-400 mt-3">
 											<span>
 												<b className="text-white">
-													123
+													{formatCompactNumber(
+														u.total_following,
+													)}
 												</b>{" "}
 												Following
 											</span>
 											<span>
 												<b className="text-white">
-													1.2K
+													{formatCompactNumber(
+														u.total_followers,
+													)}
 												</b>{" "}
 												Followers
 											</span>

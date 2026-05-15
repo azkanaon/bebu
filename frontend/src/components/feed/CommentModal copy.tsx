@@ -38,8 +38,7 @@ export default function CommentModal({
 }: Props) {
 	const authStorage = localStorage.getItem("bebu-auth-storage");
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
-
-	const user = parsedStorage?.state?.user?.data;
+	const user = parsedStorage?.state?.user;
 	const currentUserId = user?.user_public_id;
 
 	const [comments, setComments] = useState<CommentType[]>([]);
