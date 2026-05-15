@@ -3,9 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"backend-bebu/config"
 	"backend-bebu/internal/models"
+
+	"github.com/gin-gonic/gin"
 )
 
 type RecommendationResponse struct {
@@ -13,6 +14,9 @@ type RecommendationResponse struct {
 	Name     string `json:"name"`
 	Username string `json:"username"`
 	Avatar   string `json:"avatar"`
+	Bio   	 string `json:"bio"`
+	TotalFollowers int `json:"total_followers"`
+	TotalFollowing int `json:"total_following"`
 }
 
 func GetUserRecommendations(c *gin.Context) {
@@ -24,6 +28,7 @@ func GetUserRecommendations(c *gin.Context) {
 	// Query ke database
 	err := config.DB.
 		Preload("Profile").
+		Preload("Stats").
 		Where("user_id != ?", currentUserID). // ❌ exclude diri sendiri
 		Order("RANDOM()").                    // 🎲 random biar variatif
 		Limit(4).                             // ambil 4 saja
@@ -42,7 +47,6 @@ func GetUserRecommendations(c *gin.Context) {
 	for _, user := range users {
 		avatar := user.Profile.AvatarUrl
 
-		// fallback avatar
 		if avatar == "" {
 			avatar = "https://i.pravatar.cc/150"
 		}
@@ -52,6 +56,9 @@ func GetUserRecommendations(c *gin.Context) {
 			Name:     user.Profile.DisplayName,
 			Username: user.Username,
 			Avatar:   avatar,
+			Bio:	  user.Profile.Bio,
+			TotalFollowers: user.Stats.TotalFollowers,
+			TotalFollowing: user.Stats.TotalFollowing,
 		})
 	}
 

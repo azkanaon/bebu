@@ -25,17 +25,17 @@ func main() {
 	authService := services.NewAuthService(userRepo, loginLimiter)
 	authHandler := handlers.NewAuthHandler(authService)
 
+	categoryRepo := repositories.NewCategoryRepository(db)
+	categoryService := services.NewCategoryService(categoryRepo)
+	categoryHandler := handlers.NewCategoryHandler(categoryService)
+
 	postRepo := repositories.NewPostRepository(db)
-	postService := services.NewPostService(postRepo, userRepo, db) 
+	postService := services.NewPostService(postRepo, userRepo, categoryRepo, db) 
 	postHandler := handlers.NewPostHandler(postService) 
 
 	bookRepo := repositories.NewBookRepository(db)
 	bookService := services.NewBookService(bookRepo)
 	bookHandler := handlers.NewBookHandler(bookService)
-
-	categoryRepo := repositories.NewCategoryRepository(db)
-	categoryService := services.NewCategoryService(categoryRepo)
-	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
 	userService := services.NewUserService(db, userRepo)
     userHandler := handlers.NewUserHandler(userService)
@@ -165,13 +165,11 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 
 		categories := v1.Group("/categories")
 		{
-			categories.GET("/user", handlers.GetUserCategories)
-
-			// 🔥 TAMBAHAN
-			categories.GET("", handlers.GetAllCategories)
-			categories.POST("/:id/favorite", handlers.FavoriteCategory)
-			categories.DELETE("/:id/favorite", handlers.UnfavoriteCategory)
-			categories.GET("/search", categoryHandler.Search)
+			categories.GET("/user", authMiddleware.RequiredAuth(), categoryHandler.GetUserCategories)
+			categories.GET("", authMiddleware.RequiredAuth(), categoryHandler.GetAllCategories)
+			categories.POST("/:id/favorite", authMiddleware.RequiredAuth(), categoryHandler.FavoriteCategory)
+			categories.DELETE("/:id/favorite", authMiddleware.RequiredAuth(), categoryHandler.UnfavoriteCategory)
+			categories.GET("/search", authMiddleware.RequiredAuth(), categoryHandler.Search)
 		}
 
 		posts := v1.Group("/posts")

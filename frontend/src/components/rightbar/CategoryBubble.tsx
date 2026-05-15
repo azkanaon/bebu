@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Category } from "@/types/category";
+import { useRouter, useSearchParams } from "next/navigation";
+import { getUserCategoriesAPI, unfavoriteCategoryAPI } from "@/lib/api";
 
 export function CategoryBubble({
 	onAddClick,
@@ -12,34 +14,59 @@ export function CategoryBubble({
 	refresh: boolean;
 }) {
 	const [categories, setCategories] = useState<Category[]>([]);
-	const [activeCategory, setActiveCategory] = useState<number | null>(null);
+	const router = useRouter();
+    const searchParams = useSearchParams();
+    
+    // Ambil category_id dari URL (jika ada)
+    const activeCategoryId = searchParams.get("category_id");
 
 	useEffect(() => {
-		fetch("http://localhost:8080/api/v1/categories/user")
-			.then((res) => res.json())
-			.then((data) => {
+		const loadUserFavs = async () => {
+			try {
+				const data = await getUserCategoriesAPI();
 				if (Array.isArray(data)) setCategories(data);
-				else setCategories([]);
-			})
-			.catch(() => setCategories([]));
+			} catch (err: unknown) {
+				setCategories([]);
+			}
+		};
+		loadUserFavs();
 	}, [refresh]);
 
+	const handleCategoryClick = (id: number) => {
+        const params = new URLSearchParams(searchParams.toString());
+        
+        if (activeCategoryId === id.toString()) {
+            params.delete("category_id"); // Toggle off jika diklik lagi
+        } else {
+            params.set("category_id", id.toString());
+        }
+        
+        router.push(`?${params.toString()}`);
+    };
+
 	const handleRemove = async (id: number) => {
-		const res = await fetch(
-			`http://localhost:8080/api/v1/categories/${id}/favorite`,
-			{ method: "DELETE" },
-		);
+		try {
+			// Gunakan API helper yang sudah kita buat di api.ts
+			await unfavoriteCategoryAPI(id);
 
-		if (!res.ok) {
-			toast.error("Failed to remove");
-			return;
+			// Update state lokal: hapus kategori dari list bubble
+			setCategories((prev) => prev.filter((c) => c.id !== id));
+
+			// Jika kategori yang dihapus sedang aktif sebagai filter, hapus dari URL
+			if (activeCategoryId === id.toString()) {
+				const params = new URLSearchParams(searchParams.toString());
+				params.delete("category_id");
+				router.push(`?${params.toString()}`);
+			}
+
+			toast.success("Removed");
+		} catch (error: unknown) {
+			const errorMessage =
+				error instanceof Error
+					? error.message
+					: "Failed to remove";
+			toast.error(errorMessage);
 		}
-
-		setCategories((prev) => prev.filter((c) => c.id !== id));
-
-		if (activeCategory === id) setActiveCategory(null);
-
-		toast.success("Removed");
 	};
 
 	return (
@@ -57,14 +84,12 @@ export function CategoryBubble({
 
 			<div className="flex flex-wrap gap-2">
 				{categories.map((c) => {
-					const isActive = activeCategory === c.id;
+					const isActive = activeCategoryId === c.id.toString();
 
 					return (
 						<div
 							key={c.id}
-							onClick={() =>
-								setActiveCategory(isActive ? null : c.id)
-							}
+							onClick={() => handleCategoryClick(c.id)}
 							className={`
 								relative group
 								px-3 py-1.5

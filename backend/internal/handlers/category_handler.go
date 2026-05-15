@@ -4,138 +4,115 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"backend-bebu/config"
-	"backend-bebu/internal/models"
 	"backend-bebu/internal/services"
 
 	"strconv"
 )
 
-type CategoryResponse struct {
-	ID    uint   `json:"id"`
-	Name  string `json:"name"`
-	Count int    `json:"count"`
-}
-
 type CategoryHandler struct {
-	service *services.CategoryService
+	service services.CategoryService
 }
 
-func NewCategoryHandler(s *services.CategoryService) *CategoryHandler {
+func NewCategoryHandler(s services.CategoryService) *CategoryHandler {
 	return &CategoryHandler{s}
 }
 
-func GetUserCategories(c *gin.Context) {
-	userID := uint(1)
+func (h *CategoryHandler) GetUserCategories(c *gin.Context) {
+	val, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userID := val.(uint)
 
-	var categories []models.Category
-
-	err := config.DB.
-		Joins("JOIN user_categories uc ON uc.category_id = categories.category_id").
-		Where("uc.user_id = ?", userID).
-		Order("categories.usage_count DESC").
-		Limit(10).
-		Find(&categories).Error
-
+	categories, err := h.service.GetUserCategories(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
+			"error": "Failed to fetch user categories",
 		})
 		return
 	}
 
-	// 🔥 IMPORTANT: initialize slice
-	response := make([]CategoryResponse, 0)
-
-	for _, cat := range categories {
-		response = append(response, CategoryResponse{
-			ID:   cat.CategoryID,
-			Name: cat.CategoryName,
-		})
-	}
-
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, categories)
 }
 
-func GetAllCategories(c *gin.Context) {
-	userID := uint(1)
-
-	var categories []models.Category
-	config.DB.Find(&categories)
-
-	var result []gin.H
-
-	for _, cat := range categories {
-		var count int64
-
-		config.DB.Model(&models.UserCategory{}).
-			Where("user_id = ? AND category_id = ?", userID, cat.CategoryID).
-			Count(&count)
-
-		result = append(result, gin.H{
-			"id":           cat.CategoryID,
-			"name":         cat.CategoryName,
-			"is_favorited": count > 0,
-		})
+func (h *CategoryHandler) GetAllCategories(c *gin.Context) {
+	// Ambil userID jika ada (opsional, tidak harus ada untuk list kategori umum)
+	var currentUserID uint
+	val, exists := c.Get("userID")
+	if exists {
+		currentUserID = val.(uint)
 	}
 
-	c.JSON(http.StatusOK, result)
+	categories, err := h.service.GetAllCategories(currentUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+		return
+	}
+
+	c.JSON(http.StatusOK, categories)
 }
 
-func FavoriteCategory(c *gin.Context) {
-	userID := uint(1)
+func (h *CategoryHandler) FavoriteCategory(c *gin.Context) {
+	// Ambil userID dinamis
+	val, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userID := val.(uint)
 
+	// Ambil category ID dari param
 	categoryIDParam := c.Param("id")
-	categoryIDUint64, err := strconv.ParseUint(categoryIDParam, 10, 32)
+	categoryID, err := strconv.ParseUint(categoryIDParam, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
 		return
 	}
-	categoryID := uint(categoryIDUint64)
 
-	// 🔥 Cek jumlah kategori
-	var count int64
-	config.DB.Model(&models.UserCategory{}).
-		Where("user_id = ?", userID).
-		Count(&count)
-
-	if count >= 10 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Maximum 10 categories allowed",
-		})
+	// Panggil Service
+	err = h.service.FavoriteCategory(userID, uint(categoryID))
+	if err != nil {
+		// Mapping error spesifik
+		switch err.Error() {
+		case "maximum_limit_reached":
+			c.JSON(http.StatusBadRequest, gin.H{"error": "You can only have up to 10 favorite categories"})
+		case "already_favorited":
+			c.JSON(http.StatusBadRequest, gin.H{"error": "This category is already in your favorites"})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add favorite"})
+		}
 		return
 	}
 
-	// 🔥 Prevent duplicate
-	var existing models.UserCategory
-	err = config.DB.
-		Where("user_id = ? AND category_id = ?", userID, categoryID).
-		First(&existing).Error
-
-	if err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Already favorited",
-		})
-		return
-	}
-
-	config.DB.Create(&models.UserCategory{
-		UserID:     userID,
-		CategoryID: categoryID,
-	})
-
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, gin.H{"message": "Category added to favorites"})
 }
 
-func UnfavoriteCategory(c *gin.Context) {
-	userID := uint(1)
+func (h *CategoryHandler) UnfavoriteCategory(c *gin.Context) {
+	// Ambil userID dinamis dari middleware
+	val, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userID := val.(uint)
+
+	// Parse ID kategori dari URL parameter
 	categoryIDParam := c.Param("id")
+	categoryID, err := strconv.ParseUint(categoryIDParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category ID"})
+		return
+	}
 
-	config.DB.
-		Where("user_id = ? AND category_id = ?", userID, categoryIDParam).
-		Delete(&models.UserCategory{})
+	// Panggil Service
+	err = h.service.UnfavoriteCategory(userID, uint(categoryID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove favorite category"})
+		return
+	}
 
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, gin.H{"message": "Category removed from favorites"})
 }
 
 func (h *CategoryHandler) Search(c *gin.Context) {

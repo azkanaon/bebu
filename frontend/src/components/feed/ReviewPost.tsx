@@ -183,11 +183,10 @@ export default function ReviewPost({ post, isModalView = false }: Props) {
 
 	const authStorage = localStorage.getItem("bebu-auth-storage");
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
-
-	const user = parsedStorage?.state?.user?.data;
+	const user = parsedStorage?.state?.user;
 	const currentUserId = user?.user_public_id;
-	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
+	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 	const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
 	const handleDelete = async (commentId: number, postId: number) => {
@@ -253,7 +252,7 @@ export default function ReviewPost({ post, isModalView = false }: Props) {
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, []);
-
+	
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: 10 }}
