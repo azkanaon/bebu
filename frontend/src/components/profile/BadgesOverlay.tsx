@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Search, Loader2, Medal, Star } from 'lucide-react'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useInView } from 'react-intersection-observer'
 import ClientPortal from '../ClientPortal'
 import Image from 'next/image'
@@ -10,6 +10,7 @@ import { useInfiniteBadges } from '@/api/profile/useInfiniteCollection'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useUpdateFavoriteBadges } from '@/api/profile/useUpdateFavorites'
 import { toast } from 'sonner'
+import { FavoriteBadge } from '@/types/profile'
 
 // Helper Vibe Badge (Warna-warna Metallic)
 const getBadgeVibe = (name: string) => {
@@ -58,14 +59,14 @@ type Props = {
   open: boolean
   onClose: () => void
   username: string
-  initialFavorites?: []
+  initialFavorites: FavoriteBadge[]
 }
 
 export default function BadgesOverlay({
   open,
   onClose,
   username,
-  initialFavorites = [],
+  initialFavorites,
 }: Props) {
   const [search, setSearch] = useState('')
   const { ref, inView } = useInView()
@@ -77,11 +78,15 @@ export default function BadgesOverlay({
   const { mutate: updateFavs } = useUpdateFavoriteBadges(username)
 
   const [favIds, setFavIds] = useState<number[]>([])
+  const prevOpenRef = useRef(false)
 
   useEffect(() => {
-    if (open) {
-      setFavIds(initialFavorites.map((f: any) => f.badgeId))
+    // modal baru saja dibuka
+    if (open && !prevOpenRef.current) {
+      setFavIds(initialFavorites?.map((f: FavoriteBadge) => f.badgeId) ?? [])
     }
+
+    prevOpenRef.current = open
   }, [open, initialFavorites])
 
   const handleToggleFavorite = (badgeId: number) => {

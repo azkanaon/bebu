@@ -1,0 +1,1 @@
+ALTER TABLE books ADD COLUMN google_book_id VARCHAR(255) UNIQUE;

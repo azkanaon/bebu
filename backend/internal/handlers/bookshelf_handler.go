@@ -373,3 +373,44 @@ func (h *BookshelfHandler) DeleteNote(c *gin.Context) {
 	// 4. Jika semuanya berhasil, kirim response sukses
 	c.JSON(http.StatusOK, gin.H{"message": "Note deleted successfully"})
 }
+
+func (h *BookshelfHandler) GetReadingStreak(c *gin.Context) {
+	username := c.Param("username")
+	
+	// Ambil viewerID dari context (OptionalAuth)
+	var viewerID *uint
+	if id, exists := c.Get("userID"); exists {
+		if castedID, ok := id.(uint); ok {
+			viewerID = &castedID
+		}
+	}
+
+	stats, err := h.bookshelfService.GetReadingStreak(viewerID, username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch reading stats"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": stats})
+}
+
+func (h *BookshelfHandler) GetBookshelfNotes(c *gin.Context) {
+	bookshelfID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	noteType := c.Query("type")
+	var viewerID *uint
+	if id, exists := c.Get("userID"); exists {
+		uid := id.(uint)
+		viewerID = &uid
+	}
+
+	res, err := h.bookshelfService.GetBookshelfNotes(viewerID, uint(bookshelfID), noteType, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, res)
+}

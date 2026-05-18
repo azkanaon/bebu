@@ -64,6 +64,7 @@ export default function Achievements({ items, username }: Props) {
         open={openAchievements}
         onClose={() => setOpenAchievements(false)}
         username={username} // Pastikan username di-pass dari ProfilePage
+        initialFavorites={items} // Pass data favorite achievements ke overlay
       />
     </div>
   )

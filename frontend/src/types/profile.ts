@@ -4,8 +4,8 @@ export interface UserProfileResponse {
   profile: ProfileInfo
   stats: ProfileStats
   socialLinks: SocialLink[]
-  favoriteBadges: Badge[]
-  favoriteAchievements: Achievement[]
+  favoriteBadges: FavoriteBadge[]
+  favoriteAchievements: FavoriteAchievement[]
   settings?: UserSetting
   viewerContext?: ViewerContext
   isPrivate: boolean
@@ -79,7 +79,16 @@ export interface UpdateProfileRequest {
 // Interface untuk response (biasanya mengembalikan data profile yang baru)
 export interface UpdateProfileResponse {
   message: string
-  data: any // Sesuaikan dengan response asli BE kamu
+  data: ProfileData // Sesuaikan dengan response asli BE kamu
+}
+
+export type ProfileData = {
+  displayName: string
+  avatarUrl: string
+  bio: string
+  location: string
+  gender: string
+  joinedAt: string
 }
 
 export interface FavoriteAchievement {

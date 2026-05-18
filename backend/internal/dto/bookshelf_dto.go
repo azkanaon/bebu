@@ -4,7 +4,21 @@ import (
 	"math"
 	"time"
 )
+type BookshelfContextDTO struct {
+	Title       string   `json:"title"`
+	Authors     []string `json:"authors"`
+	CoverImgURL string   `json:"coverImgUrl"`
+	Progress    int      `json:"progress"`
+	CurrentPage int      `json:"currentPage"`
+	TotalPages  int      `json:"totalPages"`
+}
 
+// Response utama untuk endpoint notes
+type BookshelfNotesResponseDTO struct {
+	Bookshelf BookshelfContextDTO `json:"bookshelf"`
+	Data      []NoteDTO           `json:"data"`
+	Meta      *PaginationDTO      `json:"meta"`
+}
 // BookshelfItemDTO merepresentasikan satu item buku di rak pengguna.
 type BookshelfItemDTO struct {
 	ID          uint            `json:"id"`
@@ -12,6 +26,7 @@ type BookshelfItemDTO struct {
 	Book        BookSummaryDTO  `json:"book"`
 	ShelfStatus string          `json:"shelfStatus"`
 	Progress    int             `json:"progress"` // ProgressPercent
+	CurrentPage int 			`json:"currentPage"`
 	StartedAt   *time.Time      `json:"startedAt,omitempty"`
 	FinishedAt  *time.Time      `json:"finishedAt,omitempty"`
 }
@@ -49,12 +64,27 @@ func NewPaginationDTO(totalItems int64, page, limit int) *PaginationDTO {
 }
 
 type AddToBookshelfRequestDTO struct {
-	BookID      uint   `json:"book_id" binding:"required"`
-	ShelfStatus string `json:"shelf_status" binding:"required,oneof=want_to_read reading done"`
+	GoogleBookID    string   `json:"google_book_id" binding:"required"`
+	Title           string   `json:"title" binding:"required"`
+	Authors         []string `json:"authors" binding:"required"`
+	Genres          []string `json:"genres"`
+	Synopsis        string   `json:"synopsis"`
+	CoverImgURL     string   `json:"cover_img_url"`
+	TotalPages      int      `json:"total_pages"`
+	PublicationYear int16    `json:"publication_year"`
+	Language        string   `json:"language"`
+	ShelfStatus     string   `json:"shelf_status" binding:"required,oneof=want_to_read reading done"`
 }
 
 type UpdateBookshelfRequestDTO struct {
 	ShelfStatus     *string `json:"shelf_status,omitempty" binding:"omitempty,oneof=want_to_read reading done"`
 	ProgressPercent *int    `json:"progress_percent,omitempty" binding:"omitempty,min=0,max=100"`
+	CurrentPage     *int    `json:"current_page" binding:"omitempty,min=0"`
+}
+
+type ReadingStatsDTO struct {
+	CurrentStreak    int        `json:"currentStreak"`
+	LongestStreak    int        `json:"longestStreak"`
+	LastActivityDate *time.Time `json:"lastActivityDate"`
 }
 

@@ -131,7 +131,11 @@ func (s *authService) Register(req *dto.RegisterRequest, file *multipart.FileHea
 			TotalPosts:         0,
 			TotalBadges:        0,
 			TotalAchievements:  0,
-		},
+		}, 
+		ReadingStats: &models.UserReadingStat{
+            CurrentStreak: 0,
+            LongestStreak: 0,
+        },
 	}
 	// Jika display_name kosong, gunakan username
 	if newUser.Profile.DisplayName == "" {

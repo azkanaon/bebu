@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Search, Loader2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInView } from 'react-intersection-observer'
 import ClientPortal from '../ClientPortal'
 import Image from 'next/image'
@@ -69,8 +69,14 @@ export default function FollowModal({
     fetchFollowing,
   ])
 
+  const prevOpenRef = useRef(false)
+
   useEffect(() => {
-    if (open) setActiveTab(initialTab)
+    if (open && !prevOpenRef.current) {
+      setActiveTab(initialTab)
+    }
+
+    prevOpenRef.current = open
   }, [open, initialTab])
 
   const currentResponse =
@@ -219,7 +225,6 @@ function UserRow({
   user,
   onCloseModal,
   ownerUsername,
-  activeTab,
 }: {
   user: FollowUserData
   onCloseModal: () => void
@@ -252,14 +257,27 @@ function UserRow({
     // Buat satu fungsi penanganan sukses yang lengkap
     const mutationOptions = {
       onSuccess: () => {
-        // Refresh daftar di dalam modal
-        queryClient.invalidateQueries({ queryKey: [activeTab, ownerUsername] })
+        // 1. Invalidate KEDUA list (Followers DAN Following) untuk user yang profilnya sedang dibuka
+        // Kita tidak pakai 'activeTab' lagi agar keduanya ter-refresh
+        queryClient.invalidateQueries({
+          queryKey: ['followers', ownerUsername],
+        })
+        queryClient.invalidateQueries({
+          queryKey: ['following', ownerUsername],
+        })
 
-        // Refresh profile yang sedang dibuka (agar angka followers/following berubah)
+        // 2. Invalidate profile yang sedang dibuka agar angka stats berubah
         queryClient.invalidateQueries({ queryKey: ['profile', ownerUsername] })
 
-        // Refresh profil kita sendiri (jika kita follow orang lain, Following kita bertambah)
+        // 3. PENTING: Jika kita mem-follow orang, maka daftar "Following" KITA sendiri juga berubah
+        // Kita harus invalidate daftar kita sendiri agar saat kita balik ke profil sendiri, datanya sinkron
         if (currentUser?.username) {
+          queryClient.invalidateQueries({
+            queryKey: ['followers', currentUser.username],
+          })
+          queryClient.invalidateQueries({
+            queryKey: ['following', currentUser.username],
+          })
           queryClient.invalidateQueries({
             queryKey: ['profile', currentUser.username],
           })

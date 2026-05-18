@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Search, Loader2, Trophy, Star } from 'lucide-react'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useInView } from 'react-intersection-observer'
 import ClientPortal from '../ClientPortal'
 import Image from 'next/image'
@@ -10,13 +10,15 @@ import { useInfiniteAchievements } from '@/api/profile/useInfiniteCollection'
 import { toast } from 'sonner'
 import { useUpdateFavoriteAchievements } from '@/api/profile/useUpdateFavorites'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { FavoriteAchievement } from '@/types/profile'
 
 type Props = {
   open: boolean
   onClose: () => void
   username: string
-  initialFavorites?: [] | null
+  initialFavorites: FavoriteAchievement[]
 }
+
 const getAchievementVibe = (name: string) => {
   const vibes = [
     {
@@ -79,25 +81,32 @@ export default function AchievementsOverlay({
   // Gunakan state lokal agar UI bintang langsung berubah (instan)
   // Kita ambil ID saja dari initialFavorites (data yang ada di ProfileHeader)
   const [favIds, setFavIds] = useState<number[]>([])
+  const prevOpenRef = useRef(false)
 
   useEffect(() => {
-    if (open) {
-      setFavIds(initialFavorites?.map((f: any) => f.achievementId))
+    // modal baru saja dibuka
+    if (open && !prevOpenRef.current) {
+      setFavIds(
+        initialFavorites?.map((f: FavoriteAchievement) => f.achievementId) ??
+          [],
+      )
     }
+
+    prevOpenRef.current = open
   }, [open, initialFavorites])
 
-  const handleToggleFavorite = (badgeId: number) => {
+  const handleToggleFavorite = (achievementId: number) => {
     let newFavIds = [...favIds]
 
-    if (newFavIds.includes(badgeId)) {
+    if (newFavIds.includes(achievementId)) {
       // UNSTAR: Hapus dari daftar
-      newFavIds = newFavIds.filter((id) => id !== badgeId)
+      newFavIds = newFavIds.filter((id) => id !== achievementId)
     } else {
       // STAR: Cek jika sudah 4
       if (newFavIds.length >= 4) {
-        return toast.error('Maximum 4 favorite badges allowed!')
+        return toast.error('Maximum 4 favorite achievements allowed!')
       }
-      newFavIds.push(badgeId)
+      newFavIds.push(achievementId)
     }
 
     // Update state lokal (biar bintang langsung nyala/mati)
@@ -201,7 +210,7 @@ export default function AchievementsOverlay({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                handleToggleFavorite(item.badgeId)
+                                handleToggleFavorite(item.achievementId)
                               }}
                               className={`absolute top-4 right-4 z-20 p-1.5 rounded-full transition-all duration-300 outline-none ${
                                 isStarred
