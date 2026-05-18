@@ -1,15 +1,14 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, Variants } from 'framer-motion'
 import ProfileHeader from '@/components/profile/ProfileHeader'
 import Achievements from '@/components/profile/Achievements'
 import Badges from '@/components/profile/Badges'
-import ActivityTracking from '@/components/profile/ActivityTracking'
 import PostTabs from '@/components/profile/PostTabs'
 import { useProfile } from '@/api/profile/useProfile'
 import { use } from 'react'
 
-const container = {
+const container: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
@@ -19,7 +18,7 @@ const container = {
   },
 }
 
-const item = {
+const item: Variants = {
   hidden: { opacity: 0, y: 30 },
   show: {
     opacity: 1,
@@ -79,11 +78,7 @@ export default function ProfilePage({ params }: Props) {
       </motion.div>
 
       <motion.div variants={item}>
-        <ActivityTracking />
-      </motion.div>
-
-      <motion.div variants={item}>
-        <PostTabs />
+        <PostTabs username={username} />
       </motion.div>
     </motion.div>
   )

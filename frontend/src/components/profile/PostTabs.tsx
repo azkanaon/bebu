@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import PostCard from './PostCard'
-import BookshelfTab from './BookshelfTab'
+import BookshelfShowcase from './BookshelfShowCase'
 
 const tabs = ['Posts', 'Liked', 'Saved', 'Bookshelf']
 
-export default function PostTabs() {
+export default function PostTabs({ username }: { username: string }) {
   const [active, setActive] = useState('Posts')
   const [hovered, setHovered] = useState<string | null>(null) // State untuk mendeteksi hover
 
@@ -66,7 +66,7 @@ export default function PostTabs() {
           transition={{ duration: 0.2, ease: 'easeInOut' }}
         >
           {active === 'Bookshelf' ? (
-            <BookshelfTab />
+            <BookshelfShowcase username={username} />
           ) : (
             <PostGrid type="active" />
           )}

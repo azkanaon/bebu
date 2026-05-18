@@ -9,6 +9,7 @@ import {
   Shield,
   Flag,
   User,
+  Library,
 } from 'lucide-react'
 import { SidebarItem } from './SidebarItem'
 import { UserProfile } from './UserProfile'
@@ -61,6 +62,11 @@ export default function Sidebar({ user }: SidebarProps) {
             icon={<User size={20} />}
             label="My Profile"
             href={profileHref}
+          />
+          <SidebarItem
+            icon={<Library size={20} />}
+            label="List Bookshelf"
+            href={`/bookshelf/${user?.username}`}
           />
           <SidebarItem
             icon={<Book size={20} />}

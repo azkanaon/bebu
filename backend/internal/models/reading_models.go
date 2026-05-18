@@ -9,6 +9,7 @@ type UserBookshelf struct {
 	UserID          uint      `gorm:"column:user_id;not null;index"`
 	BookID          uint      `gorm:"column:book_id;not null"`
 	ShelfStatus     string    `gorm:"column:shelf_status;size:50;not null;default:want_to_read"`
+	CurrentPage     int `gorm:"column:current_page;not null;default:0"`
 	ProgressPercent *int      `gorm:"column:progress_percent"`
 	StartedAt       *time.Time `gorm:"column:started_at"`
 	FinishedAt      *time.Time `gorm:"column:finished_at"`
@@ -61,6 +62,7 @@ type ReadingActivityLog struct {
 type Note struct {
 	NoteID           uint      `gorm:"primaryKey"`
 	UserBookshelfID uint      `gorm:"not null;index"` // Foreign key ke user_bookshelves
+	Type             string    `gorm:"column:type;size:20;not null;default:insight"`
 	PageStart        *int      // Pointer ke int agar bisa NULL
 	PageEnd          *int      // Pointer ke int agar bisa NULL
 	Description      string    `gorm:"type:text;not null"`
@@ -69,4 +71,12 @@ type Note struct {
 
 	// Relasi: Sebuah catatan dimiliki oleh satu entri di rak buku.
 	UserBookshelf UserBookshelf `gorm:"foreignKey:UserBookshelfID;references:UserBookshelfID"`
+}
+
+type UserReadingStat struct {
+	UserID           uint      `gorm:"primaryKey"`
+	CurrentStreak    int       `gorm:"not null;default:0"`
+	LongestStreak    int       `gorm:"not null;default:0"`
+	LastActivityDate *time.Time `gorm:"type:date"`
+	UpdatedAt        time.Time `gorm:"autoUpdateTime"`
 }

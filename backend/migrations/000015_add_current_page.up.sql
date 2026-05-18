@@ -1,0 +1,1 @@
+ALTER TABLE user_bookshelves ADD COLUMN current_page INT NOT NULL DEFAULT 0;

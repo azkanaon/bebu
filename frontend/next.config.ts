@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**', // Mengizinkan semua gambar dari Cloudinary
       },
+      {
+        protocol: 'https',
+        hostname: 'books.google.com',
+      },
     ],
   },
 }

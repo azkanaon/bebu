@@ -32,6 +32,7 @@ type User struct {
 
     FavoriteUserBadges []UserBadge `gorm:"foreignKey:UserID;references:UserID"`
 	FavoriteUserAchievements []UserAchievement `gorm:"foreignKey:UserID;references:UserID"`
+    ReadingStats *UserReadingStat `gorm:"foreignKey:UserID;references:UserID"`
 }
 
 type UserProfile struct {

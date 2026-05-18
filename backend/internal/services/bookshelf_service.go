@@ -4,10 +4,12 @@ import (
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
+	"backend-bebu/pkg/utils"
 	"errors"
+	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +22,8 @@ type BookshelfService interface {
 	AddNote(userID, bookshelfID uint, req *dto.AddNoteRequestDTO) (*dto.NoteDTO, error)
 	UpdateNote(userID, noteID uint, req *dto.UpdateNoteRequestDTO) (*dto.NoteDTO, error)
 	DeleteNote(userID, noteID uint) error
+	GetReadingStreak(viewerID *uint, username string) (*dto.ReadingStatsDTO, error)
+	GetBookshelfNotes(viewerID *uint, bookshelfID uint, noteType string, page, limit int) (*dto.BookshelfNotesResponseDTO, error)
 }
 
 type bookshelfService struct {
@@ -113,6 +117,7 @@ func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername, st
 				Authors:     authorNames,
 			},
 			ShelfStatus: bs.ShelfStatus,
+			CurrentPage: bs.CurrentPage,
 			StartedAt:   bs.StartedAt,
 			FinishedAt:  bs.FinishedAt,
 		}
@@ -133,45 +138,91 @@ func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername, st
 }
 
 func (s *bookshelfService) AddBookToShelf(userID uint, req *dto.AddToBookshelfRequestDTO) (*dto.BookshelfItemDTO, error) {
-	// 1. Siapkan model UserBookshelf untuk disimpan
-	newEntry := &models.UserBookshelf{
-		UserID:      userID,
-		BookID:      req.BookID,
-		ShelfStatus: req.ShelfStatus,
-	}
+	var bookID uint
 
-	// Tambahkan logika berdasarkan status
-	if req.ShelfStatus == "reading" {
-		now := time.Now()
-		newEntry.StartedAt = &now
-	} else if req.ShelfStatus == "done" {
-		now := time.Now()
-		newEntry.StartedAt = &now // Asumsi jika 'done', pasti sudah pernah 'reading'
-		newEntry.FinishedAt = &now
-		newEntry.ProgressPercent = new(int)
-		*newEntry.ProgressPercent = 100
-	}
+	// 1. Mulai Transaksi Database
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		txRepo := s.bookshelfRepo.WithTx(tx)
 
-	// 2. Panggil repository untuk membuat entri
-	createdEntry, err := s.bookshelfRepo.AddToBookshelf(newEntry)
+		// 2. Cek apakah buku sudah ada di database kita berdasarkan GoogleBookID
+		existingBook, err := txRepo.FindBookByGoogleID(req.GoogleBookID)
+		
+		if err == nil {
+			// BUKU SUDAH ADA
+			bookID = existingBook.BookID
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			// BUKU BELUM ADA, MARI KITA BUAT
+			newBook := &models.Book{
+				GoogleBookID:    req.GoogleBookID,
+				Title:           req.Title,
+				Synopsis:        req.Synopsis,
+				CoverImgURL:     req.CoverImgURL,
+				PublicationYear: req.PublicationYear,
+				Language:        req.Language,
+				TotalPages:      req.TotalPages,
+				Slug:            strings.ToLower(strings.ReplaceAll(req.Title, " ", "-")) + "-" + uuid.New().String()[:8],
+			}
+
+			if err := tx.Create(newBook).Error; err != nil {
+				return err
+			}
+			bookID = newBook.BookID
+
+			// A. Proses Authors
+			for _, authorName := range req.Authors {
+				author, err := txRepo.GetOrCreateAuthor(tx, authorName)
+				if err != nil { return err }
+				
+				// Buat relasi BookAuthor
+				tx.Create(&models.BookAuthor{BookID: bookID, AuthorID: author.AuthorID})
+			}
+
+			// B. Proses Genres
+			for _, genreName := range req.Genres {
+				genre, err := txRepo.GetOrCreateGenre(tx, genreName)
+				if err != nil { return err }
+				
+				// Buat relasi BookGenre
+				tx.Create(&models.BookGenre{BookID: bookID, GenreID: genre.GenreID})
+			}
+		} else {
+			return err // Error DB lainnya
+		}
+
+		// 3. Masukkan ke UserBookshelf
+		newEntry := &models.UserBookshelf{
+			UserID:      userID,
+			BookID:      bookID,
+			ShelfStatus: req.ShelfStatus,
+		}
+
+		// Logika tanggal & progress otomatis
+		if req.ShelfStatus == "reading" {
+			now := time.Now(); newEntry.StartedAt = &now
+		} else if req.ShelfStatus == "done" {
+			now := time.Now(); newEntry.StartedAt = &now; newEntry.FinishedAt = &now
+			p := 100; newEntry.ProgressPercent = &p
+			newEntry.CurrentPage = req.TotalPages
+		}
+
+		// Simpan ke bookshelf (Repo ini harus handle error duplikat book_id + user_id)
+		if _, err := txRepo.AddToBookshelf(newEntry); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		// Cek apakah ini error karena duplikat
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // 23505 adalah kode untuk unique_violation
-			return nil, errors.New("book is already in the bookshelf")
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "23505") {
+			return nil, errors.New("book is already in your bookshelf")
 		}
 		return nil, err
 	}
 
-	createdEntry, err = s.bookshelfRepo.GetBookshelfEntryByID(createdEntry.UserBookshelfID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. Mapping ke DTO
-	mappedDTO := mapBookshelfToDTO(createdEntry)
-	
-	return mappedDTO, nil
+	// 4. Ambil data lengkap untuk response
+	fullEntry, err := s.bookshelfRepo.GetBookshelfEntryByUserIDAndBookID(userID, bookID)
+	return mapBookshelfToDTO(fullEntry), err
 }
 
 func mapBookshelfToDTO(bs *models.UserBookshelf) *dto.BookshelfItemDTO {
@@ -190,8 +241,10 @@ func mapBookshelfToDTO(bs *models.UserBookshelf) *dto.BookshelfItemDTO {
 			Title:       bs.Book.Title,
 			CoverImgURL: bs.Book.CoverImgURL,
 			Authors:     authorNames,
+			TotalPages: bs.Book.TotalPages,
 		},
 		ShelfStatus: bs.ShelfStatus,
+		CurrentPage: bs.CurrentPage,
 		StartedAt:   bs.StartedAt,
 		FinishedAt:  bs.FinishedAt,
 	}
@@ -204,7 +257,7 @@ func mapBookshelfToDTO(bs *models.UserBookshelf) *dto.BookshelfItemDTO {
 }
 
 func (s *bookshelfService) UpdateShelfEntry(userID, bookshelfID uint, req *dto.UpdateBookshelfRequestDTO) (*dto.BookshelfItemDTO, error) {
-	// 1. Ambil entri bookshelf yang ada dari database
+	// 1. Ambil entri bookshelf (Pastikan repository sudah Preload("Book"))
 	entry, err := s.bookshelfRepo.FindBookshelfByID(bookshelfID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -213,57 +266,50 @@ func (s *bookshelfService) UpdateShelfEntry(userID, bookshelfID uint, req *dto.U
 		return nil, err
 	}
 
-	// 2. VERIFIKASI KEPEMILIKAN: Pastikan user yang login adalah pemilik entri ini
+	// 2. VERIFIKASI KEPEMILIKAN
 	if entry.UserID != userID {
 		return nil, errors.New("forbidden: you are not the owner of this bookshelf entry")
 	}
 
-	// 3. Terapkan perubahan dari request ke model
-	updated := false // Flag untuk mengecek apakah ada perubahan
-	if req.ShelfStatus != nil && *req.ShelfStatus != entry.ShelfStatus {
-		entry.ShelfStatus = *req.ShelfStatus
-		updated = true
-
-		// Logika bisnis tambahan berdasarkan perubahan status
-		now := time.Now()
-		if entry.ShelfStatus == "reading" && entry.StartedAt == nil {
-			entry.StartedAt = &now
-		} else if entry.ShelfStatus == "done" {
-			if entry.StartedAt == nil {
+	// 3. Gunakan TRANSAKSI agar semua update sinkron
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		// A. Logika Perubahan Status (Reading / Done / Want to Read)
+		if req.ShelfStatus != nil && *req.ShelfStatus != entry.ShelfStatus {
+			entry.ShelfStatus = *req.ShelfStatus
+			
+			now := time.Now()
+			if entry.ShelfStatus == "reading" && entry.StartedAt == nil {
 				entry.StartedAt = &now
+			} else if entry.ShelfStatus == "done" {
+				if entry.StartedAt == nil { entry.StartedAt = &now }
+				entry.FinishedAt = &now
+				// Jika status 'done', paksa current_page ke maksimal halaman buku
+				entry.CurrentPage = entry.Book.TotalPages
 			}
-			entry.FinishedAt = &now
-			entry.ProgressPercent = new(int) // Buat pointer int baru
-			*entry.ProgressPercent = 100
 		}
-	}
-	
-	// Update progress hanya jika statusnya 'reading'
-	if req.ProgressPercent != nil && entry.ShelfStatus == "reading" {
-		entry.ProgressPercent = req.ProgressPercent
-		updated = true
-	}
 
-	// 4. Jika tidak ada perubahan, tidak perlu ke DB.
-	if !updated {
-		// Kita bisa langsung map dan kembalikan data yang ada
-		fullEntry, _ := s.bookshelfRepo.GetBookshelfEntryByID(entry.UserBookshelfID)
-		return mapBookshelfToDTO(fullEntry), nil
-	}
+		// B. Logika Perubahan Halaman (Manual Input)
+		// Jika user input current_page, kita hitung ulang persentasenya
+		targetPage := entry.CurrentPage
+		if req.CurrentPage != nil {
+			targetPage = *req.CurrentPage
+		}
 
-	// 5. Simpan perubahan ke database
-	updatedEntry, err := s.bookshelfRepo.UpdateBookshelf(entry)
+		// Jalankan Helper Sync Progress (Menghitung % dan simpan ke DB)
+		if err := s.syncProgress(tx, entry, targetPage); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	// 6. Ambil data lengkap (dengan preload) dan map ke DTO untuk response
-	fullEntry, err := s.bookshelfRepo.GetBookshelfEntryByID(updatedEntry.UserBookshelfID)
-	if err != nil {
-		return nil, err
-	}
-	
-	return mapBookshelfToDTO(fullEntry), nil
+	// 4. Ambil data terbaru untuk dikembalikan ke Frontend
+	fullEntry, err := s.bookshelfRepo.GetBookshelfEntryByID(bookshelfID)
+	return mapBookshelfToDTO(fullEntry), err
 }
 
 func (s *bookshelfService) DeleteShelfEntry(userID, bookshelfID uint) error {
@@ -342,6 +388,7 @@ func mapBookshelfToDetailDTO(bs *models.UserBookshelf) *dto.BookshelfDetailDTO {
 	for _, note := range bs.Notes {
 		notesDTO = append(notesDTO, dto.NoteDTO{
 			ID:          note.NoteID,
+			Type:        note.Type,
 			PageStart:   note.PageStart,
 			PageEnd:     note.PageEnd,
 			Description: note.Description,
@@ -355,9 +402,11 @@ func mapBookshelfToDetailDTO(bs *models.UserBookshelf) *dto.BookshelfDetailDTO {
 			PublicID:    bs.Book.PublicID,
 			Title:       bs.Book.Title,
 			CoverImgURL: bs.Book.CoverImgURL,
+			TotalPages: bs.Book.TotalPages,
 			Authors:     authorNames,
 		},
 		ShelfStatus: bs.ShelfStatus,
+		CurrentPage: bs.CurrentPage,
 		StartedAt:   bs.StartedAt,
 		FinishedAt:  bs.FinishedAt,
 		Notes:       notesDTO, // <-- Sertakan notes yang sudah di-map
@@ -371,8 +420,7 @@ func mapBookshelfToDetailDTO(bs *models.UserBookshelf) *dto.BookshelfDetailDTO {
 }
 
 func (s *bookshelfService) AddNote(userID, bookshelfID uint, req *dto.AddNoteRequestDTO) (*dto.NoteDTO, error) {
-	// 1. Verifikasi bahwa bookshelf entry ada dan dimiliki oleh user.
-	// Gunakan lagi method yang sudah ada.
+	// 1. Verifikasi (Query di luar transaksi tidak apa-apa untuk pengecekan awal)
 	entry, err := s.bookshelfRepo.FindBookshelfByID(bookshelfID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -385,35 +433,56 @@ func (s *bookshelfService) AddNote(userID, bookshelfID uint, req *dto.AddNoteReq
 		return nil, errors.New("forbidden: you can only add notes to your own bookshelf entries")
 	}
 
-	// 2. Buat objek model Note baru
-	newNote := &models.Note{
-		UserBookshelfID: bookshelfID,
-		PageStart:       req.PageStart,
-		PageEnd:         req.PageEnd,
-		Description:     req.Description,
-	}
+	var createdNote *models.Note
 
-	// 3. Simpan note baru ke database
-	createdNote, err := s.bookshelfRepo.AddNoteToBookshelf(newNote)
+	// 2. Gunakan TRANSAKSI untuk simpan data
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		txRepo := s.bookshelfRepo.WithTx(tx)
+
+		// Simpan note
+		newNote := &models.Note{
+			UserBookshelfID: bookshelfID,
+			Type:            req.Type,
+			PageStart:       req.PageStart,
+			PageEnd:         req.PageEnd,
+			Description:     req.Description,
+		}
+		
+		createdNote, err = txRepo.AddNoteToBookshelf(newNote)
+		if err != nil {
+			return err
+		}
+
+		maxPage, _ := txRepo.GetMaxPageEndFromNotes(tx, bookshelfID)
+        if err := s.syncProgress(tx, entry, maxPage); err != nil {
+            return err
+        }
+
+		// --- PASANG UPDATE STREAK DI SINI ---
+		if err := txRepo.UpdateUserStreak(tx, userID); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	
-	// (Opsional) Update 'updated_at' di UserBookshelf agar rak buku ini muncul paling atas.
-	// s.bookshelfRepo.UpdateBookshelf(entry) // Ini akan mengupdate updated_at secara otomatis
 
-	// 4. Mapping ke DTO untuk response
+	// 3. Mapping ke DTO
 	return &dto.NoteDTO{
 		ID:          createdNote.NoteID,
 		PageStart:   createdNote.PageStart,
 		PageEnd:     createdNote.PageEnd,
+		Type:        createdNote.Type,
 		Description: createdNote.Description,
 		CreatedAt:   createdNote.CreatedAt,
 	}, nil
 }
 
 func (s *bookshelfService) UpdateNote(userID, noteID uint, req *dto.UpdateNoteRequestDTO) (*dto.NoteDTO, error) {
-	// 1. Ambil catatan yang ada dari database
+	// 1. Ambil data & Verifikasi
 	note, err := s.bookshelfRepo.FindNoteByID(noteID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -422,30 +491,39 @@ func (s *bookshelfService) UpdateNote(userID, noteID uint, req *dto.UpdateNoteRe
 		return nil, err
 	}
 
-	// 2. VERIFIKASI KEPEMILIKAN
-	// Cek apakah UserID dari UserBookshelf yang terkait sama dengan userID dari user yang login.
 	if note.UserBookshelf.UserID != userID {
 		return nil, errors.New("forbidden: you are not the owner of this note")
 	}
 
-	// 3. Terapkan perubahan dari request ke model
-	if req.PageStart != nil {
-		note.PageStart = req.PageStart
-	}
-	if req.PageEnd != nil {
-		note.PageEnd = req.PageEnd
-	}
-	if req.Description != nil {
-		note.Description = *req.Description
-	}
+	var updatedNote *models.Note
 
-	// 4. Simpan perubahan ke database
-	updatedNote, err := s.bookshelfRepo.UpdateNote(note)
+	// 2. Gunakan TRANSAKSI
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		txRepo := s.bookshelfRepo.WithTx(tx)
+
+		// Terapkan perubahan
+		if req.PageStart != nil { note.PageStart = req.PageStart }
+		if req.PageEnd != nil { note.PageEnd = req.PageEnd }
+		if req.Description != nil { note.Description = *req.Description }
+
+		updatedNote, err = txRepo.UpdateNote(note)
+		if err != nil {
+			return err
+		}
+
+		// --- PASANG UPDATE STREAK DI SINI ---
+		// Meskipun hanya update catatan, ini tetap dihitung aktivitas baca aktif
+		if err := txRepo.UpdateUserStreak(tx, userID); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
 
-	// 5. Mapping ke DTO untuk response
 	return &dto.NoteDTO{
 		ID:          updatedNote.NoteID,
 		PageStart:   updatedNote.PageStart,
@@ -473,4 +551,120 @@ func (s *bookshelfService) DeleteNote(userID, noteID uint) error {
 
 	// 3. Panggil repository untuk menghapus catatan
 	return s.bookshelfRepo.DeleteNote(note)
+}
+
+func (s *bookshelfService) GetReadingStreak(viewerID *uint, username string) (*dto.ReadingStatsDTO, error) {
+	// 1. Cek akses (Gunakan fungsi global di utils)
+	targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, username)
+	if err != nil {
+		return nil, err
+	}
+	
+	if !hasAccess {
+		// Jika profil privat dan tidak di-follow, kita kembalikan stats kosong
+		return &dto.ReadingStatsDTO{CurrentStreak: 0, LongestStreak: 0}, nil
+	}
+
+	// 2. Ambil data dari repository
+	stats, err := s.bookshelfRepo.GetReadingStats(targetUser.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Mapping ke DTO
+	return &dto.ReadingStatsDTO{
+		CurrentStreak:    stats.CurrentStreak,
+		LongestStreak:    stats.LongestStreak,
+		LastActivityDate: stats.LastActivityDate,
+	}, nil
+}
+
+func (s *bookshelfService) syncProgress(tx *gorm.DB, entry *models.UserBookshelf, newPage int) error {
+	// 1. Validasi: Jangan sampai melebihi total halaman buku
+	if entry.Book.TotalPages > 0 && newPage > entry.Book.TotalPages {
+		newPage = entry.Book.TotalPages
+	}
+
+	// 2. Hitung Persentase
+	var progress int
+	if entry.Book.TotalPages > 0 {
+		progress = (newPage * 100) / entry.Book.TotalPages
+	}
+
+	// 3. Update Model
+	entry.CurrentPage = newPage
+	entry.ProgressPercent = &progress
+    
+    // Logika otomatis: Jika progress 100%, set status ke 'done'
+    if progress == 100 {
+        entry.ShelfStatus = "done"
+        now := time.Now()
+        entry.FinishedAt = &now
+    }
+
+	// 4. Simpan ke DB
+	_, err := s.bookshelfRepo.WithTx(tx).UpdateBookshelf(entry)
+	return err
+}
+
+func (s *bookshelfService) GetBookshelfNotes(viewerID *uint, bookshelfID uint, noteType string, page, limit int) (*dto.BookshelfNotesResponseDTO, error) {
+	// 1. Ambil data bookshelf lengkap dengan buku & penulis (untuk header)
+	entry, err := s.bookshelfRepo.GetBookshelfEntryByID(bookshelfID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Cek akses privasi menggunakan utilitas global kita
+	// Kita butuh username untuk ini
+	_, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, entry.User.Username)
+	if err != nil {
+		return nil, err
+	}
+	if !hasAccess {
+		return nil, errors.New("forbidden: this bookshelf is private")
+	}
+
+	// 3. Ambil catatan yang dipaginasi dari repo
+	notes, total, err := s.bookshelfRepo.GetNotesByBookshelfID(bookshelfID, noteType, page, limit) // <-- Kirim noteType
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Mapping Data Penulis untuk Header
+	var authorNames []string
+	for _, ba := range entry.Book.BookAuthors {
+		if ba.Author.AuthorID > 0 {
+			authorNames = append(authorNames, ba.Author.AuthorName)
+		}
+	}
+
+	// 5. Mapping Notes ke DTO
+	notesDTO := make([]dto.NoteDTO, 0, len(notes))
+	for _, n := range notes {
+		notesDTO = append(notesDTO, dto.NoteDTO{
+			ID:          n.NoteID,
+			Type:        n.Type,
+			PageStart:   n.PageStart,
+			PageEnd:     n.PageEnd,
+			Description: n.Description,
+			CreatedAt:   n.CreatedAt,
+		})
+	}
+	progressVal := 0
+	if entry.ProgressPercent != nil {
+		progressVal = *entry.ProgressPercent
+	}
+	// 6. Rakit Response Akhir
+	return &dto.BookshelfNotesResponseDTO{
+		Bookshelf: dto.BookshelfContextDTO{
+			Title:       entry.Book.Title,
+			Authors:     authorNames,
+			CoverImgURL: entry.Book.CoverImgURL,
+			Progress:    progressVal,
+			CurrentPage: entry.CurrentPage,
+			TotalPages: entry.Book.TotalPages,
+		},
+		Data: notesDTO,
+		Meta: dto.NewPaginationDTO(total, page, limit),
+	}, nil
 }

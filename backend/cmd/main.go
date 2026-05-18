@@ -8,6 +8,7 @@ import (
 	"backend-bebu/internal/middlewares"
 	"backend-bebu/internal/repositories"
 	"backend-bebu/internal/services"
+	"backend-bebu/internal/worker"
 	"backend-bebu/pkg/utils"
 
 	"github.com/gin-contrib/cors"
@@ -65,6 +66,8 @@ func main() {
 	platformHandler := handlers.NewPlatformHandler(platformService)
 
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
+
+	worker.InitStreakWorker(bookshelfRepo)
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
@@ -127,6 +130,8 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 
 			users.GET("/:username/badges", authMiddleware.OptionalAuth(), gamificationHandler.GetUserBadges)
     		users.GET("/:username/achievements", authMiddleware.OptionalAuth(), gamificationHandler.GetUserAchievements)
+
+			users.GET("/:username/reading-stats", authMiddleware.OptionalAuth(), bookshelfHandler.GetReadingStreak)
 		}
 
 		profile := v1.Group("/profile").Use(authMiddleware.RequiredAuth())
@@ -155,6 +160,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			bookshelves.DELETE("/:id", authMiddleware.RequiredAuth(), bookshelfHandler.DeleteFromBookshelf)
 			bookshelves.GET("/:id", authMiddleware.OptionalAuth(), bookshelfHandler.GetBookshelfEntryDetail)
 			bookshelves.POST("/:id/notes", authMiddleware.RequiredAuth(), bookshelfHandler.AddNote)
+			bookshelves.GET("/:id/notes", authMiddleware.OptionalAuth(), bookshelfHandler.GetBookshelfNotes)
 		}
 
 		notes := v1.Group("/notes").Use(authMiddleware.RequiredAuth())

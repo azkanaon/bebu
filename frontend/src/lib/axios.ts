@@ -7,6 +7,11 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
 }
 
+type FailedQueueItem = {
+  resolve: (value?: unknown) => void
+  reject: (reason?: unknown) => void
+}
+
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/',
   withCredentials: true,
@@ -26,9 +31,9 @@ api.interceptors.request.use((config) => {
 
 // Variable untuk handle multiple refresh calls
 let isRefreshing = false
-let failedQueue: any[] = []
+let failedQueue: FailedQueueItem[] = []
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error)

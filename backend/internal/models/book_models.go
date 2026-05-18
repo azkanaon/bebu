@@ -13,6 +13,7 @@ type Book struct {
 	Title           string         `gorm:"column:title;size:255;not null"`
 	Synopsis        string         `gorm:"column:synopsis;type:text"`
 	CoverImgURL     string         `gorm:"column:cover_img_url;type:text"`
+	GoogleBookID 	string `gorm:"column:google_book_id;size:255;unique"`
 	PublicationYear int16          `gorm:"column:publication_year"`
 	Language        string         `gorm:"column:language;size:50"`
 	TotalPages      int            `gorm:"column:total_pages"`

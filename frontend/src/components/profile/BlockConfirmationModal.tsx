@@ -34,10 +34,10 @@ export default function BlockConfirmModal({
 
           {/* MODAL CONTENT */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20, x: '-50%', y: '-50%' }}
-            animate={{ opacity: 1, scale: 1, y: 0, x: '-50%', y: '-50%' }}
-            exit={{ opacity: 0, scale: 0.9, y: 20, x: '-50%', y: '-50%' }}
-            className="fixed top-1/2 left-1/2 w-[90%] max-w-sm bg-[#0B1220] border border-white/10 rounded-3xl p-6 z-110 shadow-2xl text-center"
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-[#0B1220] border border-white/10 rounded-3xl p-6 z-110 shadow-2xl text-center"
           >
             <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
               <ShieldAlert size={32} />
