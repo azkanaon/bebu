@@ -1,37 +1,43 @@
-import type { NextConfig } from 'next'
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'i.pravatar.cc',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos', // ✅ tambahin ini
-      },
-      {
-        protocol: 'https',
-        hostname: 'example.com', // ✅ tambahin ini
-      },
-      {
-        protocol: 'https',
-        hostname: 'api.dicebear.com', // ✅ Tambahkan ini
-        pathname: '/7.x/**', // Opsional: agar lebih spesifik
-      },
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-        port: '',
-        pathname: '/**', // Mengizinkan semua gambar dari Cloudinary
-      },
-      {
-        protocol: 'https',
-        hostname: 'books.google.com',
-      },
-    ],
-  },
-}
+	images: {
+		remotePatterns: [
+			{
+				protocol: "https",
+				hostname: "i.pravatar.cc",
+			},
+			{
+				protocol: "https",
+				hostname: "picsum.photos",
+			},
+			{
+				protocol: "https",
+				hostname: "example.com", 
+			},
+			{
+				protocol: "https",
+				hostname: "api.dicebear.com", 
+				pathname: "/7.x/**", 
+			},
+			{
+				protocol: "https",
+				hostname: "res.cloudinary.com",
+				port: "",
+				pathname: "/**",
+			},
+			{
+				protocol: "https",
+				hostname: "books.google.com",
+			},
+			{
+				protocol: "https",
+				hostname: "dummyimage.com",
+				port: "",
+				pathname: "/**",
+			},
+		],
+	},
+};
 
-export default nextConfig
+export default nextConfig;

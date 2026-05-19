@@ -1,13 +1,14 @@
 import {
-  CreatePostPayload,
-  CreateCommentRequest,
-  ShareRequest,
-  ShareResponse,
-  UserSearchResponse,
-  GenericResponse,
-} from '@/types/post'
-import { ReportRequest, ReportResponse } from '@/types/report'
-import api from '@/lib/axios'
+	CreatePostPayload,
+	CreateCommentRequest,
+	ShareRequest,
+	ShareResponse,
+	UserSearchResponse,
+	GenericResponse,
+} from "@/types/post";
+import { BookFiltersResponse } from "@/types/book";
+import { ReportRequest, ReportResponse } from "@/types/report";
+import api from "@/lib/axios";
 
 export async function getPostsAPI(
 	tab: string,
@@ -26,21 +27,21 @@ export async function getPostsAPI(
 	return res.data;
 }
 
-{/* CATEGORIES */}
+/* CATEGORIES */
 
 export async function getAllCategoriesAPI() {
-    const res = await api.get("/v1/categories");
-    return res.data;
+	const res = await api.get("/v1/categories");
+	return res.data;
 }
 
 export async function favoriteCategoryAPI(id: number) {
-    const res = await api.post(`/v1/categories/${id}/favorite`);
-    return res.data;
+	const res = await api.post(`/v1/categories/${id}/favorite`);
+	return res.data;
 }
 
 export async function unfavoriteCategoryAPI(id: number) {
-    const res = await api.delete(`/v1/categories/${id}/favorite`);
-    return res.data;
+	const res = await api.delete(`/v1/categories/${id}/favorite`);
+	return res.data;
 }
 
 export async function getUserCategoriesAPI() {
@@ -57,7 +58,9 @@ export async function searchCategoriesAPI(query: string) {
 	return res.data;
 }
 
-{/* ---------- */}
+/* ---------- */
+
+/* BOOKS */
 
 export async function getBooks() {
   const res = await fetch('http://localhost:8080/api/v1/books', {
@@ -68,6 +71,70 @@ export async function getBooks() {
 
   return res.json()
 }
+
+type GetBookFiltersParams = {
+	genre?: string | null;
+	author?: string | null;
+	language?: string | null;
+};
+
+export async function getBookFiltersAPI(
+	params: GetBookFiltersParams,
+): Promise<BookFiltersResponse> {
+	const res = await api.get("/v1/books/filters", {
+		params: {
+			genre: params.genre || undefined,
+			author: params.author || undefined,
+			language: params.language || undefined,
+		},
+	});
+
+	return res.data;
+}
+
+export async function searchBooksAPI(params: {
+	q?: string;
+	genre?: string | null;
+	author?: string | null;
+	language?: string | null;
+	page?: number;
+	limit?: number;
+}) {
+	const res = await api.get("/v1/books/search", {
+		params: {
+			q: params.q || undefined,
+			genre: params.genre || undefined,
+			author: params.author || undefined,
+			language: params.language || undefined,
+			page: params.page || 1,
+			limit: params.limit || 10,
+		},
+	});
+
+	return res.data;
+}
+
+export async function getPopularBooksAPI(range: "today" | "7d" | "30d" | "all",) {
+	const res = await api.get(`/v1/books/popular?range=${range}`);
+
+	return res.data;
+}
+
+export async function getHighlyRatedBooksAPI() {
+	const res = await api.get("/v1/books/highly-rated");
+
+	return res.data;
+}
+
+export async function getAllBooksAPI(params: {page?: number; limit?: number; sort?: "title" | "newest" | "rating" | "popular";}) {
+	const res = await api.get("/v1/books/all-books", {
+		params,
+	});
+
+	return res.data;
+}
+
+/* ----- */
 
 export async function createPost(payload: CreatePostPayload) {
   const formData = new FormData()
@@ -95,68 +162,68 @@ export async function deletePostAPI(publicID: string) {
 }
 
 export async function followUserAPI(username: string) {
-  const res = await api.post(`/v1/users/${username}/follow`)
-  return res.data
+	const res = await api.post(`/v1/users/${username}/follow`);
+	return res.data;
 }
 
 export async function unfollowUserAPI(username: string) {
-  const res = await api.delete(`/v1/users/${username}/follow`)
-  return res.data
+	const res = await api.delete(`/v1/users/${username}/follow`);
+	return res.data;
 }
 
 export async function toggleLikeAPI(postId: number) {
-  const res = await api.post(`/v1/posts/${postId}/like`)
-  return res.data
+	const res = await api.post(`/v1/posts/${postId}/like`);
+	return res.data;
 }
 
 export async function toggleSaveAPI(postId: number) {
-  const res = await api.post(`/v1/posts/${postId}/save`)
-  return res.data
+	const res = await api.post(`/v1/posts/${postId}/save`);
+	return res.data;
 }
 
 export async function getCommentsAPI(postId: number) {
-  const res = await api.get(`/v1/posts/${postId}/comments`)
-  return res.data.data
+	const res = await api.get(`/v1/posts/${postId}/comments`);
+	return res.data.data;
 }
 
 export async function createCommentAPI(payload: CreateCommentRequest) {
-  const res = await api.post('/v1/comments/', payload)
-  return res.data
+	const res = await api.post("/v1/comments/", payload);
+	return res.data;
 }
 
 export async function toggleLikeCommentAPI(commentId: number) {
-  const res = await api.post(`/v1/comments/${commentId}/like`)
-  return res.data
+	const res = await api.post(`/v1/comments/${commentId}/like`);
+	return res.data;
 }
 
 export async function deleteCommentAPI(commentId: number, postId: number) {
-  const res = await api.delete(`/v1/comments/${commentId}?post_id=${postId}`)
-  return res.data
+	const res = await api.delete(`/v1/comments/${commentId}?post_id=${postId}`);
+	return res.data;
 }
 
 export async function createReportAPI(
-  data: ReportRequest,
+	data: ReportRequest,
 ): Promise<ReportResponse> {
-  const res = await api.post('/v1/report', data)
-  return res.data
+	const res = await api.post("/v1/report", data);
+	return res.data;
 }
 
 export async function sharePostAPI(data: ShareRequest): Promise<ShareResponse> {
-  const res = await api.post('/v1/posts/shares', data)
-  return res.data
+	const res = await api.post("/v1/posts/shares", data);
+	return res.data;
 }
 
 export async function getRecentRecipientsAPI(): Promise<
-  GenericResponse<UserSearchResponse[]>
+	GenericResponse<UserSearchResponse[]>
 > {
-  const res = await api.get('/v1/posts/shares/recent-recipients')
-  return res.data
+	const res = await api.get("/v1/posts/shares/recent-recipients");
+	return res.data;
 }
 
 // Pencarian user umum
 export async function searchUsersAPI(
-  query: string,
+	query: string,
 ): Promise<GenericResponse<UserSearchResponse[]>> {
-  const res = await api.get(`/v1/users/search?q=${query}`)
-  return res.data
+	const res = await api.get(`/v1/users/search?q=${query}`)
+	return res.data;
 }

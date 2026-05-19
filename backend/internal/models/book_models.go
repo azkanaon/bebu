@@ -22,12 +22,12 @@ type Book struct {
 	UpdatedAt       time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt       gorm.DeletedAt `gorm:"column:deleted_at;index"`
 
-	// Relasi: Buku ini ada di banyak entri BookAuthor
-	BookAuthors []BookAuthor `gorm:"foreignKey:BookID"`
-	
-    // Relasi lain bisa ditambahkan di sini jika perlu
-	BookGenres  []BookGenre  `gorm:"foreignKey:BookID"`
-	Posts       []Post       `gorm:"foreignKey:BookID"`
+	// Relasi
+	BookAuthors []BookAuthor 	`gorm:"foreignKey:BookID"`
+	BookGenres  []BookGenre  	`gorm:"foreignKey:BookID"`
+	Posts       []Post       	`gorm:"foreignKey:BookID"`
+	BookStat 	BookStat 	 	`gorm:"foreignKey:BookID"`
+	DailyStats  []BookDailyStat `gorm:"foreignKey:BookID"`
 }
 
 type Author struct {
@@ -72,4 +72,33 @@ type BookGenre struct {
 
 	Book  Book  `gorm:"foreignKey:BookID;references:BookID"`
 	Genre Genre `gorm:"foreignKey:GenreID;references:GenreID"`
+}
+
+type BookStat struct {
+	BookID        uint      `gorm:"column:book_id;primaryKey"`
+	OverallRating float32   `gorm:"column:overall_rating;type:numeric(3,2);default:0.00"`
+	TotalRatingSum int      `gorm:"column:total_rating_sum;default:0"`
+	TotalReviews  int       `gorm:"column:total_reviews;default:0"`
+	TotalPosts    int       `gorm:"column:total_posts;default:0"`
+	
+	Rating1Count  int       `gorm:"column:rating_1_count;default:0"`
+	Rating2Count  int       `gorm:"column:rating_2_count;default:0"`
+	Rating3Count  int       `gorm:"column:rating_3_count;default:0"`
+	Rating4Count  int       `gorm:"column:rating_4_count;default:0"`
+	Rating5Count  int       `gorm:"column:rating_5_count;default:0"`
+
+	UpdatedAt     time.Time `gorm:"column:updated_at;autoUpdateTime"`
+	
+	Book          *Book     `gorm:"foreignKey:BookID;constraint:OnDelete:CASCADE;"`
+}
+
+type BookDailyStat struct {
+	ID         uint      `gorm:"primaryKey;column:id"`
+	BookID     uint      `gorm:"column:book_id;not null;uniqueIndex:idx_book_date"`
+	Date       time.Time `gorm:"type:date;not null;uniqueIndex:idx_book_date"`
+	TotalPosts int       `gorm:"column:total_posts;default:0;not null"`
+	CreatedAt  time.Time `gorm:"not null"`
+	UpdatedAt  time.Time `gorm:"not null"`
+
+	Book          *Book     `gorm:"foreignKey:BookID;constraint:OnDelete:CASCADE;"`
 }

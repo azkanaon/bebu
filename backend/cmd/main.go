@@ -151,6 +151,11 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		{
 			books.GET("/trending", handlers.GetTrendingBooks)
 			books.GET("", bookHandler.GetBooks)
+			books.GET("/filters", authMiddleware.OptionalAuth(), bookHandler.GetDynamicFilters)
+			books.GET("/search", authMiddleware.OptionalAuth(), bookHandler.SearchBooks)
+			books.GET("/popular", authMiddleware.OptionalAuth(), bookHandler.GetPopularBooks)
+			books.GET("/highly-rated", authMiddleware.OptionalAuth(), bookHandler.GetHighlyRatedBooks,)
+			books.GET("/all-books", authMiddleware.OptionalAuth(), bookHandler.GetAllBooks,)
 		}
 
 		bookshelves := v1.Group("/bookshelves")
