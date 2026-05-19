@@ -124,10 +124,7 @@ export default function BookModal({
         setLocalStatus(initialData.shelfStatus)
         setLocalPage(initialData.currentPage)
       } else if (bookshelfInfo) {
-        // Fallback jika initialData tidak ada tapi info dari API notes ada
         setLocalPage(bookshelfInfo.currentPage)
-        // Jika di API notes ada shelfStatus, masukkan juga:
-        // setLocalStatus(bookshelfInfo.shelfStatus)
       }
     }
   }, [open, initialData, bookshelfInfo])
@@ -191,7 +188,7 @@ export default function BookModal({
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 150 }}
               className="pointer-events-auto relative w-full h-full md:h-auto md:max-h-[85vh] md:w-[90%] md:max-w-5xl bg-[#0B1220] md:rounded-[2.5rem] border border-white/10 flex flex-col overflow-hidden shadow-2xl"
             >
               <div className="flex-1 flex flex-col md:flex-row overflow-hidden">

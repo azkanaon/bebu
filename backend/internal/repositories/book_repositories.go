@@ -224,6 +224,7 @@ func (r *bookRepository) SearchBooks(query string, genre string, author string, 
 			Genres:          genres,
 			TotalPages: 	 book.TotalPages,
 			Rating:			 book.BookStat.OverallRating,
+			GoogleBookID:   book.GoogleBookID,
 		})
 	}
 

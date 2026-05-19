@@ -36,15 +36,31 @@ export default function BookshelfPage({ params }: Props) {
   const isMe = currentUser?.username === profileUsername
 
   const [activeStatus, setActiveStatus] = useState<ShelfStatus>('reading')
+  const [searchTerm, setSearchTerm] = useState('') // Nilai yang diketik di input
+  const [debouncedSearch, setDebouncedSearch] = useState('') // Nilai yang dikirim ke API
   const [searchQuery, setSearchQuery] = useState('')
   const { ref, inView } = useInView()
   const [isAddBookOpen, setIsAddBookOpen] = useState(false)
 
   const [selectedItem, setSelectedItem] = useState<BookshelfItem | null>(null)
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+    }, 500) // Delay 500ms
+
+    return () => clearTimeout(handler) // Bersihkan timer jika user mengetik lagi
+  }, [searchTerm])
+
   // 1. Fetch Data
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
-    useInfiniteBookshelf(profileUsername, activeStatus)
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isFetching, // Tambahkan isFetching untuk indikator search
+  } = useInfiniteBookshelf(profileUsername, activeStatus, debouncedSearch)
 
   const { data: stats } = useReadingStats(profileUsername)
 
@@ -57,13 +73,8 @@ export default function BookshelfPage({ params }: Props) {
 
   // Tidak perlu filter status manual lagi di useMemo
   const filteredBooks = useMemo(() => {
-    const allBooks = data?.pages.flatMap((page) => page.data) || []
-
-    // Sekarang useMemo hanya untuk searching teks saja
-    return allBooks.filter((item) =>
-      item.book.title.toLowerCase().includes(searchQuery.toLowerCase()),
-    )
-  }, [data, searchQuery])
+    return data?.pages.flatMap((page) => page.data) || []
+  }, [data])
 
   return (
     <div className="flex flex-col gap-8 pb-20 text-slate-200 mt-4">
@@ -149,16 +160,22 @@ export default function BookshelfPage({ params }: Props) {
           {/* SEARCH BAR */}
           <div className="mb-6 relative">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
+              className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isFetching && searchTerm ? 'text-blue-500' : 'text-slate-600'}`}
               size={16}
             />
             <input
               type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search in your bookshelf..."
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-slate-200 outline-none focus:border-blue-500/30 transition-all"
+              value={searchTerm} // Gunakan searchTerm (bukan debouncedSearch)
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search books by title..."
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-sm text-slate-200 outline-none focus:border-blue-500/30 transition-all"
             />
+            {/* Indikator Loading Kecil saat sedang searching */}
+            {isFetching && searchTerm && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2 size={14} className="animate-spin text-blue-500" />
+              </div>
+            )}
           </div>
 
           {/* GRID BUKU */}
@@ -170,7 +187,7 @@ export default function BookshelfPage({ params }: Props) {
             <div>
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={activeStatus} // Key di sini sangat penting untuk AnimatePresence
+                  key={activeStatus + debouncedSearch} // Key di sini sangat penting untuk AnimatePresence
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -181,11 +198,20 @@ export default function BookshelfPage({ params }: Props) {
                     <BookCard
                       key={item.publicId}
                       item={item}
-                      onClick={() => setSelectedItem(item)}
+                      onClick={setSelectedItem}
                     />
                   ))}
                 </motion.div>
               </AnimatePresence>
+
+              {/* Empty State jika tidak ketemu */}
+              {!isLoading && !isFetching && filteredBooks.length === 0 && (
+                <div className="text-center py-20 text-slate-500">
+                  <p className="text-sm italic">
+                    No books found for &quot;{debouncedSearch}&quot;
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

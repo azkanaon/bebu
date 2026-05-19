@@ -1,13 +1,13 @@
 package dto
 
 type BookResponse struct {
-	BookID 	uint `json:"id"`
-	Title    string `json:"title"`
+	BookID uint   `json:"id"`
+	Title  string `json:"title"`
 }
 
 type BookFilterResponse struct {
-	Genres   []string `json:"genres"`
-	Authors  []string `json:"authors"`
+	Genres    []string `json:"genres"`
+	Authors   []string `json:"authors"`
 	Languages []string `json:"languages"`
 }
 
@@ -20,8 +20,9 @@ type BookSearchItem struct {
 	Language        string   `json:"language"`
 	Authors         []string `json:"authors"`
 	Genres          []string `json:"genres"`
-	TotalPages 		int	     `json:"total_pages"`
+	TotalPages      int      `json:"total_pages"`
 	Rating          float32  `json:"rating"`
+	GoogleBookID    string   `json:"google_books_id"`
 }
 
 type BookSearchResponse struct {

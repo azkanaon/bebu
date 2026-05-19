@@ -10,6 +10,7 @@ import {
   ReadingStats,
   NoteType,
   ShelfStatus,
+  LocalBookSearchResponse,
 } from '@/types/bookshelf'
 
 export const bookshelfService = {
@@ -18,12 +19,13 @@ export const bookshelfService = {
     username: string,
     page: number,
     limit: number,
-    status?: ShelfStatus, // Tambahkan status
+    status?: ShelfStatus,
+    q?: string, // Tambahkan parameter q
   ): Promise<BookshelfResponse> => {
     const res = await api.get<BookshelfResponse>(
       `/v1/users/${username}/bookshelves`,
       {
-        params: { page, limit, status }, // status akan jadi ?status=...
+        params: { page, limit, status, q }, // Masukkan ke params axios
       },
     )
     return res.data
@@ -110,5 +112,12 @@ export const bookshelfService = {
       `/v1/users/${username}/reading-stats`,
     )
     return res.data.data
+  },
+
+  searchLocalBooks: async (query: string): Promise<LocalBookSearchResponse> => {
+    const res = await api.get<LocalBookSearchResponse>(`/v1/books/search`, {
+      params: { q: query },
+    })
+    return res.data
   },
 }

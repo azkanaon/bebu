@@ -9,7 +9,7 @@ import (
 )
 
 type BookshelfRepository interface {
-	GetBookshelvesByUserID(userID uint, status string, page, limit int) ([]models.UserBookshelf, int64, error)
+	GetBookshelvesByUserID(userID uint, status string, search string, page, limit int) ([]models.UserBookshelf, int64, error)
 	GetBookshelfEntryByID(id uint) (*models.UserBookshelf, error)
 	AddToBookshelf(bookshelf *models.UserBookshelf) (*models.UserBookshelf, error)
 	FindBookshelfByID(id uint) (*models.UserBookshelf, error)
@@ -47,31 +47,45 @@ func (r *bookshelfRepository) WithTx(tx *gorm.DB) BookshelfRepository {
 	return &bookshelfRepository{db: tx}
 }
 
-func (r *bookshelfRepository) GetBookshelvesByUserID(userID uint, status string, page, limit int) ([]models.UserBookshelf, int64, error) {
+func (r *bookshelfRepository) GetBookshelvesByUserID(userID uint, status string, search string, page, limit int) ([]models.UserBookshelf, int64, error) {
 	var bookshelves []models.UserBookshelf
 	var total int64
 	offset := (page - 1) * limit
 
-	// Buat query dasar
-	query := r.db.Model(&models.UserBookshelf{}).Where("user_id = ?", userID)
+	// 1. Inisialisasi Query dengan JOIN ke tabel books
+	// Kita gunakan Joins agar bisa mengakses kolom 'title' milik tabel books
+	query := r.db.Model(&models.UserBookshelf{}).
+		Joins("JOIN books ON books.book_id = user_bookshelves.book_id").
+		Where("user_bookshelves.user_id = ?", userID)
 	
-	// Tambahkan filter status jika ada
+	// 2. Filter berdasarkan Status (jika ada)
 	if status != "" {
-		query = query.Where("shelf_status = ?", status)
+		query = query.Where("user_bookshelves.shelf_status = ?", status)
 	}
 
-	// Hitung total item yang cocok (untuk paginasi)
+	// 3. Filter berdasarkan Judul Buku (Search)
+	if search != "" {
+		query = query.Where(
+			"LOWER(books.title) LIKE ?", 
+			"%"+strings.ToLower(search)+"%",
+		)
+	}
+
+	// 4. Hitung Total Item yang terfilter
+	// Penting: Gunakan Distinct jika join menyebabkan baris ganda (walaupun di sini 1-to-1)
 	err := query.Count(&total).Error
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Ambil data untuk halaman saat ini dengan Preload yang diperlukan
+	// 5. Ambil Data dengan Preload
 	err = query.
-		Preload("Book.BookAuthors.Author"). // Preload buku dan penulisnya
+		Preload("Book.BookAuthors.Author").
 		Offset(offset).
 		Limit(limit).
-		Order("updated_at DESC"). // Urutkan berdasarkan yang terakhir diupdate
+		Order("user_bookshelves.updated_at DESC").
+		// Pastikan kita hanya mengambil kolom dari user_bookshelves agar tidak bentrok
+		Select("user_bookshelves.*"). 
 		Find(&bookshelves).Error
 
 	return bookshelves, total, err

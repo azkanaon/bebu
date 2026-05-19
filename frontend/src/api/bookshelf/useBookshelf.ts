@@ -19,20 +19,25 @@ import {
 import { toast } from 'sonner'
 
 // Hook untuk mendapatkan daftar buku (Infinite Scroll)
-export const useInfiniteBookshelf = (username: string, status: ShelfStatus) => {
+export const useInfiniteBookshelf = (
+  username: string,
+  status: ShelfStatus,
+  q?: string,
+) => {
   return useInfiniteQuery<
     BookshelfResponse,
     Error,
     InfiniteData<BookshelfResponse>
   >({
-    // QueryKey menyertakan status agar cache tidak tercampur
-    queryKey: ['bookshelf', username, status],
+    // q masuk ke queryKey agar cache-nya unik per kata kunci pencarian
+    queryKey: ['bookshelf', username, status, q],
     queryFn: ({ pageParam = 1 }) =>
       bookshelfService.getBookshelves(
         username,
         pageParam as number,
         12,
         status,
+        q,
       ),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>

@@ -20,9 +20,8 @@ func NewBookshelfHandler(bookshelfService services.BookshelfService) *BookshelfH
 func (h *BookshelfHandler) GetUserBookshelves(c *gin.Context) {
 	// 1. Ambil path parameter
 	username := c.Param("username")
-
-	// 2. Ambil query parameters untuk filter dan paginasi
-	status := c.Query("status") // "reading", "done", "want_to_read", atau "" (semua)
+	status := c.Query("status")
+	search := c.Query("q") 
 
 	// Ambil 'page' dengan nilai default 1
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -49,7 +48,7 @@ func (h *BookshelfHandler) GetUserBookshelves(c *gin.Context) {
 	}
 
 	// 4. Panggil service
-	bookshelves, pagination, err := h.bookshelfService.GetUserBookshelves(viewerID, username, status, page, limit)
+	bookshelves, pagination, err := h.bookshelfService.GetUserBookshelves(viewerID, username, status, search, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bookshelves"})
 		return
