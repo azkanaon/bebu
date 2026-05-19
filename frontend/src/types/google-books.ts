@@ -8,6 +8,10 @@ export interface GoogleBookVolume {
     imageLinks?: {
       thumbnail: string
     }
+    // TAMBAHKAN FIELD DI BAWAH INI:
+    categories?: string[] // Ini untuk genres
+    publishedDate?: string // Ini untuk publication_year
+    language?: string // Ini untuk language
   }
 }
 

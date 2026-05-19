@@ -14,7 +14,7 @@ import (
 )
 
 type BookshelfService interface {
-	GetUserBookshelves(viewerID *uint, targetUsername, status string, page, limit int) ([]dto.BookshelfItemDTO, *dto.PaginationDTO, error)
+	GetUserBookshelves(viewerID *uint, targetUsername string, status string, search string, page, limit int) ([]dto.BookshelfItemDTO, *dto.PaginationDTO, error)
 	AddBookToShelf(userID uint, req *dto.AddToBookshelfRequestDTO) (*dto.BookshelfItemDTO, error)
 	UpdateShelfEntry(userID, bookshelfID uint, req *dto.UpdateBookshelfRequestDTO) (*dto.BookshelfItemDTO, error)
 	DeleteShelfEntry(userID, bookshelfID uint) error
@@ -41,7 +41,7 @@ func NewBookshelfService(db *gorm.DB,bookshelfRepo repositories.BookshelfReposit
 }
 
 
-func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername, status string, page, limit int) ([]dto.BookshelfItemDTO, *dto.PaginationDTO, error) {
+func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername string, status string, search string, page, limit int) ([]dto.BookshelfItemDTO, *dto.PaginationDTO, error) {
 	// 1. Dapatkan data user target
 	targetUser, err := s.userRepo.FindByUsername(targetUsername)
 	if err != nil {
@@ -92,10 +92,10 @@ func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername, st
 
 
 	// 3. Jika punya akses, panggil repository untuk mengambil data
-	bookshelves, total, err := s.bookshelfRepo.GetBookshelvesByUserID(targetUser.UserID, status, page, limit)
-	if err != nil {
-		return nil, nil, err
-	}
+	bookshelves, total, err := s.bookshelfRepo.GetBookshelvesByUserID(targetUser.UserID, status, search, page, limit)
+    if err != nil {
+        return nil, nil, err
+    }
 
 	// 4. Mapping ke DTO
 	dtos := make([]dto.BookshelfItemDTO, 0, len(bookshelves)) // Inisialisasi slice dengan kapasitas

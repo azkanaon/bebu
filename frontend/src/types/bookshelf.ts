@@ -49,11 +49,6 @@ export interface UpdateProgressRequest {
   current_page: number
 }
 
-export interface AddBookRequest {
-  book_id: number
-  shelf_status: ShelfStatus
-}
-
 export interface NoteRequest {
   type: NoteType
   page_start?: number
@@ -87,4 +82,39 @@ export interface ReadingStatsResponse {
 
 export interface CommonMessageResponse {
   message: string
+}
+
+export interface LocalBook {
+  public_id: string
+  title: string
+  synopsis: string
+  cover_img_url: string
+  publication_year: number
+  language: string
+  authors: string[]
+  genres: string[]
+  total_pages: number
+
+  google_books_id: string | null
+}
+
+export interface LocalBookSearchResponse {
+  books: LocalBook[]
+  page: number
+  limit: number
+  total: number
+  total_pages: number
+}
+
+export interface AddBookRequest {
+  title: string
+  synopsis: string
+  cover_img_url: string
+  publication_year: number
+  language: string
+  authors: string[]
+  genres: string[]
+  total_pages: number
+  google_book_id: string | null
+  shelf_status: ShelfStatus
 }
