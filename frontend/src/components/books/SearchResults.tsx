@@ -13,8 +13,48 @@ export default function SearchResults({ books, isSearching, viewMode }: Props) {
 	// LOADING
 	if (isSearching) {
 		return (
-			<div className="py-10 text-center text-gray-400">
-				Searching books...
+			<div
+				className="
+					flex
+					flex-col
+					items-center
+					justify-center
+
+					rounded-3xl
+
+					border
+					border-blue-400/[0.08]
+
+					bg-[#0B1220]/50
+
+					py-20
+
+					backdrop-blur-xl
+				"
+			>
+				<div
+					className="
+						h-10
+						w-10
+						rounded-full
+
+						border-2
+						border-blue-400/20
+						border-t-blue-300
+
+						animate-spin
+					"
+				/>
+
+				<p
+					className="
+						mt-5
+						text-sm
+						text-gray-400
+					"
+				>
+					Searching books...
+				</p>
 			</div>
 		);
 	}
@@ -28,44 +68,88 @@ export default function SearchResults({ books, isSearching, viewMode }: Props) {
 					flex-col
 					items-center
 					justify-center
+
 					rounded-3xl
+
 					border
-					border-white/10
-					bg-white/[0.02]
-					py-20
+					border-blue-400/[0.08]
+
+					bg-[#0B1220]/50
+
+					px-6
+					py-24
+
 					text-center
+
+					backdrop-blur-xl
 				"
 			>
-				<h2 className="text-xl font-semibold text-white">
+				<div
+					className="
+						flex
+						h-16
+						w-16
+						items-center
+						justify-center
+
+						rounded-2xl
+
+						bg-blue-500/[0.08]
+
+						text-2xl
+					"
+				>
+					📚
+				</div>
+
+				<h2
+					className="
+						mt-6
+						text-xl
+						font-semibold
+						tracking-tight
+						text-white
+					"
+				>
 					No books found
 				</h2>
 
-				<p className="mt-2 text-sm text-gray-400">
-					Try changing keywords or filters
+				<p
+					className="
+						mt-2
+						max-w-sm
+						text-sm
+						leading-relaxed
+						text-gray-400
+					"
+				>
+					Try changing your keywords, filters, or search another
+					title.
 				</p>
 			</div>
 		);
 	}
 
 	return (
-		<div className="space-y-8">
-
-			{/* GRID */}
+		<div className="space-y-6">
+			{/* CONTENT */}
 			<div
 				className={
 					viewMode === "grid"
 						? `
-				grid
-				grid-cols-2
-				gap-5
-				sm:grid-cols-3
-				xl:grid-cols-4
-			`
+							grid
+							grid-cols-2
+							gap-x-2
+							gap-y-2
+
+							sm:grid-cols-3
+							xl:grid-cols-3
+						`
 						: `
-				grid
-				grid-cols-1
-				gap-4
-			`
+							grid
+							grid-cols-1
+							gap-3
+						`
 				}
 			>
 				{books.map((book) =>

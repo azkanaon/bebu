@@ -1,7 +1,8 @@
 import Image from "next/image";
+import { BookOpen, Clock3 } from "lucide-react";
+
 import { BookSearchItem } from "@/types/book";
 import BookRatingBadge from "./BookRatingBadge";
-import { BookOpen } from "lucide-react";
 
 type Props = {
 	book: BookSearchItem;
@@ -12,24 +13,27 @@ export default function SearchGridCard({ book }: Props) {
 		<div
 			className="
 				group
-				overflow-hidden
-				rounded-3xl
+
 				border
-				border-white/10
-				bg-white/[0.03]
+				border-blue-400/[0.08]
+
+				bg-[#0B1220]/60
+
 				transition-all
 				duration-300
-				hover:-translate-y-1
-				hover:border-blue-500/30
-				hover:bg-white/[0.05]
+
+				hover:border-blue-400/[0.16]
+				hover:bg-[#0B1220]/78
 			"
 		>
 			{/* COVER */}
 			<div
 				className="
 					relative
+
 					aspect-[3/4]
 					w-full
+
 					overflow-hidden
 				"
 			>
@@ -39,51 +43,78 @@ export default function SearchGridCard({ book }: Props) {
 					fill
 					className="
 						object-cover
+
 						transition-transform
-						duration-500
-						group-hover:scale-105
+						duration-700
+
+						group-hover:scale-[1.02]
 					"
 				/>
+
+				{/* RATING */}
+				<div className="absolute top-3 right-3 z-10">
+					<BookRatingBadge rating={book.rating} />
+				</div>
 			</div>
 
 			{/* CONTENT */}
-			<div className="space-y-3 p-4">
+			<div className="space-y-1.5 px-4 py-3">
 				{/* TITLE */}
 				<h2
 					className="
-			line-clamp-2
-			text-sm
-			font-semibold
-			leading-relaxed
-			text-white
-		"
+						line-clamp-1
+
+						text-sm
+						font-semibold
+						leading-6
+						tracking-tight
+
+						text-white
+
+						transition-colors
+						duration-300
+
+						group-hover:text-blue-50
+					"
 				>
 					{book.title}
 				</h2>
 
+				{/* AUTHOR */}
+				<p
+					className="
+						line-clamp-1
+
+						text-xs
+						font-medium
+
+						text-gray-400
+					"
+				>
+					{book.authors[0]}
+				</p>
+
 				{/* FOOTER */}
 				<div
 					className="
-			flex
-			items-center
-			justify-between
-			gap-3
-		"
-				>
-					<BookRatingBadge rating={book.rating} />
+						flex
+						items-center
+						justify-between
 
-					<div
-						className="
-				flex
-				items-center
-				gap-1.5
-				text-xs
-				text-gray-400
-			"
-					>
-						<BookOpen size={14} />
+						text-[11px]
+						text-gray-500
+					"
+				>
+					<div className="flex items-center gap-1.5">
+						<BookOpen size={13} />
 
 						<span>{book.total_pages} pages</span>
+					</div>
+
+					<div className="flex items-center gap-1.5">
+						<Clock3 size={13} />
+
+						<span>{book.publication_year} </span>
 					</div>
 				</div>
 			</div>

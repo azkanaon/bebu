@@ -412,16 +412,12 @@ func (r *bookRepository) GetPopularBooks(timeRange string, limit int,) ([]dto.Po
 			dto.PopularBookItem{
 				PublicID: book.PublicID,
 				Title: book.Title,
-				CoverImgURL:
-					book.CoverImgURL,
-				Rating:
-					book.BookStat.
-						OverallRating,
-				TotalPages:
-					book.TotalPages,
+				CoverImgURL: book.CoverImgURL,
+				Rating: book.BookStat.OverallRating,
+				TotalPages: book.TotalPages,
 				Authors: authors,
-				PopularityScore:
-					scoreMap[book.BookID],
+				PopularityScore: scoreMap[book.BookID],
+				PublicationYear: book.PublicationYear,
 			},
 		)
 	}
@@ -617,24 +613,15 @@ func (r *bookRepository) GetHighlyRatedBooks(limit int,) ([]dto.HighlyRatedBookI
 		result = append(
 			result,
 			dto.HighlyRatedBookItem{
-				PublicID:
-					book.PublicID,
-				Title:
-					book.Title,
-				CoverImgURL:
-					book.CoverImgURL,
-				Rating:
-					book.BookStat.
-						OverallRating,
-				WeightedScore:
-					scoreMap[book.BookID],
-				TotalReviews:
-					book.BookStat.
-						TotalReviews,
-				TotalPages:
-					book.TotalPages,
-				Authors:
-					authors,
+				PublicID: book.PublicID,
+				Title: book.Title,
+				CoverImgURL: book.CoverImgURL,
+				Rating: book.BookStat.OverallRating,
+				WeightedScore: scoreMap[book.BookID],
+				TotalReviews: book.BookStat.TotalReviews,
+				TotalPages: book.TotalPages,
+				Authors: authors,
+				PublicationYear: book.PublicationYear,
 			},
 		)
 	}

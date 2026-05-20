@@ -2,7 +2,9 @@
 
 import * as Popover from "@radix-ui/react-popover";
 import { Check, ChevronDown, Search } from "lucide-react";
+
 import { useMemo, useState } from "react";
+
 import clsx from "clsx";
 
 type FilterPopoverProps = {
@@ -28,114 +30,204 @@ export default function FilterPopover({
 
 	return (
 		<Popover.Root>
+			{/* TRIGGER */}
 			<Popover.Trigger asChild>
 				<button
 					className="
-						flex-1
-						flex
+						group
+
+						inline-flex
 						items-center
-						justify-center
 						gap-2
-						px-5
-						py-3.5
-						rounded-2xl
-						bg-[#0F172A]/80
-						backdrop-blur-xl
+
+						h-9
+						px-3.5
+
+						rounded-xl
+
 						border
-						border-white/10
-						text-white
-						hover:border-blue-400/40
-						hover:bg-blue-500/10
+						border-white/[0.06]
+
+						bg-white/[0.03]
+
+						backdrop-blur-xl
+
+						text-sm
+						text-gray-300
+
 						transition-all
-						duration-300
+						duration-200
+
+						hover:border-blue-400/25
+						hover:bg-blue-500/[0.08]
+						hover:shadow-[0_0_18px_rgba(59,130,246,0.10)]
+
+						data-[state=open]:border-blue-400/30
+						data-[state=open]:bg-blue-500/[0.10]
+						data-[state=open]:shadow-[0_0_22px_rgba(59,130,246,0.14)]
 					"
 				>
-					<span className="truncate">{selectedItem || label}</span>
+					<span
+						className="
+							max-w-[140px]
+							truncate
+						"
+					>
+						{selectedItem || label}
+					</span>
 
-					<ChevronDown className="w-4 h-4 opacity-70" />
+					<ChevronDown
+						className="
+							h-3.5
+							w-3.5
+							text-gray-500
+							transition-transform
+							duration-200
+
+							group-data-[state=open]:rotate-180
+						"
+					/>
 				</button>
 			</Popover.Trigger>
 
+			{/* CONTENT */}
 			<Popover.Portal>
 				<Popover.Content
 					sideOffset={10}
-					align="end"
+					align="start"
 					className="
-            z-50
-            w-[280px]
-            rounded-2xl
-            border
-            border-white/10
-            bg-[#0B1120]/95
-            backdrop-blur-2xl
-            shadow-2xl
-            shadow-blue-900/20
-            overflow-hidden
-            animate-in
-            fade-in
-            zoom-in-95
-          "
+						z-50
+
+						w-[260px]
+
+						overflow-hidden
+
+						rounded-2xl
+
+						border
+						border-white/[0.08]
+
+						bg-[#0B1120]/96
+
+						backdrop-blur-2xl
+
+						shadow-[0_18px_50px_rgba(0,0,0,0.45)]
+
+						animate-in
+						fade-in
+						zoom-in-95
+					"
 				>
 					{/* SEARCH */}
-					<div className="relative border-b border-white/5">
-						<Search
+					<div
+						className="
+							border-b
+							border-white/[0.06]
+							p-2
+						"
+					>
+						<div
 							className="
-                absolute
-                left-4
-                top-1/2
-                -translate-y-1/2
-                w-4
-                h-4
-                text-gray-500
-              "
-						/>
+								flex
+								items-center
+								gap-2
 
-						<input
-							type="text"
-							placeholder={`Search ${label.toLowerCase()}...`}
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							className="
-                w-full
-                bg-transparent
-                text-white
-                placeholder:text-gray-500
-                pl-10
-                pr-4
-                py-3
-                outline-none
-              "
-						/>
+								rounded-xl
+
+								border
+								border-white/[0.06]
+
+								bg-white/[0.03]
+
+								px-3
+
+								focus-within:border-blue-400/25
+							"
+						>
+							<Search
+								className="
+									h-3.5
+									w-3.5
+									text-gray-500
+								"
+							/>
+
+							<input
+								type="text"
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								placeholder={`Search ${label.toLowerCase()}`}
+								className="
+									h-9
+									w-full
+									bg-transparent
+
+									text-sm
+									text-gray-200
+
+									placeholder:text-gray-500
+
+									outline-none
+								"
+							/>
+						</div>
 					</div>
 
 					{/* LIST */}
-					<div className="max-h-[300px] overflow-y-auto p-2">
+					<div
+						className="
+							max-h-[280px]
+							overflow-y-auto
+							custom-scrollbar
+							p-1.5
+						"
+					>
+						{/* ALL OPTION */}
 						<button
 							onClick={() => onSelectItem(null)}
 							className={clsx(
 								`
-                  w-full
-                  flex
-                  items-center
-                  justify-between
-                  px-3
-                  py-2.5
-                  rounded-xl
-                  text-sm
-                  transition-all
-                `,
+									group/item
+
+									flex
+									w-full
+									items-center
+									justify-between
+
+									rounded-xl
+
+									px-3
+									py-2.5
+
+									text-sm
+
+									transition-colors
+								`,
 								selectedItem === null
-									? "bg-blue-500/15 text-blue-300"
-									: "text-gray-300 hover:bg-white/5",
+									? `
+										bg-blue-500/[0.14]
+										text-blue-200
+										shadow-[0_0_12px_rgba(59,130,246,0.12)]
+									`
+									: `
+										text-gray-300
+										hover:bg-white/[0.04]
+									`,
 							)}
 						>
 							<span>All {label}</span>
 
 							{selectedItem === null && (
-								<Check className="w-4 h-4" />
+								<Check
+									className="
+										h-4
+										w-4
+									"
+								/>
 							)}
 						</button>
 
+						{/* ITEMS */}
 						{filteredItems.map((item) => {
 							const isSelected = selectedItem === item;
 
@@ -145,25 +237,49 @@ export default function FilterPopover({
 									onClick={() => onSelectItem(item)}
 									className={clsx(
 										`
-                      w-full
-                      flex
-                      items-center
-                      justify-between
-                      px-3
-                      py-2.5
-                      rounded-xl
-                      text-sm
-                      transition-all
-                    `,
+											group/item
+
+											flex
+											w-full
+											items-center
+											justify-between
+
+											rounded-xl
+
+											px-3
+											py-2.5
+
+											text-sm
+
+											transition-colors
+										`,
 										isSelected
-											? "bg-blue-500/15 text-blue-300"
-											: "text-gray-300 hover:bg-white/5",
+											? `
+												bg-blue-500/[0.14]
+												text-blue-200
+												shadow-[0_0_12px_rgba(59,130,246,0.12)]
+											`
+											: `
+												text-gray-300
+												hover:bg-white/[0.04]
+											`,
 									)}
 								>
-									<span>{item}</span>
+									<span
+										className="
+											truncate
+										"
+									>
+										{item}
+									</span>
 
 									{isSelected && (
-										<Check className="w-4 h-4" />
+										<Check
+											className="
+												h-4
+												w-4
+											"
+										/>
 									)}
 								</button>
 							);

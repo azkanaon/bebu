@@ -78,9 +78,7 @@ type GetBookFiltersParams = {
 	language?: string | null;
 };
 
-export async function getBookFiltersAPI(
-	params: GetBookFiltersParams,
-): Promise<BookFiltersResponse> {
+export async function getBookFiltersAPI(params: GetBookFiltersParams,): Promise<BookFiltersResponse> {
 	const res = await api.get("/v1/books/filters", {
 		params: {
 			genre: params.genre || undefined,
@@ -92,14 +90,7 @@ export async function getBookFiltersAPI(
 	return res.data;
 }
 
-export async function searchBooksAPI(params: {
-	q?: string;
-	genre?: string | null;
-	author?: string | null;
-	language?: string | null;
-	page?: number;
-	limit?: number;
-}) {
+export async function searchBooksAPI(params: {q?: string; genre?: string | null; author?: string | null; language?: string | null; page?: number; limit?: number;}) {
 	const res = await api.get("/v1/books/search", {
 		params: {
 			q: params.q || undefined,
@@ -107,7 +98,7 @@ export async function searchBooksAPI(params: {
 			author: params.author || undefined,
 			language: params.language || undefined,
 			page: params.page || 1,
-			limit: params.limit || 10,
+			limit: params.limit || 12,
 		},
 	});
 

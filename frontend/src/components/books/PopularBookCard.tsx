@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { BookOpen } from "lucide-react";
+
+import { BookOpen, Clock3, MessageSquareText } from "lucide-react";
 
 import { PopularBookItem } from "@/types/book";
 
@@ -14,82 +15,164 @@ export default function PopularBookCard({ book }: Props) {
 		<div
 			className="
 				group
-				w-[180px]
+
+				w-[190px]
 				shrink-0
 			"
 		>
-			{/* COVER */}
 			<div
 				className="
-					relative
-					aspect-[3/4]
 					overflow-hidden
-					rounded-3xl
+
 					border
-					border-white/10
-					bg-white/[0.03]
+					border-blue-400/[0.08]
+
+					bg-[#0B1220]/70
+
+					transition-all
+					duration-300
+
+					hover:border-blue-400/[0.16]
+					hover:bg-[#0B1220]/85
 				"
 			>
-				<Image
-					src={book.cover_img_url}
-					alt={book.title}
-					fill
-					className="
-						object-cover
-						transition-transform
-						duration-500
-						group-hover:scale-105
-					"
-				/>
-
-				{/* GRADIENT */}
+				{/* COVER */}
 				<div
 					className="
-						absolute inset-0
-						bg-gradient-to-t
-						from-black/70
-						via-transparent
-						to-transparent
-					"
-				/>
-			</div>
+						relative
 
-			{/* CONTENT */}
-			<div className="mt-3 space-y-3">
-				<h2
-					className="
-						line-clamp-2
-						text-sm
-						font-semibold
-						leading-relaxed
-						text-white
+						aspect-[3/4]
+						overflow-hidden
 					"
 				>
-					{book.title}
-				</h2>
+					<Image
+						src={book.cover_img_url}
+						alt={book.title}
+						fill
+						className="
+							object-cover
 
-				<div
-					className="
-						flex
-						items-center
-						justify-between
-						gap-2
-					"
-				>
-					<BookRatingBadge rating={book.rating} />
+							transition-transform
+							duration-700
 
+							group-hover:scale-[1.03]
+						"
+					/>
+
+					{/* OVERLAY */}
 					<div
 						className="
-							flex
-							items-center
-							gap-1
-							text-xs
+							absolute
+							inset-0
+
+							bg-gradient-to-t
+							from-black/55
+							via-black/10
+							to-transparent
+						"
+					/>
+
+					{/* RATING */}
+					<div className="absolute top-3 right-3 z-10">
+						<BookRatingBadge rating={book.rating} />
+					</div>
+
+					{/* POSTS */}
+					{book.popularity_score !== undefined && (
+						<div
+							className="
+								absolute
+								left-3
+								bottom-3
+								z-10
+
+								flex
+								items-center
+								gap-1.5
+
+								border
+								border-white/10
+
+								bg-black/35
+
+								px-2
+								py-1
+
+								backdrop-blur-md
+
+								text-[11px]
+								font-medium
+								text-white
+							"
+						>
+							<MessageSquareText size={12} />
+
+							<span>{book.popularity_score}</span>
+						</div>
+					)}
+				</div>
+
+				{/* CONTENT */}
+				<div className="space-y-1.5 px-3.5 py-3">
+					{/* TITLE */}
+					<h2
+						className="
+							line-clamp-1
+
+							text-[14px]
+							font-semibold
+							leading-5
+							tracking-tight
+
+							text-white
+
+							transition-colors
+							duration-300
+
+							group-hover:text-blue-50
+						"
+					>
+						{book.title}
+					</h2>
+
+					{/* AUTHOR */}
+					<p
+						className="
+							line-clamp-1
+
+							text-[12px]
+							font-medium
+
 							text-gray-400
 						"
 					>
-						<BookOpen size={14} />
+						{book.authors?.[0]}
+					</p>
 
-						<span>{book.total_pages}</span>
+					{/* FOOTER */}
+					<div
+						className="
+							mt-2
+
+							flex
+							items-center
+							justify-between
+
+							text-[11px]
+							text-gray-500
+						"
+					>
+						<div className="flex items-center gap-1">
+							<BookOpen size={12} />
+
+							<span>{book.total_pages}</span>
+						</div>
+
+						<div className="flex items-center gap-1">
+							<Clock3 size={12} />
+
+							<span>{book.publication_year}</span>
+						</div>
 					</div>
 				</div>
 			</div>

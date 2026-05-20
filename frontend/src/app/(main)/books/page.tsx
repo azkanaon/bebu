@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
-import { getBookFiltersAPI, searchBooksAPI, getPopularBooksAPI, } from "@/lib/api";
+import {
+	getBookFiltersAPI,
+	searchBooksAPI,
+	getPopularBooksAPI,
+} from "@/lib/api";
 import { BookSearchItem, PopularBookItem } from "@/types/book";
 import SearchBar from "@/components/books/SearchBar";
 import SearchResults from "@/components/books/SearchResults";
@@ -29,6 +33,7 @@ export default function BooksPage() {
 
 	const [isSearching, setIsSearching] = useState(false);
 	const [searchResults, setSearchResults] = useState<BookSearchItem[]>([]);
+	const [totalResults, setTotalResults] = useState(0);
 
 	// Pagination Search
 	const [page, setPage] = useState(1);
@@ -39,9 +44,11 @@ export default function BooksPage() {
 
 	// Popular Books
 	const [popularBooks, setPopularBooks] = useState<PopularBookItem[]>([]);
-	const [popularRange, setPopularRange] = useState<"today" | "7d" | "30d" | "all">("today");
+	const [popularRange, setPopularRange] = useState<
+		"today" | "7d" | "30d" | "all"
+	>("today");
 	const [isLoadingPopular, setIsLoadingPopular] = useState(false);
-	
+
 	// FETCH FILTERS
 	useEffect(() => {
 		const fetchFilters = async () => {
@@ -106,11 +113,12 @@ export default function BooksPage() {
 					author: selectedAuthor,
 					language: selectedLanguage,
 					page,
-					limit: 10,
+					limit: 12,
 				});
 
 				setSearchResults(data.books || []);
 				setTotalPages(data.total_pages || 1);
+				setTotalResults(data.total || 0);
 			} catch (error) {
 				console.error(error);
 			} finally {
@@ -119,7 +127,13 @@ export default function BooksPage() {
 		};
 
 		fetchBooks();
-	}, [debouncedSearch, selectedGenre, selectedAuthor, selectedLanguage, page]);
+	}, [
+		debouncedSearch,
+		selectedGenre,
+		selectedAuthor,
+		selectedLanguage,
+		page,
+	]);
 
 	// Pagination
 	useEffect(() => {
@@ -141,7 +155,7 @@ export default function BooksPage() {
 		selectedLanguage !== null;
 
 	return (
-		<div className="space-y-6 py-4">
+		<div className="space-y-4 py-4">
 			{/* SEARCH */}
 			<SearchBar
 				search={search}
@@ -161,9 +175,29 @@ export default function BooksPage() {
 			{isSearchMode ? (
 				<>
 					<div className="flex items-center justify-between">
-						<p className="text-sm text-gray-400">
-							{searchResults.length} result(s)
-						</p>
+						<div>
+							<h2
+								className="
+							text-lg
+							font-semibold
+							tracking-tight
+							text-white
+						"
+							>
+								Search Results
+							</h2>
+
+							<p
+								className="
+							mt-1
+							text-sm
+							text-gray-400
+						"
+							>
+								Found {totalResults} book
+								{totalResults > 1 && "s"}
+							</p>
+						</div>
 
 						<ViewToggle
 							viewMode={viewMode}
@@ -180,10 +214,9 @@ export default function BooksPage() {
 					<SearchPagination
 						page={page}
 						totalPages={totalPages}
-						onPrev={() => setPage((prev) => Math.max(prev - 1, 1))}
-						onNext={() =>
-							setPage((prev) => Math.min(prev + 1, totalPages))
-						}
+						onNext={() => setPage((prev) => prev + 1)}
+						onPrev={() => setPage((prev) => prev - 1)}
+						onPageChange={(newPage) => setPage(newPage)}
 					/>
 				</>
 			) : (

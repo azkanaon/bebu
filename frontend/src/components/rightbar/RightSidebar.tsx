@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+
 import { FriendRecommendation } from "./FriendRecommendation";
 import { TrendingBooks } from "./TrendingBooks";
 import { CategoryBubble } from "./CategoryBubble";
@@ -7,6 +9,8 @@ import { Leaderboard } from "./Leaderboard";
 import { Footer } from "./Footer";
 
 export default function RightSidebar() {
+	const pathname = usePathname();
+
 	const [isOpen, setIsOpen] = useState(false);
 	const [refresh, setRefresh] = useState(false);
 
@@ -14,12 +18,13 @@ export default function RightSidebar() {
 		<div className="space-y-4 pr-8 my-4">
 			<FriendRecommendation />
 
-			<CategoryBubble
-				onAddClick={() => setIsOpen(true)}
-				refresh={refresh}
-			/>
-
-			<TrendingBooks />
+			{pathname !== "/books" && (
+				<CategoryBubble
+					onAddClick={() => setIsOpen(true)}
+					refresh={refresh}
+				/>
+			)}
+			{pathname !== "/books" && <TrendingBooks />}
 			<Leaderboard />
 			<Footer />
 

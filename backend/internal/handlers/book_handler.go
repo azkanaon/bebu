@@ -61,7 +61,7 @@ func (h *BookHandler) SearchBooks(c *gin.Context) {
 	language := c.Query("language")
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "12"))
 
 	result, err := h.service.SearchBooks(
 		query,

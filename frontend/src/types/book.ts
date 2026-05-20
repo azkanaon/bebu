@@ -32,7 +32,8 @@ export type PopularBookItem = {
 	rating: number;
 	total_pages: number;
 	authors: string[];
-	popularity_score: number;
+	popularity_score?: number;
+	publication_year: number;
 };
 
 export type PopularBooksResponse = {
@@ -49,6 +50,7 @@ export type HighlyRatedBookItem = {
 	total_reviews: number;
 	total_pages: number;
 	authors: string[];
+	publication_year: number;
 };
 
 export type HighlyRatedBooksResponse = {

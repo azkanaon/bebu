@@ -21,7 +21,6 @@ type SearchBarProps = {
 	languages: string[];
 };
 
-
 export default function SearchBar({
 	search,
 	setSearch,
@@ -36,80 +35,81 @@ export default function SearchBar({
 	languages,
 }: SearchBarProps) {
 	return (
-		<div className="w-full flex flex-col gap-3">
+		<div className="w-full space-y-3">
 			{/* SEARCH */}
-			<div className="relative flex-1 group">
+			<div className="relative">
 				<div
 					className="
-            absolute
-            -inset-[1px]
-            rounded-2xl
-            bg-gradient-to-r
-            from-blue-500/20
-            to-cyan-400/20
-            opacity-0
-            blur-md
-            transition
-            duration-300
-            group-focus-within:opacity-100
-          "
-				/>
+						flex
+						items-center
+						rounded-2xl
+						border
+						border-white/[0.08]
+						bg-[#0B1120]/80
+						backdrop-blur-xl
 
-				<div
-					className="
-            relative
-            flex
-            items-center
-            bg-[#0F172A]/80
-            backdrop-blur-xl
-            border
-            border-white/10
-            rounded-2xl
-            overflow-hidden
-            transition
-            duration-300
-            group-focus-within:border-blue-400/40
-          "
+						transition-all
+						duration-300
+
+						focus-within:border-blue-400/25
+						focus-within:bg-blue-500/[0.05]
+						focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.06)]
+					"
 				>
-					<Search className="absolute left-4 w-5 h-5 text-gray-400" />
+					<Search
+						className="
+							ml-4
+							h-[18px]
+							w-[18px]
+							text-gray-500
+						"
+						strokeWidth={2.2}
+					/>
 
 					<input
 						type="text"
 						value={search}
 						onChange={(e) => setSearch(e.target.value)}
-						placeholder="Search books, authors, genres..."
+						placeholder="Search books"
 						className="
-              w-full
-              bg-transparent
-              text-white
-              placeholder:text-gray-500
-              pl-12
-              pr-4
-              py-3.5
-              outline-none
-            "
+							h-12
+							w-full
+							bg-transparent
+							px-3
+							text-[15px]
+							text-white
+							placeholder:text-gray-500
+							outline-none
+						"
 					/>
 				</div>
 			</div>
 
 			{/* FILTERS */}
-			<div className="flex flex-wrap gap-3">
+			<div
+				className="
+					flex
+					flex-wrap
+					items-center
+					gap-2
+				"
+			>
 				<FilterPopover
-					label="Genres"
+					label="Genre"
 					items={genres}
 					selectedItem={selectedGenre}
 					onSelectItem={setSelectedGenre}
 				/>
 
 				<FilterPopover
-					label="Authors"
+					label="Author"
 					items={authors}
 					selectedItem={selectedAuthor}
 					onSelectItem={setSelectedAuthor}
 				/>
 
 				<FilterPopover
-					label="Languages"
+					label="Language"
 					items={languages}
 					selectedItem={selectedLanguage}
 					onSelectItem={setSelectedLanguage}
