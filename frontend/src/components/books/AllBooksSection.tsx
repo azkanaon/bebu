@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getAllBooksAPI } from "@/lib/api";
-
 import { BookSearchItem } from "@/types/book";
-
 import SearchGridCard from "./SearchGridCard";
+import BookSortDropdown from "./BookSortDropdown";
+import SearchPagination from "./SearchPagination";
 
 type SortType = "title" | "newest" | "rating" | "popular";
 
@@ -28,7 +28,7 @@ export default function AllBooksSection() {
 
 				const data = await getAllBooksAPI({
 					page,
-					limit: 20,
+					limit: 15,
 					sort,
 				});
 
@@ -46,12 +46,21 @@ export default function AllBooksSection() {
 	}, [page, sort]);
 
 	return (
-		<div className="space-y-6">
+		<section
+			className="
+				rounded-2xl
+				border
+				border-white/[0.06]
+				bg-[#0B1120]/70
+				p-5
+				backdrop-blur-xl
+			"
+		>
 			{/* HEADER */}
 			<div
 				className="
 					flex
-					items-center
+					items-start
 					justify-between
 					gap-4
 				"
@@ -59,8 +68,9 @@ export default function AllBooksSection() {
 				<div>
 					<h2
 						className="
-							text-2xl
-							font-bold
+							text-[24px]
+							font-semibold
+							tracking-tight
 							text-white
 						"
 					>
@@ -69,122 +79,171 @@ export default function AllBooksSection() {
 
 					<p
 						className="
-							mt-1
+							mt-1.5
 							text-sm
+							leading-relaxed
 							text-gray-400
 						"
 					>
-						Browse all available books
+						Explore the complete collection of books from the community
+						library.
 					</p>
 				</div>
 
-				{/* SORT */}
-				<select
-					value={sort}
-					onChange={(e) => {
-						setPage(1);
-
-						setSort(e.target.value as SortType);
-					}}
+				{/* ACTIONS */}
+				<div
 					className="
-						rounded-xl
-						border
-						border-white/10
-						bg-[#0B1020]
-						px-4
-						py-2
-						text-sm
-						text-gray-300
-						outline-none
-					"
+			flex
+			items-center
+			gap-2
+		"
 				>
-					<option value="title">Alphabetical</option>
+					{/* SORT */}
+					<BookSortDropdown
+						value={sort}
+						onChange={(value) => {
+							setPage(1);
 
-					<option value="newest">Newest</option>
+							setSort(value);
+						}}
+					/>
 
-					<option value="rating">Highest Rated</option>
+					{/* PAGINATION MINI */}
+					<div
+						className="
+				flex
+				items-center
+				gap-1
+			"
+					>
+						<button
+							onClick={() =>
+								setPage((prev) => Math.max(prev - 1, 1))
+							}
+							disabled={page === 1}
+							className="
+					flex
+					h-8
+					w-8
+					items-center
+					justify-center
 
-					<option value="popular">Most Popular</option>
-				</select>
+					rounded-xl
+
+					border
+					border-white/10
+
+					bg-white/[0.03]
+
+					text-gray-300
+
+					transition-all
+					duration-200
+
+					hover:border-blue-500/30
+					hover:bg-blue-500/10
+					hover:text-white
+
+					disabled:cursor-not-allowed
+					disabled:opacity-30
+
+					disabled:hover:border-white/10
+					disabled:hover:bg-white/[0.03]
+					disabled:hover:text-gray-300
+				"
+						>
+							<ChevronLeft size={14} />
+						</button>
+
+						<button
+							onClick={() =>
+								setPage((prev) =>
+									Math.min(prev + 1, totalPages),
+								)
+							}
+							disabled={page === totalPages}
+							className="
+					flex
+					h-8
+					w-8
+					items-center
+					justify-center
+
+					rounded-xl
+
+					border
+					border-white/10
+
+					bg-white/[0.03]
+
+					text-gray-300
+
+					transition-all
+					duration-200
+
+					hover:border-blue-500/30
+					hover:bg-blue-500/10
+					hover:text-white
+
+					disabled:cursor-not-allowed
+					disabled:opacity-30
+
+					disabled:hover:border-white/10
+					disabled:hover:bg-white/[0.03]
+					disabled:hover:text-gray-300
+				"
+						>
+							<ChevronRight size={14} />
+						</button>
+					</div>
+				</div>
 			</div>
 
 			{/* CONTENT */}
-			{isLoading ? (
-				<div className="text-gray-400">Loading...</div>
-			) : (
-				<div
-					className="
-						grid
-						grid-cols-2
-						gap-5
+			<div className="mt-5">
+				{isLoading ? (
+					<div
+						className="
+							flex
+							h-[420px]
+							items-center
+							justify-center
 
-						sm:grid-cols-3
-						lg:grid-cols-4
-					"
-				>
-					{books.map((book) => (
-						<SearchGridCard key={book.public_id} book={book} />
-					))}
-				</div>
-			)}
+							text-sm
+							text-gray-500
+						"
+					>
+						Loading books...
+					</div>
+				) : (
+					<div
+						className="
+							grid
+							grid-cols-2
+							gap-3
+
+							md:grid-cols-3
+						"
+					>
+						{books.map((book) => (
+							<SearchGridCard key={book.public_id} book={book} />
+						))}
+					</div>
+				)}
+			</div>
 
 			{/* PAGINATION */}
-			<div
-				className="
-					flex
-					items-center
-					justify-center
-					gap-3
-					pt-4
-				"
-			>
-				<button
-					onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-					disabled={page === 1}
-					className="
-						rounded-xl
-						border
-						border-white/10
-						bg-white/[0.03]
-						px-4
-						py-2
-						text-sm
-						text-white
-						disabled:opacity-40
-					"
-				>
-					Prev
-				</button>
-
-				<div
-					className="
-						text-sm
-						text-gray-400
-					"
-				>
-					Page {page} of {totalPages}
-				</div>
-
-				<button
-					onClick={() =>
+			<div className="mt-4">
+				<SearchPagination
+					page={page}
+					totalPages={totalPages}
+					onNext={() =>
 						setPage((prev) => Math.min(prev + 1, totalPages))
 					}
-					disabled={page === totalPages}
-					className="
-						rounded-xl
-						border
-						border-white/10
-						bg-white/[0.03]
-						px-4
-						py-2
-						text-sm
-						text-white
-						disabled:opacity-40
-					"
-				>
-					Next
-				</button>
+					onPrev={() => setPage((prev) => Math.max(prev - 1, 1))}
+					onPageChange={(newPage) => setPage(newPage)}
+				/>
 			</div>
-		</div>
+		</section>
 	);
 }

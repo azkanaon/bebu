@@ -41,6 +41,7 @@ type PopularBookItem struct {
 	TotalPages      int      `json:"total_pages"`
 	Authors         []string `json:"authors"`
 	PopularityScore int      `json:"popularity_score"`
+	PublicationYear int16    `json:"publication_year"`
 }
 
 type PopularBooksResponse struct {
@@ -57,6 +58,7 @@ type HighlyRatedBookItem struct {
 	TotalReviews  int      `json:"total_reviews"`
 	TotalPages    int      `json:"total_pages"`
 	Authors       []string `json:"authors"`
+	PublicationYear int16    `json:"publication_year"`
 }
 
 type HighlyRatedBooksResponse struct {
