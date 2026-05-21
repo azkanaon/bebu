@@ -15,6 +15,8 @@ import { SidebarItem } from './SidebarItem'
 import { UserProfile } from './UserProfile'
 import Image from 'next/image'
 import { User as TypeUser } from '@/types/auth'
+import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 
 interface SidebarProps {
   user: TypeUser | null
@@ -22,7 +24,7 @@ interface SidebarProps {
 
 export default function Sidebar({ user }: SidebarProps) {
   const profileHref = user ? `/${user.username}` : '/login'
-
+  const router = useRouter()
   return (
     <div className="h-screen w-68 bg-right-bar text-white flex flex-col justify-between py-5 ml-16">
       {/* TOP SECTION */}
@@ -44,16 +46,19 @@ export default function Sidebar({ user }: SidebarProps) {
         </div>
 
         {/* SEARCH */}
-        <div className="mb-6">
-          <div className="flex items-center bg-white/5 rounded-lg px-3 py-2 backdrop-blur-sm">
-            <Search size={18} className="mr-2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="bg-transparent outline-none text-sm w-full placeholder:text-gray-500"
-            />
+        <motion.div
+          layoutId="search-bar-container"
+          onClick={() => router.push('/search')}
+          className="relative group cursor-pointer my-2"
+        >
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-blue-400 transition-colors"
+            size={18}
+          />
+          <div className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-500">
+            Search...
           </div>
-        </div>
+        </motion.div>
 
         {/* NAVIGATION */}
         <div className="flex flex-col gap-2">

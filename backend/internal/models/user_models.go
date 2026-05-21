@@ -100,6 +100,7 @@ type UserStat struct {
     TotalBadges        int `json:"totalBadges"`        
     TotalAchievements  int `json:"totalAchievements"`
 	UpdatedAt      time.Time `gorm:"autoUpdateTime"`
+    HotScore       float64   `gorm:"column:hot_score;default:0.0"`
 
     // Relations
 	User User `gorm:"foreignKey:UserID;references:UserID"`

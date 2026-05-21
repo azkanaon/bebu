@@ -2,10 +2,12 @@ package repositories
 
 import (
 	"backend-bebu/internal/models"
+	"fmt"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type BookshelfRepository interface {
@@ -32,6 +34,8 @@ type BookshelfRepository interface {
 	GetOrCreateGenre(tx *gorm.DB, name string) (*models.Genre, error)
 
 	GetBookshelfEntryByUserIDAndBookID(userID, bookID uint) (*models.UserBookshelf, error)
+	SyncBookRating(db *gorm.DB, bookID uint, rating float32, isDelete bool) error
+	SyncBookStats(db *gorm.DB, bookID uint, field string, amount int) error
 }
 
 type bookshelfRepository struct {
@@ -298,4 +302,82 @@ func (r *bookshelfRepository) GetBookshelfEntryByUserIDAndBookID(userID, bookID 
 		First(&entry).Error
 		
 	return &entry, err
+}
+
+func (r *bookshelfRepository) SyncBookRating(db *gorm.DB, bookID uint, rating float32, isDelete bool) error {
+	amount := 1
+	ratingSumChange := rating
+	if isDelete {
+		amount = -1
+		ratingSumChange = -rating
+	}
+
+	ratingBucket := int(rating)
+	if ratingBucket < 1 { ratingBucket = 1 }
+	if ratingBucket > 5 { ratingBucket = 5 }
+	ratingColumn := fmt.Sprintf("rating_%d_count", ratingBucket)
+
+	// --- LOGIKA BARU: Hitung Rating Masa Depan (New Rating) ---
+	// Kita buat variabel SQL untuk menghitung rata-rata baru di dalam satu query
+	newSum := fmt.Sprintf("(book_stats.total_rating_sum + %f)", ratingSumChange)
+	newTotal := fmt.Sprintf("NULLIF(book_stats.total_reviews + %d, 0)", amount)
+	newRatingFormula := fmt.Sprintf("(%s / CAST(%s AS NUMERIC))", newSum, newTotal)
+
+	// Rumus Hot Score yang menggunakan newRatingFormula, bukan kolom overall_rating
+	hotScoreFormula := fmt.Sprintf(`
+		(COALESCE(book_stats.total_readers, 0) * 1) + 
+		(COALESCE(book_stats.total_reviews + %d, 0) * 3) + 
+		(COALESCE(book_stats.total_posts, 0) * 1) + 
+		(COALESCE(book_stats.total_notes, 0) * 0.5) + 
+		(COALESCE(%s, 0) * 10)
+	`, amount, newRatingFormula)
+
+	updateSQL := fmt.Sprintf(`
+		UPDATE book_stats 
+		SET 
+			%s = %s + ?,
+			total_rating_sum = total_rating_sum + ?,
+			total_reviews = total_reviews + ?,
+			overall_rating = COALESCE(%s, 0),
+			hot_score = %s,
+			updated_at = NOW()
+		WHERE book_id = ?
+	`, ratingColumn, ratingColumn, newRatingFormula, hotScoreFormula)
+
+	return db.Exec(updateSQL, amount, ratingSumChange, amount, bookID).Error
+}
+
+func (r *bookshelfRepository) SyncBookStats(db *gorm.DB, bookID uint, field string, amount int) error {
+	fReaders := "COALESCE(book_stats.total_readers, 0)"
+	fReviews := "COALESCE(book_stats.total_reviews, 0)"
+	fNotes := "COALESCE(book_stats.total_notes, 0)"
+	fPosts := "COALESCE(book_stats.total_posts, 0)" // Tambahkan ini
+
+	if field == "total_readers" { fReaders = fmt.Sprintf("(%s + %d)", fReaders, amount) }
+	if field == "total_reviews" { fReviews = fmt.Sprintf("(%s + %d)", fReviews, amount) }
+	if field == "total_notes" { fNotes = fmt.Sprintf("(%s + %d)", fNotes, amount) }
+	if field == "total_posts" { fPosts = fmt.Sprintf("(%s + %d)", fPosts, amount) } // Tambahkan ini
+
+	// Rumus diperbarui: fPosts juga memengaruhi skor
+	hotScoreFormula := fmt.Sprintf(`
+		(%s * 1) + 
+		(%s * 3) + 
+		(%s * 1) + 
+		(%s * 0.5) + 
+		(COALESCE(book_stats.overall_rating, 0) * 10)
+	`, fReaders, fReviews, fPosts, fNotes)
+
+	return db.Model(&models.BookStat{}).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "book_id"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			field:        gorm.Expr("book_stats."+field+" + ?", amount),
+			"hot_score":   gorm.Expr(hotScoreFormula),
+			"updated_at":  time.Now(),
+		}),
+	}).Create(map[string]interface{}{
+		"book_id":    bookID,
+		field:        amount,
+		"hot_score":   float64(amount), 
+		"updated_at":  time.Now(),
+	}).Error
 }

@@ -2,10 +2,12 @@ package repositories
 
 import (
 	"backend-bebu/internal/models"
+
 	"gorm.io/gorm"
 )
 
 type CommentRepository interface {
+	WithTx(tx *gorm.DB) CommentRepository
 	CreateComment(comment *models.PostComment) error
 	GetCommentByID(id uint) (*models.PostComment, error)
 	UpdateCommentCount(postID uint, increment int) error
@@ -21,6 +23,11 @@ type commentRepository struct {
 
 func NewCommentRepository(db *gorm.DB) CommentRepository {
 	return &commentRepository{db}
+}
+
+func (r *commentRepository) WithTx(tx *gorm.DB) CommentRepository {
+	// Mengembalikan instance repository baru dengan handle database transaksi (tx)
+	return &commentRepository{db: tx}
 }
 
 func (r *commentRepository) CreateComment(comment *models.PostComment) error {

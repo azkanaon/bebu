@@ -30,8 +30,12 @@ func main() {
 	categoryService := services.NewCategoryService(categoryRepo)
 	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
+	bookshelfRepo := repositories.NewBookshelfRepository(db)
+	bookshelfService := services.NewBookshelfService(db, bookshelfRepo, userRepo)
+	bookshelfHandler := handlers.NewBookshelfHandler(bookshelfService)
+
 	postRepo := repositories.NewPostRepository(db)
-	postService := services.NewPostService(postRepo, userRepo, categoryRepo, db) 
+	postService := services.NewPostService(postRepo, userRepo, categoryRepo, bookshelfRepo, db) 
 	postHandler := handlers.NewPostHandler(postService) 
 
 	bookRepo := repositories.NewBookRepository(db)
@@ -41,12 +45,8 @@ func main() {
 	userService := services.NewUserService(db, userRepo)
     userHandler := handlers.NewUserHandler(userService)
 	
-	bookshelfRepo := repositories.NewBookshelfRepository(db)
-	bookshelfService := services.NewBookshelfService(db, bookshelfRepo, userRepo)
-	bookshelfHandler := handlers.NewBookshelfHandler(bookshelfService)
-	
 	commentRepo := repositories.NewCommentRepository(db)
-	commentService := services.NewCommentService(commentRepo, postRepo)
+	commentService := services.NewCommentService(commentRepo, postRepo, db)
 	commentHandler := handlers.NewCommentHandler(commentService)
 
 	reportRepo := repositories.NewReportRepository(db)

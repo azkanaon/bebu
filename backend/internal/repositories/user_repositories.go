@@ -5,6 +5,7 @@ package repositories
 import (
 	"backend-bebu/internal/models"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -50,7 +51,7 @@ type UserRepository interface {
 	AcceptAllPendingFollows(userID uint) (int64, error)
 	GetPendingFollowerIDs(userID uint) ([]uint, error)
     BulkUpdateUserStat(db *gorm.DB, userIDs []uint, columnName string, amount int) error
-	
+	SyncUserStats(db *gorm.DB, userID uint, field string, amount int) error
 }
 
 type userRepository struct {
@@ -567,4 +568,28 @@ func (r *userRepository) BulkUpdateUserStat(db *gorm.DB, userIDs []uint, columnN
     return db.Model(&models.UserStat{}).
         Where("user_id IN ?", userIDs).
         Update(columnName, gorm.Expr(columnName+" + ?", amount)).Error
+}
+
+func (r *userRepository) SyncUserStats(db *gorm.DB, userID uint, field string, amount int) error {
+	fFollowers := "COALESCE(user_stats.total_followers, 0)"
+	fPosts := "COALESCE(user_stats.total_posts, 0)"
+	fBadges := "COALESCE(user_stats.total_badges, 0)"
+	fAchievements := "COALESCE(user_stats.total_achievements, 0)" // Tambahkan ini
+
+	// Update field yang sedang dikirim
+	if field == "total_followers" { fFollowers = fmt.Sprintf("(%s + %d)", fFollowers, amount) }
+	if field == "total_posts" { fPosts = fmt.Sprintf("(%s + %d)", fPosts, amount) }
+	if field == "total_badges" { fBadges = fmt.Sprintf("(%s + %d)", fBadges, amount) }
+	if field == "total_achievements" { fAchievements = fmt.Sprintf("(%s + %d)", fAchievements, amount) }
+
+	// Rumus baru: Badge bobot 10, Achievement bobot 5
+	hotScoreFormula := fmt.Sprintf(`
+		(%s * 2) + (%s * 5) + (%s * 10) + (%s * 5)
+	`, fFollowers, fPosts, fBadges, fAchievements)
+
+	return db.Model(&models.UserStat{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
+		field:       gorm.Expr("user_stats."+field+" + ?", amount),
+		"hot_score":  gorm.Expr(hotScoreFormula),
+		"updated_at": time.Now(),
+	}).Error
 }
