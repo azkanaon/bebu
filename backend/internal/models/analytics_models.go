@@ -5,12 +5,10 @@ import (
 )
 
 type SearchLog struct {
-	SearchLogID     uint      `gorm:"column:search_log_id;primaryKey;autoIncrement"`
-	UserID          *uint     `gorm:"column:user_id"`
-	QueryText       string    `gorm:"column:query_text;type:text;not null"`
-	QueryNormalized string    `gorm:"column:query_normalized;type:text;not null;index:idx_search_logs_normalized"`
+	SearchLogID     uint      `gorm:"primaryKey;column:search_log_id"`
+	UserID          uint      `gorm:"column:user_id"`
+	QueryText       string    `gorm:"column:query_text;not null"`
+	QueryNormalized string    `gorm:"column:query_normalized;not null"`
 	CreatedAt       time.Time `gorm:"column:created_at;autoCreateTime"`
-
-	// Relations
-	User *User `gorm:"foreignKey:UserID;references:UserID"`
+	UpdatedAt       time.Time `gorm:"column:updated_at;autoUpdateTime"`
 }
