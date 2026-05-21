@@ -1,14 +1,20 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react' // 1. Tambahkan Suspense
+import { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X } from 'lucide-react'
+import { Search, X, Loader2 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import TopResults from '@/components/search/TopResults'
 
+// IMPORT HOOKS ASLI
+import { useTopSearch } from '@/api/search/useSearch'
+import PeopleResults from '@/components/search/PeopleResults'
+import BooksResults from '@/components/search/BooksResults'
+import PostsResults from '@/components/search/PostsResults'
+import SearchHistoryList from '@/components/search/SearchHistory'
+
 type SearchTab = 'top' | 'people' | 'books' | 'posts'
 
-// Komponen Internal agar useSearchParams aman di dalam Suspense
 function SearchContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -18,17 +24,25 @@ function SearchContent() {
 
   const [inputValue, setLocalInput] = useState(query)
 
+  // 1. FETCH DATA TOP RESULTS (Hanya jalan jika tab 'top' & query ada)
+  const {
+    data: topData,
+    isLoading: loadingTop,
+    isFetching: fetchingTop,
+  } = useTopSearch(query)
+
   // Update URL saat user mengetik (Debounce)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (inputValue.trim()) {
         router.push(`/search?q=${inputValue}&tab=${activeTab}`)
+      } else {
+        router.push(`/search`) // Bersihkan URL jika input kosong
       }
     }, 500)
     return () => clearTimeout(timer)
   }, [inputValue, activeTab, router])
 
-  // FUNGSI INI SEKARANG ADA DI DALAM AGAR BISA DIAKSES
   const handleSeeAll = (tabId: string) => {
     router.push(`/search?q=${inputValue}&tab=${tabId}`)
   }
@@ -42,11 +56,11 @@ function SearchContent() {
 
   return (
     <div className="flex flex-col min-h-screen text-slate-200">
-      {/* 1. SEARCH HEADER */}
+      {/* HEADER */}
       <div className="sticky top-0 z-20 bg-[#0B1220]/80 backdrop-blur-md pb-2">
         <motion.div layoutId="search-bar-container" className="relative pt-4">
           <Search
-            className="absolute left-4 top-[2.15rem] text-blue-500"
+            className={`absolute left-4 top-[2.15rem] transition-colors ${fetchingTop ? 'text-blue-400' : 'text-slate-500'}`}
             size={20}
           />
           <input
@@ -56,17 +70,22 @@ function SearchContent() {
             placeholder="Search BeBu library..."
             className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-base text-white outline-none focus:border-blue-500/30 transition-all shadow-2xl"
           />
+          {fetchingTop && (
+            <div className="absolute right-12 top-[2.15rem]">
+              <Loader2 className="animate-spin text-blue-500" size={18} />
+            </div>
+          )}
           {inputValue && (
             <button
               onClick={() => setLocalInput('')}
-              className="absolute right-4 top-[2.15rem] p-1 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+              className="absolute right-4 top-[2.15rem] p-1 bg-white/10 rounded-full hover:bg-white/20 transition-colors cursor-pointer"
             >
               <X size={14} />
             </button>
           )}
         </motion.div>
 
-        {/* 2. TABS NAVIGASI */}
+        {/* TABS */}
         <div className="flex items-center border-b border-white/5 mt-4 overflow-x-auto no-scrollbar">
           {tabs.map((tab) => (
             <button
@@ -74,7 +93,7 @@ function SearchContent() {
               onClick={() =>
                 router.push(`/search?q=${inputValue}&tab=${tab.id}`)
               }
-              className={`relative px-6 py-3 text-sm font-medium transition-colors whitespace-nowrap cursor-pointer ${
+              className={`relative px-6 py-3 text-xs font-black uppercase tracking-widest transition-colors whitespace-nowrap cursor-pointer ${
                 activeTab === tab.id
                   ? 'text-white'
                   : 'text-slate-500 hover:text-slate-300'
@@ -92,7 +111,7 @@ function SearchContent() {
         </div>
       </div>
 
-      {/* 3. CONTENT AREA */}
+      {/* CONTENT */}
       <main className="flex-1 py-6">
         <AnimatePresence mode="wait">
           <motion.div
@@ -103,20 +122,28 @@ function SearchContent() {
             transition={{ duration: 0.2 }}
           >
             {!query ? (
-              <EmptySearchState />
+              <SearchHistoryList
+                onSelect={(selectedQuery) => {
+                  setLocalInput(selectedQuery) // Masukkan ke input
+                  // URL akan otomatis update karena useEffect debounce yang sudah kita buat
+                }}
+              />
             ) : (
-              // Panggil Switch Case di sini
               <div className="w-full">
-                {activeTab === 'top' && <TopResults onSeeAll={handleSeeAll} />}
-                {activeTab === 'people' && (
-                  <DefaultComingSoon label="People search" />
-                )}
-                {activeTab === 'books' && (
-                  <DefaultComingSoon label="Full books list" />
-                )}
-                {activeTab === 'posts' && (
-                  <DefaultComingSoon label="All posts" />
-                )}
+                {activeTab === 'top' &&
+                  (loadingTop ? (
+                    <LoadingResults />
+                  ) : (
+                    <TopResults
+                      data={topData}
+                      onSeeAll={handleSeeAll}
+                      query={query}
+                    />
+                  ))}
+
+                {activeTab === 'people' && <PeopleResults query={query} />}
+                {activeTab === 'books' && <BooksResults query={query} />}
+                {activeTab === 'posts' && <PostsResults query={query} />}
               </div>
             )}
           </motion.div>
@@ -126,13 +153,12 @@ function SearchContent() {
   )
 }
 
-// Komponen Pembungkus Suspense (Penting untuk Next.js)
 export default function SearchPage() {
   return (
     <Suspense
       fallback={
         <div className="flex justify-center py-20">
-          <Search className="animate-pulse text-slate-700" />
+          <Loader2 className="animate-spin text-slate-700" />
         </div>
       }
     >
@@ -144,18 +170,24 @@ export default function SearchPage() {
 function EmptySearchState() {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-slate-500">
-      <Search size={48} className="mb-4 opacity-20" />
-      <p className="text-sm font-medium uppercase tracking-widest">
-        Type to search BeBu
+      <Search size={48} className="mb-4 opacity-20 text-blue-500" />
+      <p className="text-xs font-black uppercase tracking-[0.2em]">
+        Explore BeBu Universe
+      </p>
+      <p className="text-[10px] mt-2 opacity-50">
+        Search for books, authors, or other readers
       </p>
     </div>
   )
 }
 
-function DefaultComingSoon({ label }: { label: string }) {
+function LoadingResults() {
   return (
-    <div className="py-20 text-center text-slate-500 text-xs italic">
-      {label} coming soon...
+    <div className="flex flex-col items-center justify-center py-20 gap-4">
+      <Loader2 className="animate-spin text-blue-500" size={32} />
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+        Curating best results...
+      </p>
     </div>
   )
 }
