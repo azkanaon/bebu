@@ -1,23 +1,59 @@
+import { ViewerContext } from './profile'
+
+// --- SUB TYPES ---
 export interface SearchUser {
-  id: number
   username: string
   displayName: string
   avatarUrl: string
-  isFollowing: boolean
+  viewerContext: ViewerContext
 }
 
 export interface SearchBook {
-  id: number
+  public_id: string
   title: string
-  author: string
-  coverUrl: string
+  synopsis: string
+  cover_img_url: string
+  publication_year: number
+  language: string
+  authors: string[]
+  genres: string[] | null
+  total_pages: number
   rating: number
 }
 
 export interface SearchPost {
+  publicId: string
+  description: string
+  postType: string
+  rating: number
+  publishedAt: string
+  stats: {
+    likeCount: number
+    commentCount: number
+    saveCount: number
+  }
+}
+
+export interface SearchHistory {
   id: number
-  authorName: string
-  content: string
-  likes: number
-  createdAt: string
+  query: string
+}
+
+// --- RESPONSE TYPES ---
+export interface TopSearchResponse {
+  data: {
+    books: SearchBook[]
+    users: SearchUser[]
+    posts: SearchPost[]
+  }
+}
+
+export interface PaginatedSearchResponse<T> {
+  data: T[]
+  meta: {
+    currentPage: number
+    pageSize: number
+    totalPages: number
+    totalItems: number
+  }
 }
