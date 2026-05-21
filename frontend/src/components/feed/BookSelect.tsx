@@ -8,13 +8,13 @@ type Book = {
 	title: string;
 };
 
-export default function BookSelect({
-	value,
-	onChange,
-}: {
+type BookSelectProps = {
 	value: Book | null;
 	onChange: (v: Book | null) => void;
-}) {
+	defaultBook?: Book | null; // 👈 Tambahkan prop opsional untuk auto-select dari Profil Buku
+};
+
+export default function BookSelect({ value, onChange, defaultBook = null }: BookSelectProps) {
 	const [books, setBooks] = useState<Book[]>([]);
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
@@ -26,6 +26,12 @@ export default function BookSelect({
 		b.title.toLowerCase().includes(query.toLowerCase()),
 	);
 
+	useEffect(() => {
+		if (defaultBook && !value) {
+			onChange(defaultBook);
+		}
+	}, [defaultBook, value, onChange]);
+
 	// 🔥 FETCH DATA
 	useEffect(() => {
 		const fetchBooks = async () => {
@@ -34,12 +40,14 @@ export default function BookSelect({
 				const data = await res.json();
 				setBooks(data.data);
 			} catch (err) {
-				console.error(err);
+				console.error("Gagal memuat daftar buku global:", err);
 			}
 		};
 
-		fetchBooks();
-	}, []);
+		if (!defaultBook) {
+			fetchBooks();
+		}
+	}, [defaultBook]);
 
 	// ✅ klik luar = close
 	useEffect(() => {
@@ -57,12 +65,14 @@ export default function BookSelect({
 			document.removeEventListener("mousedown", handleClickOutside);
 	}, []);
 
+	const isLocked = !!defaultBook;
+
 	return (
 		<div ref={containerRef} className="relative">
 			{/* Trigger */}
 			<motion.div
-				whileTap={{ scale: 0.98 }}
-				onClick={() => setOpen((prev) => !prev)}
+				whileTap={isLocked ? {} : { scale: 0.98 }}
+				onClick={() => !isLocked && setOpen((prev) => !prev)}
 				className="
 w-full p-3 rounded-xl cursor-pointer
 bg-white/5
@@ -76,32 +86,34 @@ flex justify-between items-center
 					{value ? value.title : "Pilih Buku"}
 				</span>
 
-				<motion.span
-					animate={{ rotate: open ? 180 : 0 }}
-					className="text-gray-400 text-sm"
-				>
-					▼
-				</motion.span>
+				{!isLocked && (
+					<motion.span
+						animate={{ rotate: open ? 180 : 0 }}
+						className="text-gray-400 text-xs"
+					>
+						▼
+					</motion.span>
+				)}
 			</motion.div>
 
 			{/* Dropdown */}
 			<AnimatePresence>
-				{open && (
+				{open && !isLocked && (
 					<motion.div
 						initial={{ opacity: 0, scale: 0.95, y: -10 }}
 						animate={{ opacity: 1, scale: 1, y: 0 }}
 						exit={{ opacity: 0, scale: 0.95, y: -10 }}
-						transition={{ duration: 0.18 }}
+						transition={{ duration: 0.14 }}
 						className="
-absolute mt-2 w-full z-50
-rounded-2xl p-3
-bg-[#020617]/95
-backdrop-blur-xl
-border border-white/10
-shadow-[0_20px_60px_rgba(0,0,0,0.6)]
-"
+							absolute mt-2 w-full z-50
+							rounded-2xl p-3
+							bg-[#020617]/95
+							backdrop-blur-xl
+							border border-white/10
+							shadow-[0_20px_60px_rgba(0,0,0,0.6)]
+						"
 					>
-						{/* Search */}
+						{/* Search Input */}
 						<input
 							autoFocus
 							value={query}
@@ -111,80 +123,63 @@ shadow-[0_20px_60px_rgba(0,0,0,0.6)]
 							}}
 							onKeyDown={(e) => {
 								if (e.key === "ArrowDown") {
-									setHighlight((prev) =>
-										Math.min(prev + 1, filtered.length - 1),
-									);
+									setHighlight((prev) => Math.min(prev + 1, filtered.length - 1));
 								}
-
 								if (e.key === "ArrowUp") {
-									setHighlight((prev) =>
-										Math.max(prev - 1, 0),
-									);
+									setHighlight((prev) => Math.max(prev - 1, 0));
 								}
-
 								if (e.key === "Enter") {
 									const selected = filtered[highlight];
 									if (selected) {
-										onChange(selected); // ✅ FIX
+										onChange(selected);
 										setOpen(false);
 										setQuery("");
 									}
 								}
 							}}
-							placeholder="Search book..."
+							placeholder="Cari judul buku..."
 							className="
-w-full p-3 mb-3 rounded-lg text-sm
-bg-white/5
-border border-white/10
-focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30
-outline-none transition
-"
+								w-full p-2.5 mb-2 rounded-xl text-xs
+								bg-white/5 border border-white/10
+								focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
+								outline-none transition text-white
+							"
 						/>
 
-						{/* List */}
-						<div className="max-h-48 overflow-y-auto pr-1 space-y-1">
+						{/* List Items */}
+						<div className="max-h-48 overflow-y-auto pr-1 space-y-0.5 custom-scrollbar">
 							{filtered.length === 0 && (
-								<div className="text-sm text-gray-500 p-2 text-center">
-									Tidak ditemukan 😢
+								<div className="text-xs text-gray-500 p-3 text-center">
+									Buku tidak ditemukan 😢
 								</div>
 							)}
 
 							{filtered.map((book, i) => {
 								const isActive = i === highlight;
-								const isSelected = value?.id === book.id; // ✅ FIX
+								const isSelected = value?.id === book.id;
 
 								return (
-									<motion.div
+									<div
 										key={book.id}
 										onClick={() => {
-											onChange(book); // ✅ FIX
+											onChange(book);
 											setOpen(false);
 											setQuery("");
 										}}
-										whileHover={{ scale: 1.02 }}
 										className={`
-flex items-center justify-between
-p-2 px-3 rounded-lg cursor-pointer text-sm
-transition
-${isActive ? "bg-blue-500/20" : "hover:bg-white/5"}
-`}
+											flex items-center justify-between
+											p-2 px-3 rounded-lg cursor-pointer text-xs transition
+											${isActive ? "bg-blue-500/20 text-white" : "hover:bg-white/5 text-gray-300"}
+										`}
 									>
-										<span
-											className={`${
-												isSelected
-													? "text-blue-400"
-													: "text-gray-200"
-											}`}
-										>
+										<span className={isSelected ? "text-blue-400 font-medium" : ""}>
 											{book.title}
 										</span>
 
 										{isSelected && (
-											<span className="text-blue-400 text-xs">
-												✔
-											</span>
+											<span className="text-blue-400 text-[10px]">✔</span>
 										)}
-									</motion.div>
+									</div>
 								);
 							})}
 						</div>

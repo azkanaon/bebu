@@ -6,18 +6,21 @@ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Category } from "@/types/category";
 import { searchCategoriesAPI } from "@/lib/api";
+import { CategoryResponse } from "@/types/post";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 const MAX_CATEGORIES = 10;
 
+type CategorySelectProps = {
+	value: CategoryResponse[]; // 👈 Ubah dari Category[] menjadi CategoryResponse[]
+	onChange: (value: CategoryResponse[]) => void; // 👈 Ubah ini juga
+};
+
 export default function CategorySelect({
 	value,
 	onChange,
-}: {
-	value: Category[];
-	onChange: (v: Category[]) => void;
-}) {
+}: CategorySelectProps) {
 	const [query, setQuery] = useState("");
 	const [open, setOpen] = useState(false);
 	const [focused, setFocused] = useState(false);

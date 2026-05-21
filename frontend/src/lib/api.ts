@@ -6,7 +6,7 @@ import {
 	UserSearchResponse,
 	GenericResponse,
 } from "@/types/post";
-import { BookFiltersResponse } from "@/types/book";
+import { BookFiltersResponse, BookProfileResponse, BookRecommendationsResponse } from "@/types/book";
 import { ReportRequest, ReportResponse } from "@/types/report";
 import api from "@/lib/axios";
 
@@ -60,16 +60,16 @@ export async function searchCategoriesAPI(query: string) {
 
 /* ---------- */
 
-/* BOOKS */
+/* LIST BOOKS */
 
 export async function getBooks() {
-  const res = await fetch('http://localhost:8080/api/v1/books', {
-    cache: 'no-store',
-  })
+	const res = await fetch("http://localhost:8080/api/v1/books", {
+		cache: "no-store",
+	});
 
-  if (!res.ok) throw new Error('Failed to fetch books')
+	if (!res.ok) throw new Error("Failed to fetch books");
 
-  return res.json()
+	return res.json();
 }
 
 type GetBookFiltersParams = {
@@ -78,7 +78,9 @@ type GetBookFiltersParams = {
 	language?: string | null;
 };
 
-export async function getBookFiltersAPI(params: GetBookFiltersParams,): Promise<BookFiltersResponse> {
+export async function getBookFiltersAPI(
+	params: GetBookFiltersParams,
+): Promise<BookFiltersResponse> {
 	const res = await api.get("/v1/books/filters", {
 		params: {
 			genre: params.genre || undefined,
@@ -90,7 +92,14 @@ export async function getBookFiltersAPI(params: GetBookFiltersParams,): Promise<
 	return res.data;
 }
 
-export async function searchBooksAPI(params: {q?: string; genre?: string | null; author?: string | null; language?: string | null; page?: number; limit?: number;}) {
+export async function searchBooksAPI(params: {
+	q?: string;
+	genre?: string | null;
+	author?: string | null;
+	language?: string | null;
+	page?: number;
+	limit?: number;
+}) {
 	const res = await api.get("/v1/books/search", {
 		params: {
 			q: params.q || undefined,
@@ -105,7 +114,9 @@ export async function searchBooksAPI(params: {q?: string; genre?: string | null;
 	return res.data;
 }
 
-export async function getPopularBooksAPI(range: "today" | "7d" | "30d" | "all",) {
+export async function getPopularBooksAPI(
+	range: "today" | "7d" | "30d" | "all",
+) {
 	const res = await api.get(`/v1/books/popular?range=${range}`);
 
 	return res.data;
@@ -117,7 +128,11 @@ export async function getHighlyRatedBooksAPI() {
 	return res.data;
 }
 
-export async function getAllBooksAPI(params: {page?: number; limit?: number; sort?: "title" | "newest" | "rating" | "popular";}) {
+export async function getAllBooksAPI(params: {
+	page?: number;
+	limit?: number;
+	sort?: "title" | "newest" | "rating" | "popular";
+}) {
 	const res = await api.get("/v1/books/all-books", {
 		params,
 	});
@@ -127,29 +142,55 @@ export async function getAllBooksAPI(params: {page?: number; limit?: number; sor
 
 /* ----- */
 
+/* BOOK PROFILE */
+
+export async function getBookProfileAPI(
+	slug: string,
+): Promise<BookProfileResponse> {
+	const res = await api.get(`/v1/books/${slug}`);
+
+	return res.data;
+}
+
+export async function getBookRecommendationsAPI(
+	slug: string,
+): Promise<BookRecommendationsResponse> {
+	const res = await api.get(`/v1/books/${slug}/recommendations`);
+	return res.data;
+}
+
+export async function getBookPostsAPI(slug: string, tab: "review" | "analysis", cursor = 0, limit = 10) {
+    const res = await api.get(`/v1/books/${slug}/posts`, {
+        params: { tab, cursor, limit }
+    });
+    return res.data;
+}
+
+/* ------------ */
+
 export async function createPost(payload: CreatePostPayload) {
-  const formData = new FormData()
+	const formData = new FormData();
 
-  formData.append('user_id', String(payload.user_id))
-  formData.append('book_id', String(payload.book_id))
-  formData.append('description', payload.description)
-  formData.append('post_type', payload.post_type)
-  formData.append('rating', String(payload.rating))
+	formData.append("user_id", String(payload.user_id));
+	formData.append("book_id", String(payload.book_id));
+	formData.append("description", payload.description);
+	formData.append("post_type", payload.post_type);
+	formData.append("rating", String(payload.rating));
 
-  formData.append('categories', JSON.stringify(payload.categories))
+	formData.append("categories", JSON.stringify(payload.categories));
 
-  if (payload.file) {
-    formData.append('image', payload.file)
-  }
+	if (payload.file) {
+		formData.append("image", payload.file);
+	}
 
-  const res = await api.post('v1/posts', formData)
+	const res = await api.post("v1/posts", formData);
 
-  return res.data
+	return res.data;
 }
 
 export async function deletePostAPI(publicID: string) {
-  const res = await api.delete(`/v1/posts/${publicID}`)
-  return res.data
+	const res = await api.delete(`/v1/posts/${publicID}`);
+	return res.data;
 }
 
 export async function followUserAPI(username: string) {
@@ -215,6 +256,6 @@ export async function getRecentRecipientsAPI(): Promise<
 export async function searchUsersAPI(
 	query: string,
 ): Promise<GenericResponse<UserSearchResponse[]>> {
-	const res = await api.get(`/v1/users/search?q=${query}`)
+	const res = await api.get(`/v1/users/search?q=${query}`);
 	return res.data;
 }

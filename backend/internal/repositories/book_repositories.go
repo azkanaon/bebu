@@ -9,6 +9,8 @@ import (
 	"math"
 	"strings"
 	"time"
+	"context"
+	"errors"
 )
 
 type BookRepository interface {
@@ -18,6 +20,10 @@ type BookRepository interface {
 	GetPopularBooks(timeRange string, limit int,) ([]dto.PopularBookItem, error)
 	GetHighlyRatedBooks(limit int,) ([]dto.HighlyRatedBookItem, error)
 	GetAllBooks(page int, limit int, sort string,) (*dto.AllBooksResponse, error)
+	GetBySlug(ctx context.Context, slug string) (*models.Book, error)
+	GetRecommendationsByGenres(ctx context.Context, currentBookID uint, genreIDs []uint, limit int) ([]models.Book, error)
+	GetRecommendationsByAuthors(ctx context.Context, currentBookID uint, authorIDs []uint, limit int) ([]models.Book, error)
+	GetBookPosts(ctx context.Context, bookID uint, postType string, cursor uint, limit int, userID uint) ([]models.Post, error)
 }
 
 type bookRepository struct {
@@ -811,4 +817,114 @@ func (r *bookRepository) GetAllBooks(page int, limit int, sort string,) (*dto.Al
 		Total: total,
 		TotalPages: totalPages,
 	}, nil
+}
+
+/* --- BOOK PROFILE ---  */
+
+func (r *bookRepository) GetBySlug(ctx context.Context, slug string) (*models.Book, error) {
+	var book models.Book
+
+	// Query sangat bersih dan cepat berkat exact match string pada index slug
+	err := r.db.WithContext(ctx).
+		Preload("BookAuthors.Author").
+		Preload("BookGenres.Genre").
+		Preload("BookStat"). 
+		Where("slug = ?", slug).
+		First(&book).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &book, nil
+}
+
+func (r *bookRepository) GetRecommendationsByGenres(ctx context.Context, currentBookID uint, genreIDs []uint, limit int) ([]models.Book, error) {
+	var books []models.Book
+
+	if len(genreIDs) == 0 {
+		return books, nil
+	}
+
+	err := r.db.WithContext(ctx).
+		Table("books").
+		// Ambil semua kolom books dan ambil overall_rating dari book_stats dimasukkan ke preload struct stat nantinya
+		Select("books.*, MAX(book_stats.overall_rating) as dynamic_rating"). 
+		Joins("JOIN book_genres ON book_genres.book_id = books.book_id").
+		Joins("LEFT JOIN book_stats ON book_stats.book_id = books.book_id").
+		Preload("BookAuthors.Author"). 
+		Preload("BookStat"). // Pastikan stat ikut di-preload agar data objeknya terbentuk
+		Where("book_genres.genre_id IN ?", genreIDs).
+		Where("books.book_id != ?", currentBookID). 
+		Where("books.deleted_at IS NULL").
+		Group("books.book_id, book_stats.overall_rating"). // Tambah group-by untuk kolom rating
+		Order("COUNT(book_genres.genre_id) DESC, book_stats.overall_rating DESC").
+		Limit(limit).
+		Find(&books).Error
+
+	return books, err
+}
+
+func (r *bookRepository) GetRecommendationsByAuthors(ctx context.Context, currentBookID uint, authorIDs []uint, limit int) ([]models.Book, error) {
+	var books []models.Book
+
+	if len(authorIDs) == 0 {
+		return books, nil
+	}
+
+	err := r.db.WithContext(ctx).
+		Table("books").
+		Select("books.*").
+		Joins("JOIN book_authors ON book_authors.book_id = books.book_id").
+		Joins("LEFT JOIN book_stats ON book_stats.book_id = books.book_id").
+		Preload("BookAuthors.Author"). 
+		Preload("BookStat"). // Ikut di-preload juga di sini
+		Where("book_authors.author_id IN ?", authorIDs).
+		Where("books.book_id != ?", currentBookID). 
+		Where("books.deleted_at IS NULL").
+		Order("book_stats.overall_rating DESC, books.publication_year DESC"). // Utamakan rating tertinggi penulis tersebut
+		Limit(limit).
+		Find(&books).Error
+
+	return books, err
+}
+
+func (r *bookRepository) GetBookPosts(ctx context.Context, bookID uint, postType string, cursor uint, limit int, userID uint) ([]models.Post, error) {
+	var posts []models.Post
+
+	query := r.db.WithContext(ctx).
+		Select(`posts.*, 
+			(SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
+			(SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
+			userID, userID).
+		Preload("User.Profile").
+		Preload("Book.BookAuthors.Author").
+		Preload("Book.BookGenres.Genre").
+		Preload("Stats").
+		Preload("Categories"). // Untuk keperluan post tipe Analysis
+		Where("posts.book_id = ?", bookID).
+		Where("posts.post_type = ?", postType).
+		Where("posts.publish_status = ?", "published")
+
+	// Cursor Pagination
+	if cursor > 0 {
+		query = query.Where("posts.post_id < ?", cursor)
+	}
+
+	err := query.Order("posts.post_id DESC").Limit(limit).Find(&posts).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Map GORM virtual column ke struct field jika diperlukan
+	for i := range posts {
+		if posts[i].Stats != nil {
+			posts[i].TotalLikes = posts[i].Stats.LikeCount
+		}
+	}
+
+	return posts, nil
 }
