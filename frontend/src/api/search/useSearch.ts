@@ -55,10 +55,3 @@ export const useInfiniteSearchPosts = (q: string) => {
     enabled: q.length >= 2,
   })
 }
-
-export const useSearchHistory = () => {
-  return useQuery({
-    queryKey: ['search-history'],
-    queryFn: searchService.getHistory,
-  })
-}
