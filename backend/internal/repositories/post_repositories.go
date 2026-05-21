@@ -2,9 +2,12 @@ package repositories
 
 import (
 	"backend-bebu/internal/models"
+	"fmt"
+	"time"
+
+	"errors"
 
 	"gorm.io/gorm"
-	"errors"
 )
 
 type PostRepository interface {
@@ -23,6 +26,16 @@ type PostRepository interface {
 	UpdateSaveCount(postID uint, increment int) error
 	GetCommentsByPostID(postID uint, userID uint) ([]models.PostComment, error)
 	DecrementCommentCountByAmount(postID uint, amount int) error
+
+	IsLiked(postID, userID uint) (bool, error)
+    AddLike(db *gorm.DB, postID, userID uint) error
+    DeleteLike(db *gorm.DB, postID, userID uint) error
+
+    IsSaved(postID, userID uint) (bool, error)
+    AddSave(db *gorm.DB, postID, userID uint) error
+    DeleteSave(db *gorm.DB, postID, userID uint) error
+    
+    SyncPostStats(db *gorm.DB, postID uint, field string, amount int) error
 }
 
 type postRepository struct {
@@ -296,4 +309,52 @@ func (r *postRepository) DecrementCommentCountByAmount(postID uint, amount int) 
 	return r.db.Model(&models.PostStat{}).
 		Where("post_id = ?", postID).
 		Update("comment_count", gorm.Expr("comment_count - ?", amount)).Error
+}
+
+func (r *postRepository) SyncPostStats(db *gorm.DB, postID uint, field string, amount int) error {
+	fLikes := "COALESCE(post_stats.like_count, 0)"
+	fComments := "COALESCE(post_stats.comment_count, 0)"
+	fSaves := "COALESCE(post_stats.save_count, 0)"
+
+	if field == "like_count" { fLikes = fmt.Sprintf("(%s + %d)", fLikes, amount) }
+	if field == "comment_count" { fComments = fmt.Sprintf("(%s + %d)", fComments, amount) }
+	if field == "save_count" { fSaves = fmt.Sprintf("(%s + %d)", fSaves, amount) }
+
+	hotScoreFormula := fmt.Sprintf(`
+		(%s * 1) + (%s * 3) + (%s * 5)
+	`, fLikes, fComments, fSaves)
+
+	return db.Model(&models.PostStat{}).Where("post_id = ?", postID).Updates(map[string]interface{}{
+		field:       gorm.Expr("post_stats."+field+" + ?", amount),
+		"hot_score":  gorm.Expr(hotScoreFormula),
+		"updated_at": time.Now(),
+	}).Error
+}
+
+func (r *postRepository) IsLiked(postID, userID uint) (bool, error) {
+    var count int64
+    err := r.db.Model(&models.PostLike{}).Where("post_id = ? AND user_id = ?", postID, userID).Count(&count).Error
+    return count > 0, err
+}
+
+func (r *postRepository) AddLike(db *gorm.DB, postID, userID uint) error {
+    return db.Create(&models.PostLike{PostID: postID, UserID: userID}).Error
+}
+
+func (r *postRepository) DeleteLike(db *gorm.DB, postID, userID uint) error {
+    return db.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&models.PostLike{}).Error
+}
+
+func (r *postRepository) IsSaved(postID, userID uint) (bool, error) {
+    var count int64
+    err := r.db.Model(&models.PostSave{}).Where("post_id = ? AND user_id = ?", postID, userID).Count(&count).Error
+    return count > 0, err
+}
+
+func (r *postRepository) AddSave(db *gorm.DB, postID, userID uint) error {
+    return db.Create(&models.PostSave{PostID: postID, UserID: userID}).Error
+}
+
+func (r *postRepository) DeleteSave(db *gorm.DB, postID, userID uint) error {
+    return db.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&models.PostSave{}).Error
 }

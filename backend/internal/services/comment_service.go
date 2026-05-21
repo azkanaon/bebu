@@ -5,7 +5,8 @@ import (
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"errors"
-	"fmt"
+
+	"gorm.io/gorm"
 )
 
 type CommentService interface {
@@ -17,37 +18,58 @@ type CommentService interface {
 type commentService struct {
 	repo     repositories.CommentRepository
 	postRepo repositories.PostRepository
+	db           *gorm.DB    
 }
 
-func NewCommentService(repo repositories.CommentRepository, postRepo repositories.PostRepository) CommentService {
-	return &commentService{repo, postRepo}
+func NewCommentService(repo repositories.CommentRepository, postRepo repositories.PostRepository, db *gorm.DB) CommentService {
+	return &commentService{
+		repo:     repo,
+		postRepo: postRepo,
+		db:       db,
+	}
 }
 
 func (s *commentService) AddComment(userID uint, req dto.CreateCommentRequest) (*models.PostComment, error) {
-	// 1. Validasi Parent jika ini adalah balasan
-	if req.ParentCommentID != nil {
-		_, err := s.repo.GetCommentByID(*req.ParentCommentID)
-		if err != nil {
-			return nil, errors.New("komentar yang ingin dibalas tidak ditemukan")
+	var newComment *models.PostComment
+
+	// Gunakan Transaksi agar Komentar & Skor terupdate secara bersamaan
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Buat instance repo yang terikat transaksi
+		txCommentRepo := s.repo.WithTx(tx) // Pastikan CommentRepository punya WithTx
+		txPostRepo := s.postRepo.WithTx(tx)
+
+		// 1. Validasi Parent jika ini adalah balasan
+		if req.ParentCommentID != nil {
+			_, err := txCommentRepo.GetCommentByID(*req.ParentCommentID)
+			if err != nil {
+				return errors.New("komentar yang ingin dibalas tidak ditemukan")
+			}
 		}
-	}
 
-	newComment := &models.PostComment{
-		PostID:          req.PostID,
-		UserID:          userID,
-		ParentCommentID: req.ParentCommentID,
-		Comment:         req.Comment,
-	}
+		newComment = &models.PostComment{
+			PostID:          req.PostID,
+			UserID:          userID,
+			ParentCommentID: req.ParentCommentID,
+			Comment:         req.Comment,
+		}
 
-	// 2. Simpan komentar
-	if err := s.repo.CreateComment(newComment); err != nil {
+		// 2. Simpan komentar ke DB
+		if err := tx.Create(newComment).Error; err != nil {
+			return err
+		}
+
+		// 3. UPDATE SKOR POSTINGAN (Trigger Hot Score)
+		// Kita ganti UpdateCommentCount menjadi SyncPostStats
+		// field "comment_count" akan ditambah 1, dan Hot Score dihitung ulang otomatis
+		if err := txPostRepo.SyncPostStats(tx, req.PostID, "comment_count", 1); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return nil, err
-	}
-
-	// 3. Update statistik secara atomik (Gunakan fungsi yang sudah kamu buat)
-	if err := s.repo.UpdateCommentCount(req.PostID, 1); err != nil {
-		// Log error statistik tapi tetap return komentar jika sudah berhasil tersimpan
-		fmt.Println("Gagal update stats:", err)
 	}
 
 	// 4. Ambil data lengkap untuk dikembalikan ke frontend
@@ -59,22 +81,40 @@ func (s *commentService) ToggleLike(userID, commentID uint) (bool, error) {
 }
 
 func (s *commentService) SoftDeleteComment(commentID uint, userID uint, postID uint) (int, error) {
-    totalReplies, err := s.repo.CountAllRepliesRecursive(commentID)
-    if err != nil {
-        return 0, err
-    }
-    
-    totalToDelete := int(totalReplies) + 1
+	var totalToDelete int
 
-    err = s.repo.DeleteCommentRecursive(commentID, userID)
-    if err != nil {
-        return 0, err
-    }
+	// Gunakan Transaksi agar penghapusan dan update skor sinkron
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		txCommentRepo := s.repo.WithTx(tx)
+		txPostRepo := s.postRepo.WithTx(tx)
 
-    err = s.postRepo.DecrementCommentCountByAmount(postID, totalToDelete)
-    if err != nil {
-        return 0, err
-    }
+		// 1. Hitung total balasan yang akan ikut terhapus secara rekursif
+		totalReplies, err := txCommentRepo.CountAllRepliesRecursive(commentID)
+		if err != nil {
+			return err
+		}
+		
+		// Total yang dihapus adalah jumlah balasan + komentar itu sendiri (1)
+		totalToDelete = int(totalReplies) + 1
 
-    return totalToDelete, nil // Kembalikan angka ini
+		// 2. Lakukan penghapusan komentar secara rekursif di DB
+		if err := txCommentRepo.DeleteCommentRecursive(commentID, userID); err != nil {
+			return err
+		}
+
+		// 3. SYNC SKOR POSTINGAN (Trigger Hot Score)
+		// Kita gunakan SyncPostStats dengan nilai NEGATIF (-totalToDelete)
+		// Ini akan mengurangi comment_count DAN menghitung ulang hot_score seketika
+		if err := txPostRepo.SyncPostStats(tx, postID, "comment_count", -totalToDelete); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return totalToDelete, nil
 }

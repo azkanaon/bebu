@@ -310,10 +310,11 @@ func (s *userService) FollowUser(sourceUserID uint, targetUsername string) (stri
 
 	// 6. Update Stats (HANYA jika data benar-benar baru)
 	if isNew && finalStatus == "accepted" {
-		if err := txRepo.UpdateUserStat(tx, sourceUserID, "total_following", 1); err != nil {
+		if err := txRepo.SyncUserStats(tx, sourceUserID, "total_following", 1); err != nil {
 			return "", err
 		}
-		if err := txRepo.UpdateUserStat(tx, targetUser.UserID, "total_followers", 1); err != nil {
+
+		if err := txRepo.SyncUserStats(tx, targetUser.UserID, "total_followers", 1); err != nil {
 			return "", err
 		}
 	}
@@ -356,11 +357,11 @@ func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) err
 		// Jika sebelumnya 'accepted', kurangi stats
 		if currentStatus == "accepted" {
 			// Kurangi 'total_following' source
-			if err := txRepo.UpdateUserStat(tx, sourceUserID, "total_following", -1); err != nil {
+			if err := txRepo.SyncUserStats(tx, sourceUserID, "total_following", -1); err != nil {
 				return err
 			}
 			// Kurangi 'total_followers' target
-			if err := txRepo.UpdateUserStat(tx, targetUser.UserID, "total_followers", -1); err != nil {
+			if err := txRepo.SyncUserStats(tx, targetUser.UserID, "total_followers", -1); err != nil {
 				return err
 			}
 		}
@@ -448,7 +449,7 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 			if err == nil && len(followerIDs) > 0 {
 				// Gunakan handle transaksi (txRepo dan tx) secara konsisten
 				_, _ = txRepo.AcceptAllPendingFollows(userID)
-				_ = txRepo.UpdateUserStat(tx, userID, "total_followers", len(followerIDs))
+				_ = txRepo.SyncUserStats(tx, userID, "total_followers", len(followerIDs))
 				_ = txRepo.BulkUpdateUserStat(tx, followerIDs, "total_following", 1)
 			}
 		}
@@ -547,12 +548,12 @@ func (s *userService) AcceptFollowRequest(currentUserID uint, requesterUsername 
 
 		// 3. Update stats (gunakan tx, hapus errgroup karena kita butuh konsistensi di dalam tx)
 		// Tambah +1 ke 'total_following' untuk requester
-		if err := txRepo.UpdateUserStat(tx, requester.UserID, "total_following", 1); err != nil {
+		if err := txRepo.SyncUserStats(tx, currentUserID, "total_followers", 1); err != nil {
 			return err
 		}
-		
-		// Tambah +1 ke 'total_followers' untuk current user
-		if err := txRepo.UpdateUserStat(tx, currentUserID, "total_followers", 1); err != nil {
+
+		// 3. UPDATE STATS REQUESTER
+		if err := txRepo.SyncUserStats(tx, requester.UserID, "total_following", 1); err != nil {
 			return err
 		}
 
@@ -595,8 +596,8 @@ func (s *userService) BlockUser(sourceUserID uint, targetUsername string) error 
 			// Update stats hanya jika sebelumnya sudah 'accepted'
 			if statusAToB == "accepted" {
 				// Kurangi Following A, Kurangi Follower B
-				_ = txRepo.UpdateUserStat(tx, sourceUserID, "total_following", -1)
-				_ = txRepo.UpdateUserStat(tx, targetUser.UserID, "total_followers", -1)
+				_ = txRepo.SyncUserStats(tx, sourceUserID, "total_following", -1)
+				_ = txRepo.SyncUserStats(tx, targetUser.UserID, "total_followers", -1)
 			}
 		}
 
@@ -610,8 +611,8 @@ func (s *userService) BlockUser(sourceUserID uint, targetUsername string) error 
 			// Update stats hanya jika sebelumnya sudah 'accepted'
 			if statusBToA == "accepted" {
 				// Kurangi Following B, Kurangi Follower A
-				_ = txRepo.UpdateUserStat(tx, targetUser.UserID, "total_following", -1)
-				_ = txRepo.UpdateUserStat(tx, sourceUserID, "total_followers", -1)
+				_ = txRepo.SyncUserStats(tx, targetUser.UserID, "total_following", -1)
+				_ = txRepo.SyncUserStats(tx, sourceUserID, "total_followers", -1)
 			}
 		}
 

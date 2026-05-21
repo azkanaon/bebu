@@ -168,6 +168,8 @@ func (s *bookshelfService) AddBookToShelf(userID uint, req *dto.AddToBookshelfRe
 			}
 			bookID = newBook.BookID
 
+			
+
 			// A. Proses Authors
 			for _, authorName := range req.Authors {
 				author, err := txRepo.GetOrCreateAuthor(tx, authorName)
@@ -207,6 +209,10 @@ func (s *bookshelfService) AddBookToShelf(userID uint, req *dto.AddToBookshelfRe
 
 		// Simpan ke bookshelf (Repo ini harus handle error duplikat book_id + user_id)
 		if _, err := txRepo.AddToBookshelf(newEntry); err != nil {
+			return err
+		}
+
+		if err := txRepo.SyncBookStats(tx, bookID, "total_readers", 1); err != nil {
 			return err
 		}
 
@@ -455,6 +461,11 @@ func (s *bookshelfService) AddNote(userID, bookshelfID uint, req *dto.AddNoteReq
 
 		maxPage, _ := txRepo.GetMaxPageEndFromNotes(tx, bookshelfID)
         if err := s.syncProgress(tx, entry, maxPage); err != nil {
+            return err
+        }
+
+		// update hot_score buku
+		if err := txRepo.SyncBookStats(tx, entry.BookID, "total_notes", 1); err != nil {
             return err
         }
 

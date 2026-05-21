@@ -87,6 +87,10 @@ type BookStat struct {
 	Rating4Count  int       `gorm:"column:rating_4_count;default:0"`
 	Rating5Count  int       `gorm:"column:rating_5_count;default:0"`
 
+	TotalReaders   int       `gorm:"column:total_readers;default:0"`
+	TotalNotes     int       `gorm:"column:total_notes;default:0"`
+	HotScore       float64   `gorm:"column:hot_score;default:0.0"`
+
 	UpdatedAt     time.Time `gorm:"column:updated_at;autoUpdateTime"`
 	
 	Book          *Book     `gorm:"foreignKey:BookID;constraint:OnDelete:CASCADE;"`

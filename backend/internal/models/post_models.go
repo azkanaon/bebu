@@ -54,7 +54,7 @@ type PostStat struct {
 	CommentCount    int        `gorm:"column:comment_count"`
 	SaveCount       int        `gorm:"column:save_count"`
 	ShareCount      int        `gorm:"column:share_count"`
-	HotScore        float64    `gorm:"column:hot_score"`
+	HotScore        float64    `gorm:"column:hot_score;default:0.0"`
 	LastCommentedAt *time.Time `gorm:"column:last_commented_at"`
 	UpdatedAt       time.Time  `gorm:"column:updated_at"`
 

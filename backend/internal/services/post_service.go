@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/mapper"
@@ -29,16 +30,18 @@ type PostService interface {
 type postService struct {
 	postRepo repositories.PostRepository
 	userRepo repositories.UserRepository
+	bookshelfRepo repositories.BookshelfRepository
 	categoryRepo repositories.CategoryRepository
 	db       *gorm.DB
 }
 
 
-func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, categoryRepo repositories.CategoryRepository, db *gorm.DB) PostService {
+func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, categoryRepo repositories.CategoryRepository,bookshelfRepo repositories.BookshelfRepository, db *gorm.DB) PostService {
 	return &postService{
 		postRepo: postRepo,
 		userRepo: userRepo,
 		categoryRepo: categoryRepo,
+		bookshelfRepo: bookshelfRepo, 
 		db:       db,
 	}
 }
@@ -62,115 +65,143 @@ func (s *postService) GetPosts(userID uint, tab string, cursor uint, limit int, 
 }
 
 func (s *postService) CreatePost(req dto.CreatePostRequest) error {
-	tx := s.db.Begin()
-	if tx.Error != nil {
-		return tx.Error
-	}
-	defer tx.Rollback()
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		txRepo := s.postRepo.WithTx(tx)
+		txUserRepo := s.userRepo.WithTx(tx)
+		txBookRepo := s.bookshelfRepo.WithTx(tx) // Pastikan bookshelfRepo sudah di-inject di postService
 
-	post := &models.Post{
-		PublicID:      uuid.New().String(), // Asumsi PublicID Anda string
-		UserID:        req.UserID,
-		BookID:        req.BookID,
-		Description:   req.Description,
-		PostType:      req.PostType,
-		Rating:        req.Rating,
-		ImgURL:        req.ImgURL,
-		PublishStatus: "published", // Default status saat dibuat
-	}
+		// A. Simpan data Post utama
+		post := &models.Post{
+			PublicID:      uuid.New().String(),
+			UserID:        req.UserID,
+			BookID:        req.BookID,
+			Description:   req.Description,
+			PostType:      req.PostType,
+			Rating:        req.Rating,
+			ImgURL:        req.ImgURL,
+			PublishStatus: "published",
+		}
 
-	txRepo := s.postRepo.WithTx(tx)
-	createdPost, err := txRepo.CreatePost(post)
-	if err != nil {
-		return err // Rollback akan dijalankan oleh defer
-	}
+		createdPost, err := txRepo.CreatePost(post)
+		if err != nil {
+			return err
+		}
 
-	postStat := models.PostStat{
-        PostID:       createdPost.PostID,
-        LikeCount:    0,
-        CommentCount: 0,
-        SaveCount:    0,
-        ShareCount:   0,
-        HotScore:     0,
-    }
-    if err := tx.Create(&postStat).Error; err != nil {
-        return err // Rollback jika gagal buat stats
-    }
+		// B. Inisialisasi statistik postingan itu sendiri (untuk like/komen nantinya)
+		if err := tx.Create(&models.PostStat{PostID: createdPost.PostID}).Error; err != nil {
+			return err
+		}
 
-	if req.PostType == "analysis" && req.Categories != nil {
-		for _, categoryName := range req.Categories {
-			// Normalisasi nama kategori untuk pencarian yang konsisten
-			normalizedName := utils.NormalizeCategory(categoryName)
-			
-			var category models.Category
+		// C. Logika Kategori (Jika post tipe Analysis)
+		if req.PostType == "analysis" && req.Categories != nil {
+			for _, categoryName := range req.Categories {
+				normalizedName := utils.NormalizeCategory(categoryName)
+				var category models.Category
 
-			// Cari kategori di DB menggunakan handle transaksi 'tx'
-			err := tx.Where("category_normalized = ?", normalizedName).First(&category).Error
-
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				// KATEGORI TIDAK DITEMUKAN: Buat yang baru
-				category = models.Category{
-					CategoryName:       categoryName,
-					CategoryNormalized: normalizedName,
-					UsageCount:         1, // Pertama kali digunakan
+				if err := tx.Where("category_normalized = ?", normalizedName).First(&category).Error; err != nil {
+					 if errors.Is(err, gorm.ErrRecordNotFound) { 
+					category = models.Category{
+						CategoryName:       categoryName, 
+						CategoryNormalized: normalizedName, 
+						UsageCount:         1,
+					}
+					// Pastikan menangkap error saat Create
+					if err := tx.Create(&category).Error; err != nil {
+						return err
+					}
+				} else { 
+					return err 
 				}
-				if err := tx.Create(&category).Error; err != nil {
-					return err // Gagal membuat kategori, Rollback akan dijalankan
+				} else {
+					tx.Model(&category).Update("usage_count", gorm.Expr("usage_count + 1"))
 				}
-			} else if err != nil {
-				// Error lain saat mencari kategori
-				return err // Rollback akan dijalankan
-			} else {
-				// KATEGORI DITEMUKAN: Tambah usage_count
-				if err := tx.Model(&category).Update("usage_count", gorm.Expr("usage_count + 1")).Error; err != nil {
-					return err // Gagal update, Rollback akan dijalankan
-				}
-			}
-
-			// Buat relasi di tabel post_categories
-			postCategory := models.PostCategory{
-				PostID:     createdPost.PostID,
-				CategoryID: category.CategoryID,
-			}
-			if err := tx.Create(&postCategory).Error; err != nil {
-				return err // Gagal membuat relasi, Rollback akan dijalankan
+				tx.Create(&models.PostCategory{PostID: createdPost.PostID, CategoryID: category.CategoryID})
 			}
 		}
-	}
-	
-	return tx.Commit().Error
+
+		// --- BAGIAN SYNC STATISTIK (PROSES INTI) ---
+
+		// D. SYNC SKOR USER: Tambah total_posts user (+1) & hitung ulang Hot Score Profil
+		if err := txUserRepo.SyncUserStats(tx, req.UserID, "total_posts", 1); err != nil {
+			return err
+		}
+
+		// E. SYNC SKOR BUKU (Jika postingan ini terkait dengan buku)
+		if createdPost.BookID > 0 {
+			fmt.Println("DEBUG: Masuk ke SyncBookStats untuk BookID:", createdPost.BookID)
+			// 1. Tambah total_posts buku tersebut (+1) & hitung ulang Hot Score Buku
+			// Ini berlaku untuk SEMUA tipe postingan (review/analysis/dll)
+			if err := txBookRepo.SyncBookStats(tx, createdPost.BookID, "total_posts", 1); err != nil {
+				return err
+			}
+
+			// 2. Jika tipenya REVIEW, proses Rating dan Total Reviews
+			if createdPost.PostType == "review" && createdPost.Rating > 0 {
+				fmt.Println("DEBUG: Masuk ke SyncBookRating. Rating:", createdPost.Rating)
+				ratingVal := float32(createdPost.Rating)
+			
+			// Panggil tanpa tanda bintang (*)
+				if err := txBookRepo.SyncBookRating(tx, createdPost.BookID, ratingVal, false); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
 }
 
 func (s *postService) DeletePost(publicID string, userID uint) error {
+	// 1. Cari data post SEBELUM dihapus untuk mendapatkan info UserID, PostType, dan BookID
 	var post models.Post
-	if err := s.db.Where("public_id = ?", publicID).First(&post).Error; err != nil {
-		return errors.New("post not found")
+	if err := s.db.Where("public_id = ? AND user_id = ?", publicID, userID).First(&post).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("post not found")
+		}
+		return err
 	}
 
+	// Ambil daftar kategori yang menempel pada post (untuk update usage_count nanti)
 	categoryIDs, err := s.postRepo.GetPostCategories(post.PostID)
 	if err != nil {
 		return err
 	}
 
+	// 2. Mulai Transaksi
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		// Hapus Post (Soft Delete)
-		if err := s.postRepo.DeletePostWithTx(tx, post.PostID, userID); err != nil {
+		txRepo := s.postRepo.WithTx(tx)
+		txUserRepo := s.userRepo.WithTx(tx)
+		// Kita butuh bookshelfRepo untuk memanggil SyncBookStats
+		txBookRepo := s.bookshelfRepo.WithTx(tx)
+
+		// A. Hapus Post (Soft Delete)
+		if err := txRepo.DeletePostWithTx(tx, post.PostID, userID); err != nil {
 			return err
 		}
 
-		// Hapus relasi di tabel pivot (Hard Delete) agar tidak menggantung
-		if err := s.postRepo.ClearPostCategories(tx, post.PostID); err != nil {
+		// B. Bersihkan relasi kategori
+		if err := txRepo.ClearPostCategories(tx, post.PostID); err != nil {
 			return err
 		}
 
-		// Kurangi usage_count kategori terkait
-		if err := s.postRepo.DecrementCategoryUsage(tx, categoryIDs); err != nil {
+		// C. Kurangi usage_count kategori terkait
+		if err := txRepo.DecrementCategoryUsage(tx, categoryIDs); err != nil {
 			return err
 		}
 
-		// Bersihkan favorit yang sekarang sudah kosong
-		if err := s.categoryRepo.CleanEmptyFavoriteCategories(tx); err != nil {
+		// --- LOGIKA SYNC SKOR DIMULAI ---
+
+		// D. SYNC SKOR USER: total_posts - 1 dan hitung ulang Hot Score User
+		if err := txUserRepo.SyncUserStats(tx, userID, "total_posts", -1); err != nil {
 			return err
+		}
+
+		// E. SYNC SKOR BUKU: Jika yang dihapus adalah Review, kurangi total_reviews di tabel book_stats
+		if post.PostType == "review" && post.BookID > 0 { // Cek apakah ID lebih besar dari 0
+			// Panggil SyncBookStats secara langsung tanpa tanda bintang (*)
+			if err := txBookRepo.SyncBookStats(tx, post.BookID, "total_reviews", -1); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -335,23 +366,67 @@ func (s *postService) mapPostsToSummaryDTOs(posts []models.Post) []dto.PostSumma
 }
 
 func (s *postService) ToggleLike(postID uint, userID uint) (bool, error) {
-    return s.postRepo.ToggleLike(postID, userID)
+	var isLiked bool
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		txRepo := s.postRepo.WithTx(tx)
+
+		// A. Cek status like saat ini
+		alreadyLiked, err := txRepo.IsLiked(postID, userID)
+		if err != nil {
+			return err
+		}
+
+		if alreadyLiked {
+			// B. UNLIKE: Hapus baris & Sync skor (-1)
+			if err := txRepo.DeleteLike(tx, postID, userID); err != nil {
+				return err
+			}
+			isLiked = false
+			return txRepo.SyncPostStats(tx, postID, "like_count", -1)
+		} else {
+			// C. LIKE: Tambah baris & Sync skor (+1)
+			if err := txRepo.AddLike(tx, postID, userID); err != nil {
+				return err
+			}
+			isLiked = true
+			return txRepo.SyncPostStats(tx, postID, "like_count", 1)
+		}
+	})
+
+	return isLiked, err
 }
 
 func (s *postService) ToggleSave(userID uint, postID uint) (bool, error) {
-    isSaved, err := s.postRepo.ToggleSave(userID, postID)
-    if err != nil {
-        return false, err
-    }
+	var isSaved bool
 
-    increment := 1
-    if !isSaved {
-        increment = -1
-    }
-    
-    _ = s.postRepo.UpdateSaveCount(postID, increment)
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		txRepo := s.postRepo.WithTx(tx)
 
-    return isSaved, nil
+		// A. Cek status save saat ini
+		alreadySaved, err := txRepo.IsSaved(postID, userID)
+		if err != nil {
+			return err
+		}
+
+		if alreadySaved {
+			// B. UNSAVE: Hapus baris & Sync skor (-1)
+			if err := txRepo.DeleteSave(tx, postID, userID); err != nil {
+				return err
+			}
+			isSaved = false
+			return txRepo.SyncPostStats(tx, postID, "save_count", -1)
+		} else {
+			// C. SAVE: Tambah baris & Sync skor (+1)
+			if err := txRepo.AddSave(tx, postID, userID); err != nil {
+				return err
+			}
+			isSaved = true
+			return txRepo.SyncPostStats(tx, postID, "save_count", 1)
+		}
+	})
+
+	return isSaved, err
 }
 
 func (s *postService) GetComments(postID uint, userID uint) ([]dto.CommentResponse, error) {
