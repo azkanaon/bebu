@@ -2,11 +2,8 @@ package handlers
 
 import (
 	"net/http"
-
 	"backend-bebu/internal/services"
-
 	"github.com/gin-gonic/gin"
-
 	"strconv"
 )
 
@@ -166,4 +163,75 @@ func (h *BookHandler) GetAllBooks(c *gin.Context,) {
 		http.StatusOK,
 		result,
 	)
+}
+
+/* --- BOOK PROFILE --- */
+
+func (h *BookHandler) GetBookProfile(c *gin.Context) {
+	slug := c.Param("slug")
+
+	book, err := h.service.GetBookProfile(c.Request.Context(), slug)
+	if err != nil {
+		if err.Error() == "book not found" {
+			c.JSON(http.StatusNotFound, gin.H{"status": "error", "message": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "book profile retrieved successfully",
+		"data":    book,
+	})
+}
+
+func (h *BookHandler) GetBookRecommendations(c *gin.Context) {
+	slug := c.Param("slug")
+
+	recommendations, err := h.service.GetBookRecommendations(c.Request.Context(), slug)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "failed to fetch recommendations"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "book recommendations retrieved successfully",
+		"data":    recommendations,
+	})
+}
+
+func (h *BookHandler) GetBookPosts(c *gin.Context) {
+	slug := c.Param("slug")
+	
+	// Default tab ke "review", opsi lain adalah "analysis"
+	tab := c.DefaultQuery("tab", "review") 
+	
+	cursorStr := c.DefaultQuery("cursor", "0")
+	cursor, _ := strconv.ParseUint(cursorStr, 10, 32)
+	
+	limitStr := c.DefaultQuery("limit", "10")
+	limit, _ := strconv.Atoi(limitStr)
+
+	// Ambil userID dari context auth middleware (jika user sudah login)
+	var currentUserID uint
+	val, exists := c.Get("userID")
+	if exists {
+		currentUserID = val.(uint)
+	}
+
+	// Panggil service
+	data, err := h.service.GetBookPosts(c.Request.Context(), slug, tab, uint(cursor), limit, currentUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"status": "error", "message": "failed to fetch book posts"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "book posts retrieved successfully",
+		"data":    data,
+	})
 }

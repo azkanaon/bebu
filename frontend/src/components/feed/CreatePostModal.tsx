@@ -9,6 +9,7 @@ import StarRating from "./StarRating";
 import ImageUpload from "./ImageUpload";
 import CategorySelect from "./CategorySelect";
 import { createPost } from "@/lib/api";
+import { CategoryResponse } from "@/types/post";
 
 const tabs = [
 	{ key: "review", label: "Review" },
@@ -21,14 +22,12 @@ type Book = {
 };
 
 export default function CreatePostModal() {
-	const { isOpen, type, open, close } = usePostModal();
+	const { isOpen, type, initialBook, open, close } = usePostModal();
 
-	const [book, setBook] = useState<Book | null>(null);
+	const [book, setBook] = useState<Book | null>(initialBook);
 	const [rating, setRating] = useState(0);
 	const [file, setFile] = useState<File | null>(null);
-	const [categories, setCategories] = useState<
-		{ id: number; name: string }[]
-	>([]);
+	const [categories, setCategories] = useState<CategoryResponse[]>([]);
 	const [text, setText] = useState("");
 	const maxChar = 100;
 
@@ -36,14 +35,38 @@ export default function CreatePostModal() {
 
 	const isDisabled = !book || !text || (type === "review" && rating === 0);
 
+	const handleCloseModal = () => {
+		setBook(null);
+		setRating(0);
+		setFile(null);
+		setCategories([]);
+		setText("");
+		close(); // Panggil close dari Zustand store
+	};
+
+	const authStorage =
+		typeof window !== "undefined"
+			? localStorage.getItem("bebu-auth-storage")
+			: null;
+	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
+	const user = parsedStorage?.state?.user;
+
+	useEffect(() => {
+		if (isOpen && initialBook) {
+			setBook(initialBook);
+		} else if (!isOpen) {
+			setBook(null);
+		}
+	}, [isOpen, initialBook]);
+
 	// ESC close
 	useEffect(() => {
 		const handleEsc = (e: KeyboardEvent) => {
-			if (e.key === "Escape") close();
+			if (e.key === "Escape") handleCloseModal();
 		};
 		window.addEventListener("keydown", handleEsc);
 		return () => window.removeEventListener("keydown", handleEsc);
-	}, [close]);
+	}, []);
 
 	return createPortal(
 		<AnimatePresence>
@@ -57,7 +80,7 @@ export default function CreatePostModal() {
 					{/* Overlay */}
 					<motion.div
 						className="absolute inset-0 bg-black/60 backdrop-blur-md"
-						onClick={close}
+						onClick={handleCloseModal}
 					/>
 
 					{/* Modal */}
@@ -150,7 +173,7 @@ ${
 
 								{/* RIGHT (Close Button) */}
 								<motion.button
-									onClick={close}
+									onClick={handleCloseModal}
 									whileHover={{ scale: 1.1, rotate: 90 }}
 									whileTap={{ scale: 0.9 }}
 									className="
@@ -207,7 +230,9 @@ transition
 									return (
 										<button
 											key={t.key}
-											onClick={() => open(t.key)}
+											onClick={() =>
+												open(t.key, initialBook)
+											}
 											className={`
 relative flex-1 py-2 text-sm font-medium rounded-full overflow-hidden
 transition
@@ -259,12 +284,19 @@ ${glow}
 
 								if (isDisabled || isLoading) return;
 
+								const finalBookId = initialBook?.id || book?.id;
+
+								if (!finalBookId) {
+									console.error("ID Buku tidak ditemukan!");
+									return;
+								}
+
 								try {
 									setIsLoading(true);
 
 									await createPost({
-										user_id: 1,
-										book_id: book.id,
+										user_id: user?.id,
+										book_id: finalBookId,
 										description: text,
 										post_type: type,
 										rating,
@@ -282,7 +314,7 @@ ${glow}
 										file, // 🔥 ini pengganti img_url
 									});
 
-									close(); // tutup modal setelah sukses
+									handleCloseModal(); // tutup modal setelah sukses
 
 									// optional: reset state
 									setText("");
@@ -297,7 +329,11 @@ ${glow}
 							}}
 							className="space-y-5"
 						>
-							<BookSelect value={book} onChange={setBook} />
+							<BookSelect
+								value={book}
+								onChange={setBook}
+								defaultBook={initialBook} // 👈 Pasang initialBook dari zustand ke sini
+							/>
 
 							{/* Textarea */}
 							<div className="relative">
@@ -489,6 +525,6 @@ ${isDisabled ? "bg-gray-700 text-gray-400 cursor-not-allowed" : "text-white"}
 				</motion.div>
 			)}
 		</AnimatePresence>,
-		document.body
+		document.body,
 	);
 }
