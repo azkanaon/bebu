@@ -51,6 +51,7 @@ func ToBookReviewPostResponse(p models.Post, currentUserID uint) dto.BookPostRev
 		}
 	}
 
+	res.Rating  = int(p.Rating)
 	res.IsLiked = p.IsLiked
 	res.IsSaved = p.IsSaved
 

@@ -18,7 +18,7 @@ export default function RightSidebar() {
 		<div className="space-y-4 pr-8 my-4">
 			<FriendRecommendation />
 
-			{pathname !== "/books" && (
+			{pathname !== "/books" && !pathname.includes("/books/") && (
 				<CategoryBubble
 					onAddClick={() => setIsOpen(true)}
 					refresh={refresh}

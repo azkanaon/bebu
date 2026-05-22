@@ -152,6 +152,7 @@ export type BookReviewPostType = {
 	content: string;
 	is_liked: boolean;
 	is_saved: boolean;
+	rating: number;
 	likes: number;
 	comments: number;
 	shares: number;

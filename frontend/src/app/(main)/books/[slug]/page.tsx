@@ -40,29 +40,29 @@ export default async function BookProfilePage({
 	}
 
 	return (
-		<div className="w-full space-y-8 py-2 px-1">
+		<div className="w-full space-y-4 py-2 px-1">
 			<BookHero book={bookData} />
 
 			<BookRatingStats stats={bookData.stats} />
 
 			{recommendations?.genre_recommendations && (
 				<BookCarouselSection
-					title="Buku Sejenis"
-					description="Buku-buku dengan kombinasi genre serupa yang mungkin kamu nikmati."
+					title="Similar Books"
+					description="Books with similar genre combinations that you might enjoy."
 					books={recommendations.genre_recommendations}
 				/>
 			)}
 
 			{recommendations?.author_recommendations && (
 				<BookCarouselSection
-					title="Karya Lain Penulis"
-					description={`Koleksi buku berharga lainnya yang ditulis oleh ${bookData.authors?.[0]?.author_name || "penulis yang sama"}.`}
+					title="More by the Author"
+					description={`Explore other remarkable works written by ${bookData.authors?.[0]?.author_name || "the same author"}.`}
 					books={recommendations.author_recommendations}
 				/>
 			)}
 
 			{/* SEKAT LINE PEMBATAS SEBELUM TAB POSTS */}
-			<div className="border-t border-white/[0.04] pt-2" />
+			<div className="border-t border-white/[0.08]" />
 
 			{/* RENDER DUA TAB POSTINGAN REVIEW & ANALYSIS */}
 			<BookProfilePostsSection

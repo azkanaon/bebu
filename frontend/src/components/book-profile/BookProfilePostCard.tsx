@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ThumbsUp, MessageCircle, Share2, Bookmark } from "lucide-react";
+import { ThumbsUp, MessageCircle, Share2, Bookmark, Star } from "lucide-react";
 import { BookReviewPostType, BookAnalysisPostType } from "@/types/book";
 import { usePostStore } from "@/stores/usePostStore";
 import { toggleLikeAPI, toggleSaveAPI } from "@/lib/api";
@@ -99,12 +99,57 @@ export default function BookProfilePostCard({
 						alt={post.user.displayName}
 					/>
 					<div>
-						<div className="font-semibold text-sm text-white leading-tight">
-							{post.user.displayName}
-						</div>
-						<div className="text-[11px] text-gray-500 mt-0.5">
-							{timeAgo(post.createdAt)}
-						</div>
+						{!isAnalysis ? (
+							<>
+								{/* REVIEW HEADER */}
+								<div className="flex items-center gap-1.5 text-[12px]">
+									<span className="font-medium text-slate-200">
+										{post.user.displayName}
+									</span>
+
+									<span className="text-slate-600">•</span>
+
+									<span className="text-slate-500">
+										{timeAgo(post.createdAt)}
+									</span>
+								</div>
+
+								{/* REVIEW RATING */}
+								{"rating" in post && (
+									<div className="mt-1 flex items-center gap-1.5">
+										<div className="flex items-center gap-0.5">
+											{[1, 2, 3, 4, 5].map((star) => (
+												<Star
+													key={star}
+													size={11}
+													className={
+														star <=
+														Math.round(post.rating)
+															? "fill-amber-400 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.35)]"
+															: "text-slate-700"
+													}
+												/>
+											))}
+										</div>
+
+										<span className="text-[11px] font-medium text-amber-300/90">
+											{post.rating.toFixed(1)}
+										</span>
+									</div>
+								)}
+							</>
+						) : (
+							<>
+								{/* ANALYSIS HEADER */}
+								<div className="font-semibold text-sm text-white leading-tight">
+									{post.user.displayName}
+								</div>
+
+								<div className="mt-0.5 text-[11px] text-gray-500">
+									{timeAgo(post.createdAt)}
+								</div>
+							</>
+						)}
 					</div>
 				</div>
 

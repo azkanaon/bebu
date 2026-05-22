@@ -141,6 +141,7 @@ type BookPostReviewResponse struct {
 	Content      string    `json:"content"`
 	IsLiked      bool      `json:"is_liked"`
 	IsSaved      bool      `json:"is_saved"`
+	Rating       int       `json:"rating"`
 	Likes        int       `json:"likes"`
 	Comments     int       `json:"comments"`
 	Shares       int       `json:"shares"`
