@@ -1,6 +1,6 @@
 import React from "react";
 import { BookStatDTO } from "@/types/book";
-import { Star } from "lucide-react"; // Pastikan sudah install lucide-react atau gunakan SVG biasa
+import { Star } from "lucide-react";
 
 interface BookRatingStatsProps {
 	stats: BookStatDTO;
@@ -25,80 +25,128 @@ export const BookRatingStats: React.FC<BookRatingStatsProps> = ({ stats }) => {
 		{ star: 1, count: rating_1_count },
 	];
 
-	// Mencari jumlah bintang dengan count terbesar sebagai acuan lebar bar (100%)
 	const maxCount = Math.max(...ratings.map((r) => r.count), 1);
 
 	return (
-		<section className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center py-6 border-y border-slate-800/50">
-			{/* BAGIAN 2: Overall Rating (Sisi Kiri) */}
-			<div className="md:col-span-4 flex flex-col items-center justify-center text-center space-y-2 border-r-0 md:border-r border-slate-800/60">
-				<h3 className="text-sm font-semibold text-slate-500 uppercase tracking-widest">
-					Rating Keseluruhan
-				</h3>
-				<div className="flex items-baseline gap-1">
-					<span className="text-6xl font-bold text-white">
-						{overall_rating.toFixed(1)}
-					</span>
-					<span className="text-slate-500 text-xl">/ 5</span>
+		<section className="mt-4 border-y border-white/[0.08] py-4">
+			<div className="grid grid-cols-1 gap-8 md:grid-cols-[200px_minmax(0,1fr)]">
+				{/* LEFT */}
+				<div
+					className="
+						flex
+						flex-col
+						items-center
+						justify-center
+						text-center
+						md:border-r
+						md:border-white/[0.08]
+						md:pr-8
+					"
+				>
+					<p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+						Overall Rating
+					</p>
+
+					<div className="mt-2 flex items-end gap-1">
+						<span className="text-5xl font-bold tracking-[-0.04em] text-white/95">
+							{overall_rating.toFixed(1)}
+						</span>
+
+						<span className="mb-1 text-base text-slate-500">
+							/5
+						</span>
+					</div>
+
+					<div className="mt-2 flex items-center gap-1">
+						{[...Array(5)].map((_, i) => (
+							<Star
+								key={i}
+								size={15}
+								className={
+									i < Math.round(overall_rating)
+										? "fill-yellow-400 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.50)]"
+										: "text-slate-700"
+								}
+							/>
+						))}
+					</div>
+
+					<p className="mt-2 text-[13px] text-slate-400">
+						<span className="font-medium text-slate-300">
+							{total_reviews.toLocaleString()}
+						</span>{" "}
+						reviews
+					</p>
 				</div>
 
-				{/* Visual Bintang (Disederhanakan) */}
-				<div className="flex gap-1">
-					{[...Array(5)].map((_, i) => (
-						<Star
-							key={i}
-							size={18}
-							className={
-								i < Math.round(overall_rating)
-									? "fill-yellow-500 text-yellow-500"
-									: "text-slate-700"
-							}
-						/>
-					))}
-				</div>
+				{/* RIGHT */}
+				<div className="space-y-3">
+					{ratings.map((item) => {
+						const barWidth = (item.count / maxCount) * 100;
 
-				<p className="text-xs text-slate-400">
-					Dihitung dari {total_reviews.toLocaleString()} ulasan
-				</p>
-			</div>
+						return (
+							<div
+								key={item.star}
+								className="group flex items-center gap-3"
+							>
+								{/* STAR LABEL */}
+								<div className="flex w-10 shrink-0 items-center gap-1">
+									<span className="text-[13px] font-semibold text-slate-300">
+										{item.star}
+									</span>
 
-			{/* BAGIAN 3: Rating Breakdown (Sisi Kanan) */}
-			<div className="md:col-span-8 space-y-3 px-0 md:px-6">
-				{ratings.map((item) => {
-					// Menghitung persentase relatif terhadap maxCount
-					const barWidth = (item.count / maxCount) * 100;
+									<Star
+										size={11}
+										className="fill-amber-400/70 text-amber-400/70"
+									/>
+								</div>
 
-					return (
-						<div
-							key={item.star}
-							className="flex items-center gap-4 group"
-						>
-							{/* Label Bintang */}
-							<div className="flex items-center gap-1 w-10 shrink-0">
-								<span className="text-xs font-bold text-slate-300">
-									{item.star}
-								</span>
-								<Star
-									size={12}
-									className="fill-slate-500 text-slate-500"
-								/>
-							</div>
-
-							{/* Progress Bar Container */}
-							<div className="flex-1 h-2 bg-slate-800/50 rounded-full overflow-hidden">
+								{/* BAR */}
 								<div
-									className="h-full bg-indigo-500 rounded-full transition-all duration-1000 ease-out"
-									style={{ width: `${barWidth}%` }}
-								/>
-							</div>
+									className="
+										h-2
+										flex-1
+										overflow-hidden
+										rounded-full
+										bg-white/[0.04]
+									"
+								>
+									<div
+										className="
+											h-full
+											rounded-full
+											bg-gradient-to-r
+											from-indigo-500/90
+											to-blue-400/90
+											shadow-[0_0_10px_rgba(99,102,241,0.25)]
+											transition-all
+											duration-700
+											group-hover:brightness-110
+										"
+										style={{
+											width: `${barWidth}%`,
+										}}
+									/>
+								</div>
 
-							{/* Angka Jumlah Bintang */}
-							<span className="text-xs font-medium text-slate-500 w-12 text-right group-hover:text-slate-300 transition-colors">
-								{item.count.toLocaleString()}
-							</span>
-						</div>
-					);
-				})}
+								{/* COUNT */}
+								<span
+									className="
+										w-14
+										text-right
+										text-[12px]
+										font-medium
+										text-slate-500
+										transition-colors
+										group-hover:text-slate-300
+									"
+								>
+									{item.count.toLocaleString()}
+								</span>
+							</div>
+						);
+					})}
+				</div>
 			</div>
 		</section>
 	);
