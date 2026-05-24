@@ -32,16 +32,18 @@ type postService struct {
 	userRepo repositories.UserRepository
 	bookshelfRepo repositories.BookshelfRepository
 	categoryRepo repositories.CategoryRepository
+	notifService  NotificationService // <-- TAMBAHKAN INI
 	db       *gorm.DB
 }
 
 
-func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, categoryRepo repositories.CategoryRepository,bookshelfRepo repositories.BookshelfRepository, db *gorm.DB) PostService {
+func NewPostService(postRepo repositories.PostRepository, userRepo repositories.UserRepository, categoryRepo repositories.CategoryRepository,bookshelfRepo repositories.BookshelfRepository,notifService NotificationService, db *gorm.DB) PostService {
 	return &postService{
 		postRepo: postRepo,
 		userRepo: userRepo,
 		categoryRepo: categoryRepo,
 		bookshelfRepo: bookshelfRepo, 
+		notifService:  notifService,
 		db:       db,
 	}
 }
@@ -394,6 +396,22 @@ func (s *postService) ToggleLike(postID uint, userID uint) (bool, error) {
 		}
 	})
 
+	if err == nil {
+		go func() {
+			post, errFind := s.postRepo.FindPostByID(postID)
+			if errFind != nil || post == nil { return }
+
+			if isLiked {
+				// Jika LIKE: Panggil Send
+				s.notifService.Send(post.UserID, userID, "POST_LIKE", "posts", postID)
+			} else {
+				// Jika UNLIKE: Panggil Remove
+				s.notifService.Remove(post.UserID, userID, "POST_LIKE", "posts", postID, 1)
+			}
+		}()
+	}
+
+
 	return isLiked, err
 }
 
@@ -426,6 +444,18 @@ func (s *postService) ToggleSave(userID uint, postID uint) (bool, error) {
 		}
 	})
 
+	if err == nil {
+		go func() {
+			post, errFind := s.postRepo.FindPostByID(postID)
+			if errFind != nil || post == nil { return }
+
+			if isSaved {
+				s.notifService.Send(post.UserID, userID, "POST_SAVE", "posts", postID)
+			} else {
+				s.notifService.Remove(post.UserID, userID, "POST_SAVE", "posts", postID, 1)
+			}
+		}()
+	}
 	return isSaved, err
 }
 

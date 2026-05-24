@@ -14,6 +14,7 @@ type PostRepository interface {
 	WithTx(tx *gorm.DB) PostRepository
 	GetPosts(userID uint, tab string, cursor uint, limit int, categoryID uint) ([]models.Post, error)
 	CreatePost(post *models.Post) (*models.Post, error)
+	FindPostByID(id uint) (*models.Post, error)
 	GetPostCategories(postID uint) ([]uint, error)
 	DeletePostWithTx(tx *gorm.DB, postID uint, userID uint) error
 	ClearPostCategories(tx *gorm.DB, postID uint) error
@@ -140,6 +141,13 @@ func (r *postRepository) CreatePost(post *models.Post) (*models.Post, error) {
 	}
 	
 	return post, nil
+}
+
+func (r *postRepository) FindPostByID(id uint) (*models.Post, error) {
+	var post models.Post
+	// Cukup cari berdasarkan Primary Key (post_id)
+	err := r.db.First(&post, id).Error
+	return &post, err
 }
 
 func (r *postRepository) GetPostCategories(postID uint) ([]uint, error) {

@@ -17,6 +17,7 @@ import Image from 'next/image'
 import { User as TypeUser } from '@/types/auth'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import { useUnreadNotificationCount } from '@/api/notifications/useNotifications'
 
 interface SidebarProps {
   user: TypeUser | null
@@ -25,6 +26,8 @@ interface SidebarProps {
 export default function Sidebar({ user }: SidebarProps) {
   const profileHref = user ? `/${user.username}` : '/login'
   const router = useRouter()
+  const { data: unreadCount } = useUnreadNotificationCount()
+
   return (
     <div className="h-screen w-68 bg-right-bar text-white flex flex-col justify-between py-5 ml-16">
       {/* TOP SECTION */}
@@ -84,7 +87,16 @@ export default function Sidebar({ user }: SidebarProps) {
             href="/chat"
           />
           <SidebarItem
-            icon={<Bell size={20} />}
+            icon={
+              <div className="relative">
+                <Bell size={20} />
+                {unreadCount && unreadCount > 0 ? (
+                  <span className="absolute -top-1 -right-2 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-[#0B1220]">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                ) : null}
+              </div>
+            }
             label="Notification"
             href="/notifications"
           />
@@ -115,14 +127,14 @@ export default function Sidebar({ user }: SidebarProps) {
         {/* ✨ Premium Divider */}
         <div className="relative">
           {/* main gradient line */}
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          <div className="h-px w-full bg-linear-to-r from-transparent via-white/10 to-transparent" />
 
           {/* subtle glow */}
           <div className="absolute inset-0 h-px w-full blur-sm bg-white/20 opacity-60" />
         </div>
 
         {/* 🔥 Depth shadow (lebih rapat & halus) */}
-        <div className="absolute left-0 right-0 h-4 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
+        <div className="absolute left-0 right-0 h-4 bg-linear-to-b from-black/30 to-transparent pointer-events-none" />
 
         {/* User Profile */}
         <div className="px-4">

@@ -114,18 +114,44 @@ func (r *searchRepository) SearchPosts(query string, page, limit int) ([]models.
 }
 
 func (r *searchRepository) SaveSearchHistory(userID uint, query string) error {
-	normalized := strings.ToLower(strings.TrimSpace(query))
+	trimmed := strings.TrimSpace(query)
 	
-	// Gunakan Clause OnConflict: Jika (user_id & query_text) sudah ada, 
-    // maka update kolom updated_at saja.
-	return r.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "user_id"}, {Name: "query_text"}},
-		DoUpdates: clause.Assignments(map[string]interface{}{"updated_at": time.Now()}),
-	}).Create(&models.SearchLog{
-		UserID:          userID,
-		QueryText:       query,
-		QueryNormalized: normalized,
-	}).Error
+	// PENGAMAN: Jika entah bagaimana masuk teks < 2 huruf, batalkan proses
+	if len(trimmed) < 2 {
+		return nil // Return nil karena ini bukan error sistem, hanya data yang tidak layak simpan
+	}
+
+	normalized := strings.ToLower(trimmed)
+	limit := 10
+
+	// 1. Jalankan Transaksi agar proses simpan dan hapus sinkron
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		
+		// 2. UPSERT: Simpan atau Update waktu (Deduplikasi)
+		err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}, {Name: "query_text"}},
+			DoUpdates: clause.Assignments(map[string]interface{}{"updated_at": time.Now()}),
+		}).Create(&models.SearchLog{
+			UserID:          userID,
+			QueryText:       query,
+			QueryNormalized: normalized,
+		}).Error
+
+		if err != nil {
+			return err
+		}
+
+		// 3. CLEANUP: Hapus item ke-11 dan seterusnya
+		// Query: Hapus dari search_logs di mana ID-nya tidak masuk dalam 10 besar terbaru
+		subQuery := tx.Model(&models.SearchLog{}).
+			Select("search_log_id").
+			Where("user_id = ?", userID).
+			Order("updated_at DESC").
+			Limit(limit)
+
+		return tx.Where("user_id = ? AND search_log_id NOT IN (?)", userID, subQuery).
+			Delete(&models.SearchLog{}).Error
+	})
 }
 
 func (r *searchRepository) GetRecentSearches(userID uint, limit int) ([]models.SearchLog, error) {

@@ -9,6 +9,7 @@ import (
 	"backend-bebu/internal/repositories"
 	"backend-bebu/internal/services"
 	"backend-bebu/internal/worker"
+	"backend-bebu/internal/ws"
 	"backend-bebu/pkg/utils"
 
 	"github.com/gin-contrib/cors"
@@ -34,19 +35,25 @@ func main() {
 	bookshelfService := services.NewBookshelfService(db, bookshelfRepo, userRepo)
 	bookshelfHandler := handlers.NewBookshelfHandler(bookshelfService)
 
+	hub := ws.NewHub()
+	notifRepo := repositories.NewNotificationRepository(db)
+	notifService := services.NewNotificationService(notifRepo, hub)
+	notifHandler := handlers.NewNotificationHandler(notifService)
+	wsHandler := handlers.NewWSHandler(hub)
+
 	postRepo := repositories.NewPostRepository(db)
-	postService := services.NewPostService(postRepo, userRepo, categoryRepo, bookshelfRepo, db) 
+	postService := services.NewPostService(postRepo, userRepo, categoryRepo, bookshelfRepo,notifService, db) 
 	postHandler := handlers.NewPostHandler(postService) 
 
 	bookRepo := repositories.NewBookRepository(db)
 	bookService := services.NewBookService(bookRepo)
 	bookHandler := handlers.NewBookHandler(bookService)
 
-	userService := services.NewUserService(db, userRepo)
+	userService := services.NewUserService(db, userRepo, notifService)
     userHandler := handlers.NewUserHandler(userService)
 	
 	commentRepo := repositories.NewCommentRepository(db)
-	commentService := services.NewCommentService(commentRepo, postRepo, db)
+	commentService := services.NewCommentService(commentRepo, postRepo, notifService, db)
 	commentHandler := handlers.NewCommentHandler(commentService)
 
 	reportRepo := repositories.NewReportRepository(db)
@@ -69,6 +76,8 @@ func main() {
 	searchService := services.NewSearchService(searchRepo, userRepo)
 	searchHandler := handlers.NewSearchHandler(searchService)
 
+	
+
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
 
 	worker.InitStreakWorker(bookshelfRepo)
@@ -82,13 +91,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -223,9 +232,17 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			
 			search.DELETE("/history/all",authMiddleware.RequiredAuth(), searchHandler.ClearAllHistory)
 			search.DELETE("/history/:id",authMiddleware.RequiredAuth(), searchHandler.DeleteHistory)
-			
-			
 		}
+
+		notifRoutes := v1.Group("/notifications").Use(authMiddleware.RequiredAuth())
+		{
+			notifRoutes.GET("", notifHandler.GetMyNotifications)
+			notifRoutes.PUT("/:id/read", notifHandler.MarkAsRead)
+    		notifRoutes.PUT("/read-all", notifHandler.MarkAllAsRead) 
+			notifRoutes.GET("/unread-count", notifHandler.GetUnreadCount)
+		}
+
+		v1.GET("/ws", authMiddleware.RequiredAuth(), wsHandler.HandleWS)
 
 		v1.GET("/leaderboard", handlers.GetLeaderboard)
 		v1.GET("/platforms", platformHandler.GetAllPlatforms)
