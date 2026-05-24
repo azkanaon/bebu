@@ -6,6 +6,7 @@ import (
 	"backend-bebu/internal/repositories"
 	"context"
 	"fmt"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -80,12 +81,13 @@ func (s *searchService) SearchTop(viewerID *uint, query string) (*dto.SearchTopR
 		return nil, fmt.Errorf("search top failed: %w", err)
 	}
 
-	if viewerID != nil && query != "" {
-		// Kita jalankan secara Async (Goroutine) agar tidak memperlambat hasil pencarian
+	trimmedQuery := strings.TrimSpace(query)
+
+	// 2. Hanya simpan jika user login DAN panjang karakter minimal 2
+	if viewerID != nil && len(trimmedQuery) >= 2 {
 		go func(uid uint, q string) {
 			s.searchRepo.SaveSearchHistory(uid, q)
-            // (Opsional) Tambahkan logika di repo untuk menghapus data ke-11 jika ingin membatasi cuma 10 riwayat
-		}(*viewerID, query)
+		}(*viewerID, trimmedQuery)
 	}
 
 	return &dto.SearchTopResponseDTO{

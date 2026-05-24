@@ -36,13 +36,14 @@ type UserService interface {
 type userService struct {
 	db       *gorm.DB
 	userRepo repositories.UserRepository
-	// postRepo repositories.PostRepository // Kita akan butuh ini untuk postCount
+	notifService NotificationService
 }
 
-func NewUserService(db *gorm.DB, userRepo repositories.UserRepository) UserService { // <-- TERIMA DB
+func NewUserService(db *gorm.DB, userRepo repositories.UserRepository, nService NotificationService) UserService { // <-- TERIMA DB
 	return &userService{
 		db:       db, // <-- SIMPAN DB
 		userRepo: userRepo,
+		notifService: nService,
 	}
 }
 
@@ -323,6 +324,14 @@ func (s *userService) FollowUser(sourceUserID uint, targetUsername string) (stri
 	if err := tx.Commit().Error; err != nil {
 		return "", err
 	}
+	go func() {
+		switch finalStatus {
+		case "pending":
+			s.notifService.Send(targetUser.UserID, sourceUserID, "FOLLOW_REQUEST", "users", sourceUserID)
+		case "accepted":
+			s.notifService.Send(targetUser.UserID, sourceUserID, "NEW_FOLLOWER", "users", sourceUserID)
+		}
+	}()
 
 	return finalStatus, nil
 }
@@ -344,6 +353,8 @@ func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) err
 		}
 		return err
 	}
+
+	go s.notifService.Remove(targetUser.UserID, sourceUserID, "NEW_FOLLOWER", "users", sourceUserID, 1)
 
 	// 2. Mulai Transaksi
 	return s.db.Transaction(func(tx *gorm.DB) error {
@@ -368,6 +379,7 @@ func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) err
 
 		return nil
 	})
+	
 }
 
 func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*dto.ProfileInfoDTO, error) {
@@ -557,6 +569,18 @@ func (s *userService) AcceptFollowRequest(currentUserID uint, requesterUsername 
 			return err
 		}
 
+		if err == nil {
+		go func() {
+			// A. Hapus notifikasi "FOLLOW_REQUEST" yang lama di HP si pemilik akun (currentUserID)
+			// Agar notifikasi "Nando ingin mem-follow Anda" hilang karena sudah di-acc.
+			s.notifService.Remove(currentUserID, requester.UserID, "FOLLOW_REQUEST", "users", requester.UserID, 1)
+
+			// B. Kirim notifikasi ke si pengikut (requester) bahwa permintaannya diterima
+			s.notifService.Send(requester.UserID, currentUserID, "FOLLOW_ACCEPT", "users", currentUserID)
+		}()
+	}
+
+
 		return nil // Commit otomatis
 	})
 }
@@ -568,6 +592,9 @@ func (s *userService) DeclineFollowRequest(currentUserID uint, requesterUsername
 		return errors.New("requester not found")
 	}
 
+	
+	go s.notifService.Remove(currentUserID, requester.UserID, "FOLLOW_REQUEST", "users", requester.UserID, 1)
+	
 	// 2. Panggil repo untuk menghapus baris permintaan
 	// source = requester, target = currentUser
 	return s.userRepo.DeleteFollowRequest(requester.UserID, currentUserID)

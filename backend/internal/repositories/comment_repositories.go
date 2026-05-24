@@ -11,7 +11,9 @@ type CommentRepository interface {
 	CreateComment(comment *models.PostComment) error
 	GetCommentByID(id uint) (*models.PostComment, error)
 	UpdateCommentCount(postID uint, increment int) error
-	ToggleLikeComment(userID, commentID uint) (bool, error)
+	IsLiked(userID, commentID uint) (bool, error)
+    AddLike(db *gorm.DB, userID, commentID uint) error
+    DeleteLike(db *gorm.DB, userID, commentID uint) error
 	DeleteCommentRecursive(commentID uint, userID uint) error
 	CountReplies(commentID uint) (int64, error)
 	CountAllRepliesRecursive(commentID uint) (int64, error)
@@ -48,34 +50,21 @@ func (r *commentRepository) UpdateCommentCount(postID uint, increment int) error
         Error
 }
 
-func (r *commentRepository) ToggleLikeComment(userID, commentID uint) (bool, error) {
-	var like models.PostCommentLike
-	// Cek apakah sudah ada like
-	result := r.db.Where("user_id = ? AND post_comment_id = ?", userID, commentID).First(&like)
+func (r *commentRepository) IsLiked(userID, commentID uint) (bool, error) {
+    var count int64
+    err := r.db.Model(&models.PostCommentLike{}).
+        Where("user_id = ? AND post_comment_id = ?", userID, commentID).
+        Count(&count).Error
+    return count > 0, err
+}
 
-	if result.Error == nil {
-		// Jika ada, hapus (Unlike)
-		if err := r.db.Delete(&like).Error; err != nil {
-			return false, err
-		}
-		// Kurangi counter di tabel comments
-		r.db.Model(&models.PostComment{}).Where("post_comment_id = ?", commentID).
-			Update("like_count", gorm.Expr("like_count - ?", 1))
-		return false, nil
-	} else {
-		// Jika tidak ada, buat baru (Like)
-		newLike := models.PostCommentLike{
-			UserID:        userID,
-			PostCommentID: commentID,
-		}
-		if err := r.db.Create(&newLike).Error; err != nil {
-			return false, err
-		}
-		// Tambah counter di tabel comments
-		r.db.Model(&models.PostComment{}).Where("post_comment_id = ?", commentID).
-			Update("like_count", gorm.Expr("like_count + ?", 1))
-		return true, nil
-	}
+func (r *commentRepository) AddLike(db *gorm.DB, userID, commentID uint) error {
+    return db.Create(&models.PostCommentLike{UserID: userID, PostCommentID: commentID}).Error
+}
+
+func (r *commentRepository) DeleteLike(db *gorm.DB, userID, commentID uint) error {
+    return db.Where("user_id = ? AND post_comment_id = ?", userID, commentID).
+        Delete(&models.PostCommentLike{}).Error
 }
 
 func (r *commentRepository) CountReplies(commentID uint) (int64, error) {
