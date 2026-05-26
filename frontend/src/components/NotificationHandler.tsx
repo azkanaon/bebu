@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQueryClient, InfiniteData } from '@tanstack/react-query'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { toast } from 'sonner'
@@ -11,23 +11,37 @@ import { getNotificationMessage } from '@/lib/getNotifMessage'
 export default function NotificationHandler() {
   const { isAuthenticated, user } = useAuthStore()
   const queryClient = useQueryClient()
+  const socketRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
+    // Hanya konek jika user sudah login
     if (!isAuthenticated || !user) return
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws'
+    // GUNAKAN ALAMAT YANG BENAR
+    const wsUrl = 'ws://localhost:8080/api/v1/ws'
     const socket = new WebSocket(wsUrl)
+    socketRef.current = socket
+
+    let isCleaningUp = false
+
+    socket.onopen = () => {
+      if (isCleaningUp) return
+      console.log('✅ BeBu WebSocket: Connected')
+    }
 
     socket.onmessage = (event) => {
-      try {
-        // Beritahu TS bahwa ini adalah AppNotification
-        const newNotif = JSON.parse(event.data) as AppNotification
+      if (isCleaningUp) return
 
-        // 1. UPDATE CACHE
+      try {
+        const newNotif = JSON.parse(event.data) as AppNotification
+        console.log('📩 New Notif Received:', newNotif)
+
+        // 1. UPDATE CACHE LIST NOTIFIKASI SECARA INSTAN
         queryClient.setQueryData<InfiniteData<NotificationResponse>>(
           ['notifications'],
           (oldData) => {
             if (!oldData) return oldData
+
             const newPages = [...oldData.pages]
             newPages[0] = {
               ...newPages[0],
@@ -41,28 +55,34 @@ export default function NotificationHandler() {
           },
         )
 
+        // 2. INVALIDATE ANGKA UNREAD DI SIDEBAR
         queryClient.invalidateQueries({
           queryKey: ['unread-notification-count'],
         })
 
-        // 2. TOAST (Gunakan 'action' untuk klik, atau biarkan standar)
-        toast.success(`New ${newNotif.type.replace('_', ' ')}`, {
+        // 3. TAMPILKAN TOAST
+        toast.success(newNotif.actorDisplayName, {
           description: getNotificationMessage(newNotif),
-          icon: <Bell size={16} />,
-          // Sonner menggunakan action untuk tombol interaktif
-          action: {
-            label: 'View',
-            onClick: () => {
-              window.location.href = `/${newNotif.entityType}/${newNotif.entityId}`
-            },
-          },
+          icon: <Bell size={16} className="text-blue-500" />,
         })
       } catch (error) {
-        console.error('WS Error:', error)
+        console.error('❌ WS Data Error:', error)
       }
     }
 
-    return () => socket.close()
+    socket.onclose = (e) => {
+      if (isCleaningUp) return
+      console.warn('⚠️ WS Disconnected:', e.code)
+    }
+
+    socket.onerror = (err) => {
+      console.error('❌ WS Socket Error:', err)
+    }
+
+    return () => {
+      isCleaningUp = true
+      socket.close()
+    }
   }, [isAuthenticated, user, queryClient])
 
   return null
