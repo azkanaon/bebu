@@ -16,17 +16,27 @@ import { UserProfile } from './UserProfile'
 import Image from 'next/image'
 import { User as TypeUser } from '@/types/auth'
 import { motion } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useUnreadNotificationCount } from '@/api/notifications/useNotifications'
+import { useState } from 'react'
 
 interface SidebarProps {
   user: TypeUser | null
 }
 
 export default function Sidebar({ user }: SidebarProps) {
-  const profileHref = user ? `/${user.username}` : '/login'
+  const pathname = usePathname()
   const router = useRouter()
+  const profileHref = user ? `/${user.username}` : '/login'
   const { data: unreadCount } = useUnreadNotificationCount()
+
+  // 1. Tambahkan state untuk mendeteksi apakah kita benar-benar ingin ke search
+  const [isNavigatingToSearch, setIsNavigatingToSearch] = useState(false)
+
+  const handleSearchClick = () => {
+    setIsNavigatingToSearch(true)
+    router.push('/search')
+  }
 
   return (
     <div className="h-screen w-68 bg-right-bar text-white flex flex-col justify-between py-5 ml-16">
@@ -49,19 +59,34 @@ export default function Sidebar({ user }: SidebarProps) {
         </div>
 
         {/* SEARCH */}
-        <motion.div
-          layoutId="search-bar-container"
-          onClick={() => router.push('/search')}
-          className="relative group cursor-pointer my-2"
-        >
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-blue-400 transition-colors"
-            size={18}
-          />
-          <div className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-500">
-            Search...
-          </div>
-        </motion.div>
+        <div className="my-2">
+          <motion.div
+            // 2. KUNCINYA: layoutId hanya aktif jika kita benar-benar mau ke search
+            // atau jika kita sedang berada di halaman search.
+            // Ini mencegah "animasi terbang" saat pindah antar halaman biasa.
+            layoutId={
+              isNavigatingToSearch || pathname === '/search'
+                ? 'search-bar-container'
+                : undefined
+            }
+            // 3. Tambahkan transition manual agar tidak menggunakan spring default yang agresif
+            transition={{
+              type: 'spring',
+              stiffness: 400,
+              damping: 30,
+            }}
+            onClick={handleSearchClick}
+            className="relative group cursor-pointer"
+          >
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-blue-400 transition-colors"
+              size={18}
+            />
+            <div className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-500 transition-all">
+              Search...
+            </div>
+          </motion.div>
+        </div>
 
         {/* NAVIGATION */}
         <div className="flex flex-col gap-2">

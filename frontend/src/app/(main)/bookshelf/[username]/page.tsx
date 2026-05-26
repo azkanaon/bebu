@@ -38,7 +38,6 @@ export default function BookshelfPage({ params }: Props) {
   const [activeStatus, setActiveStatus] = useState<ShelfStatus>('reading')
   const [searchTerm, setSearchTerm] = useState('') // Nilai yang diketik di input
   const [debouncedSearch, setDebouncedSearch] = useState('') // Nilai yang dikirim ke API
-  const [searchQuery, setSearchQuery] = useState('')
   const { ref, inView } = useInView()
   const [isAddBookOpen, setIsAddBookOpen] = useState(false)
 
