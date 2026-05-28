@@ -1,4 +1,3 @@
-// repositories/post_share_repository.go
 package repositories
 
 import (

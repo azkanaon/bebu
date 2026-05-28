@@ -6,8 +6,28 @@ import {
 	UserSearchResponse,
 	GenericResponse,
 } from "@/types/post";
-import { BookFiltersResponse, BookProfileResponse, BookRecommendationsResponse } from "@/types/book";
-import { ReportRequest, ReportResponse } from "@/types/report";
+import {
+	BookFiltersResponse,
+	BookProfileResponse,
+	BookRecommendationsResponse,
+} from "@/types/book";
+import {
+	ReportRequest,
+	ReportResponse,
+	PaginatedReportAPIResponse,
+	ReportQueryParams,
+	GetReportDetailAPIResponse,
+	AdminActionRequest,
+	AdminActionResponse,
+} from "@/types/report";
+import {
+	UserQueryParams,
+	PaginatedUserAPIResponse,
+} from "@/types/user-management";
+import {
+	PostQueryParams,
+	PaginatedPostAPIResponse,
+} from "@/types/post-management";
 import api from "@/lib/axios";
 
 export async function getPostsAPI(
@@ -27,7 +47,7 @@ export async function getPostsAPI(
 	return res.data;
 }
 
-/* CATEGORIES */
+/* --- CATEGORIES --- */
 
 export async function getAllCategoriesAPI() {
 	const res = await api.get("/v1/categories");
@@ -58,9 +78,7 @@ export async function searchCategoriesAPI(query: string) {
 	return res.data;
 }
 
-/* ---------- */
-
-/* LIST BOOKS */
+/* --- LIST BOOKS --- */
 
 export async function getBooks() {
 	const res = await fetch("http://localhost:8080/api/v1/books", {
@@ -140,9 +158,7 @@ export async function getAllBooksAPI(params: {
 	return res.data;
 }
 
-/* ----- */
-
-/* BOOK PROFILE */
+/* --- BOOK PROFILE --- */
 
 export async function getBookProfileAPI(
 	slug: string,
@@ -159,14 +175,19 @@ export async function getBookRecommendationsAPI(
 	return res.data;
 }
 
-export async function getBookPostsAPI(slug: string, tab: "review" | "analysis", cursor = 0, limit = 10) {
-    const res = await api.get(`/v1/books/${slug}/posts`, {
-        params: { tab, cursor, limit }
-    });
-    return res.data;
+export async function getBookPostsAPI(
+	slug: string,
+	tab: "review" | "analysis",
+	cursor = 0,
+	limit = 10,
+) {
+	const res = await api.get(`/v1/books/${slug}/posts`, {
+		params: { tab, cursor, limit },
+	});
+	return res.data;
 }
 
-/* ------------ */
+/* --- POST --- */
 
 export async function createPost(payload: CreatePostPayload) {
 	const formData = new FormData();
@@ -233,13 +254,6 @@ export async function deleteCommentAPI(commentId: number, postId: number) {
 	return res.data;
 }
 
-export async function createReportAPI(
-	data: ReportRequest,
-): Promise<ReportResponse> {
-	const res = await api.post("/v1/report", data);
-	return res.data;
-}
-
 export async function sharePostAPI(data: ShareRequest): Promise<ShareResponse> {
 	const res = await api.post("/v1/posts/shares", data);
 	return res.data;
@@ -252,10 +266,77 @@ export async function getRecentRecipientsAPI(): Promise<
 	return res.data;
 }
 
+export async function createReportAPI(
+	data: ReportRequest,
+): Promise<ReportResponse> {
+	const res = await api.post("/v1/report", data);
+	return res.data;
+}
+
 // Pencarian user umum
 export async function searchUsersAPI(
 	query: string,
 ): Promise<GenericResponse<UserSearchResponse[]>> {
 	const res = await api.get(`/v1/users/search?q=${query}`);
+	return res.data;
+}
+
+/* --- REPORT MANAGEMENT --- */
+
+export async function getReportSummariesAPIs(
+	params: ReportQueryParams,
+): Promise<PaginatedReportAPIResponse> {
+	const res = await api.get("/v1/admin/reports", { params });
+	return res.data; // Mengembalikan object { data, total_count, current_page, total_pages }
+}
+
+export async function getReportDetailAPI(
+	summaryID: number,
+): Promise<GetReportDetailAPIResponse> {
+	const res = await api.get(`/v1/admin/reports/${summaryID}/detail`);
+	return res.data;
+}
+
+// Admin Action
+export async function executeAdminActionAPI(
+	payload: AdminActionRequest,
+): Promise<AdminActionResponse> {
+	const res = await api.post("/v1/admin/reports/action", payload);
+	return res.data;
+}
+
+/* --- USER MANAGEMENT --- */
+// Ambil list data user dengan kriteria filter server-side
+export async function getUserManagementAPIs(
+	params: UserQueryParams,
+): Promise<PaginatedUserAPIResponse> {
+	const res = await api.get("/v1/admin/users", { params });
+	return res.data;
+}
+
+// Mutasi status user (active / suspended / banned)
+export async function updateUserStatusAPI(
+	userID: number,
+	status: "active" | "suspended" | "banned" | "shadowbanned",
+): Promise<{ message: string }> {
+	const res = await api.put(`/v1/admin/users/${userID}/status`, { status });
+	return res.data;
+}
+
+/* --- POST MANAGEMENT --- */
+// Ambil list data postingan dengan kriteria filter server-side
+export async function getPostManagementAPIs(
+	params: PostQueryParams,
+): Promise<PaginatedPostAPIResponse> {
+	const res = await api.get("/v1/admin/posts", { params });
+	return res.data;
+}
+
+// Mutasi status publikasi post (published / soft_delete / hard_delete)
+export async function updatePostStatusAPI(
+	postID: number,
+	status: "published" | "soft_delete" | "hard_delete" | "shadowbanned",
+): Promise<{ message: string }> {
+	const res = await api.put(`/v1/admin/posts/${postID}/status`, { status });
 	return res.data;
 }

@@ -59,6 +59,14 @@ func main() {
 	reportRepo := repositories.NewReportRepository(db)
     reportService := services.NewReportService(reportRepo)
     reportHandler := handlers.NewReportHandler(reportService)
+	
+	userManagementRepo := repositories.NewUserManagementRepository(db)
+    userManagementService := services.NewUserManagementService(userManagementRepo)
+    userManagementHandler := handlers.NewUserManagementHandler(userManagementService)
+	
+	postManagementRepo := repositories.NewPostManagementRepository(db)
+    postManagementService := services.NewPostManagementService(postManagementRepo)
+    postManagementHandler := handlers.NewPostManagementHandler(postManagementService)
 
 	shareRepo := repositories.NewPostShareRepository(db)
 	shareService := services.NewPostShareService(shareRepo)
@@ -76,8 +84,6 @@ func main() {
 	searchService := services.NewSearchService(searchRepo, userRepo)
 	searchHandler := handlers.NewSearchHandler(searchService)
 
-	
-
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
 
 	worker.InitStreakWorker(bookshelfRepo)
@@ -91,13 +97,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -238,8 +244,19 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		{
 			notifRoutes.GET("", notifHandler.GetMyNotifications)
 			notifRoutes.PUT("/:id/read", notifHandler.MarkAsRead)
-    		notifRoutes.PUT("/read-all", notifHandler.MarkAllAsRead) 
+			notifRoutes.PUT("/read-all", notifHandler.MarkAllAsRead) 
 			notifRoutes.GET("/unread-count", notifHandler.GetUnreadCount)
+		}
+
+		admin := v1.Group("/admin")
+		{
+			admin.GET("/reports", reportHandler.GetReportDashboard)
+			admin.GET("/reports/:id/detail", reportHandler.GetPopUpDetail)
+			admin.POST("/reports/action", reportHandler.TakeAction)
+			admin.GET("/users", userManagementHandler.GetUsersDashboard)
+			admin.PUT("/users/:id/status", userManagementHandler.UpdateStatus)
+			admin.GET("/posts", postManagementHandler.GetPosts)
+    		admin.PUT("/posts/:id/status", postManagementHandler.UpdatePostStatus)
 		}
 
 		v1.GET("/ws", authMiddleware.RequiredAuth(), wsHandler.HandleWS)

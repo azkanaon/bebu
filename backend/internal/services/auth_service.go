@@ -1,5 +1,3 @@
-// auth_service.go
-
 package services
 
 import (
