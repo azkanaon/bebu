@@ -10,7 +10,7 @@ func ToBookReviewPostResponse(p models.Post, currentUserID uint) dto.BookPostRev
 	var res dto.BookPostReviewResponse
 
 	res.ID = p.PostID
-	res.PostPublicID = p.PublicID
+	res.PostPublicID = p.PublicID.String()
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
 	res.CreatedAt = p.CreatedAt
@@ -69,7 +69,7 @@ func ToBookAnalysisPostResponse(p models.Post, currentUserID uint) dto.BookPostA
 	var res dto.BookPostAnalysisResponse
 
 	res.ID = p.PostID
-	res.PostPublicID = p.PublicID
+	res.PostPublicID = p.PublicID.String()
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
 	res.Image = p.ImgURL

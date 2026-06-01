@@ -1,11 +1,14 @@
 // reading_models.go
 package models
 
-import "time"
+import (
+	"time"
+	"github.com/google/uuid"
+)
 
 type UserBookshelf struct {
 	UserBookshelfID uint      `gorm:"column:user_bookshelf_id;primaryKey"`
-	PublicID        string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
+	PublicID        uuid.UUID `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	UserID          uint      `gorm:"column:user_id;not null;index"`
 	BookID          uint      `gorm:"column:book_id;not null"`
 	ShelfStatus     string    `gorm:"column:shelf_status;size:50;not null;default:want_to_read"`
@@ -24,7 +27,7 @@ type UserBookshelf struct {
 
 type ReadingWrap struct {
 	ReadingWrapID         uint      `gorm:"column:reading_wrap_id;primaryKey;autoIncrement"`
-	PublicID              string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
+	PublicID              uuid.UUID `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	UserID                uint      `gorm:"column:user_id;not null"`
 	TopAuthorID           *uint     `gorm:"column:top_author_id"`
 	TopGenreID            *uint     `gorm:"column:top_genre_id"`

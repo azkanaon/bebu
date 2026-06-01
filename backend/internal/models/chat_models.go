@@ -3,13 +3,13 @@ package models
 
 import (
 	"time"
-
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type Conversation struct {
 	ConversationID   uint      `gorm:"column:conversation_id;primaryKey;autoIncrement"`
-	PublicID         string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
+	PublicID         uuid.UUID `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	CreatedByUserID  uint      `gorm:"column:created_by_user_id;not null"`
 	ConversationType string    `gorm:"column:conversation_type;size:50;not null;default:direct"`
 	LastMessageAt    *time.Time `gorm:"column:last_message_at"`

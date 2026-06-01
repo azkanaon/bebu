@@ -13,6 +13,7 @@ type PostQueryParams struct {
 // PostManageableResponse membungkus representasi data post untuk tabel admin
 type PostManageableResponse struct {
 	PostID        uint      `json:"post_id"`
+	PublicID   	  string    `json:"public_id"`
 	Description   string    `json:"description"`
 	PostType      string    `json:"post_type"`
 	Rating        float64   `json:"rating"`

@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"errors"
 
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/services"
 	"backend-bebu/pkg/utils"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 
@@ -64,12 +66,39 @@ func (h *PostHandler) GetPosts(c *gin.Context) {
     c.JSON(http.StatusOK, data)
 }
 
+func (h *PostHandler) GetPostByPublicID(c *gin.Context) {
+	var currentUserID uint
+	val, exists := c.Get("userID")
+	if exists {
+		currentUserID = val.(uint)
+	}
+
+	// Mengambil publicID dari URL path parameter (/posts/:publicID)
+	publicID := c.Param("id")
+	if publicID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Public ID is required"})
+		return
+	}
+
+	data, err := h.service.GetPostByPublicID(currentUserID, publicID)
+	if err != nil {
+		// Jika data tidak ditemukan di GORM
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Post not found"})
+			return
+		}
+		
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch post detail"})
+		return
+	}
+
+	c.JSON(http.StatusOK, data)
+}
+
 // CreatePost tidak perlu diubah secara signifikan.
 func (h *PostHandler) CreatePost(c *gin.Context) {
 	var req dto.CreatePostRequest
 
-	// ✅ manual binding dari form (sudah bagus)
-	// Kita asumsikan UserID didapat dari context, bukan form, untuk keamanan.
 	userIDValue, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})

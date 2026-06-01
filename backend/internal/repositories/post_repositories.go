@@ -13,6 +13,7 @@ import (
 type PostRepository interface {
 	WithTx(tx *gorm.DB) PostRepository
 	GetPosts(userID uint, tab string, cursor uint, limit int, categoryID uint) ([]models.Post, error)
+	GetPostByPublicID(userID uint, publicID string) (models.Post, error)
 	CreatePost(post *models.Post) (*models.Post, error)
 	FindPostByID(id uint) (*models.Post, error)
 	GetPostCategories(postID uint) ([]uint, error)
@@ -104,6 +105,38 @@ func (r *postRepository) GetPosts(userID uint, tab string, cursor uint, limit in
     }
 
     return posts, err
+}
+
+func (r *postRepository) GetPostByPublicID(userID uint, publicID string) (models.Post, error) {
+	var post models.Post
+
+	err := r.db.Debug().
+		Select(`posts.*, 
+			(SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
+			(SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
+			userID, userID).
+		Preload("User.Profile").
+		Preload("Book.BookAuthors.Author"). 
+		Preload("Book.BookGenres.Genre").
+		Preload("Stats").
+		Preload("Categories").
+		Preload("Comments", func(db *gorm.DB) *gorm.DB {
+			return db.Where("post_comment_id IN (SELECT post_comment_id FROM (SELECT post_comment_id, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY created_at DESC) as rn FROM post_comments WHERE parent_comment_id IS NULL) tmp WHERE rn <= 3)")
+		}).
+		Preload("Comments.User.Profile").
+		Where("public_id = ?", publicID).
+		First(&post).Error
+
+	if err != nil {
+		return models.Post{}, err
+	}
+
+	// Map TotalLikes dari stats
+	if post.Stats != nil {
+		post.TotalLikes = post.Stats.LikeCount
+	}
+
+	return post, nil
 }
 
 func (r *postRepository) GetPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error) {

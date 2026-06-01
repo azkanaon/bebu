@@ -28,6 +28,7 @@ type Props = {
 	onCommentDeleted?: (commentId: number, amount?: number) => void;
 	post: AnalysisPostType | ReviewPostType;
 	type: "analysis" | "review";
+	isStandalonePage?: boolean;
 };
 
 export default function CommentModal({
@@ -37,6 +38,7 @@ export default function CommentModal({
 	onCommentDeleted,
 	post,
 	type,
+	isStandalonePage = false,
 }: Props) {
 	const authStorage = localStorage.getItem("bebu-auth-storage");
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
@@ -86,13 +88,13 @@ export default function CommentModal({
 
 			const response = await createCommentAPI(payload);
 			const newComment = response.data;
-			
+
 			// Tambah comment count
 			setCurrentPost((prev) => ({
 				...prev,
 				comments: (prev.comments || 0) + 1,
 			}));
-			
+
 			// Update Parent (...Post.tsx)
 			if (onCommentAdded) {
 				// Jika kita mengirim komentar utama (bukan reply), kirim objeknya ke parent
@@ -186,7 +188,7 @@ export default function CommentModal({
 					};
 				});
 			}
-			
+
 			// Reset Form
 			setCommentText("");
 			setReplyTo(null);
@@ -198,22 +200,25 @@ export default function CommentModal({
 	};
 
 	useEffect(() => {
-		// Mengunci scroll
+		if (isStandalonePage) {
+			// Panggil fungsi fetch data langsung tanpa mengunci body scroll
+			fetchComments();
+			return;
+		}
+
+		// Mengunci scroll HANYA jika berbentuk pop-up modal
 		document.body.style.overflow = "hidden";
 
-		// Panggil fungsi fetch data
-		// Kita bungkus dalam fungsi anonim atau biarkan async berjalan di background
 		const initModal = async () => {
 			await fetchComments();
 		};
-
 		initModal();
 
 		// Cleanup function
 		return () => {
 			document.body.style.overflow = "unset";
 		};
-	}, [fetchComments]);
+	}, [fetchComments, isStandalonePage]);
 
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -433,63 +438,79 @@ export default function CommentModal({
 	};
 
 	const modalContent = (
-		<div className="fixed inset-0 z-[999] flex items-center justify-center p-0 sm:p-4">
-			{/* Backdrop dengan Blur */}
-			<motion.div
-				initial={{ opacity: 0 }}
-				animate={{ opacity: 1 }}
-				exit={{ opacity: 0 }}
-				onClick={onClose}
-				className="absolute inset-0 bg-black/70 backdrop-blur-md"
-			/>
+		<div
+			className={
+				isStandalonePage
+					? "w-full flex justify-center"
+					: "fixed inset-0 z-[999] flex items-center justify-center p-0 sm:p-4"
+			}
+		>
+			{/* Backdrop dengan Blur (Hanya untuk Modal Pop-up) */}
+			{!isStandalonePage && (
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					exit={{ opacity: 0 }}
+					onClick={onClose}
+					className="absolute inset-0 bg-black/70 backdrop-blur-md"
+				/>
+			)}
 
 			{/* Main Modal Container */}
 			<motion.div
-				initial={{ y: "100%", opacity: 0 }}
-				animate={{ y: 0, opacity: 1 }}
-				exit={{ y: "100%", opacity: 0 }}
+				initial={isStandalonePage ? {} : { y: "100%", opacity: 0 }}
+				animate={isStandalonePage ? {} : { y: 0, opacity: 1 }}
+				exit={isStandalonePage ? {} : { y: "100%", opacity: 0 }}
 				transition={{ type: "spring", damping: 25, stiffness: 200 }}
-				className="
-          relative bg-gray-950 w-full max-w-2xl
-          h-full sm:h-[90vh] 
-          rounded-t-[2rem] sm:rounded-2xl 
-          border-t sm:border border-gray-800 
-          flex flex-col shadow-2xl overflow-hidden
-        "
+				className={
+					isStandalonePage
+						? "relative w-full flex flex-col flex-1 pb-32"
+						: "relative bg-gray-950 w-full max-w-2xl h-full sm:h-[90vh] rounded-t-[2rem] sm:rounded-2xl border-t sm:border border-gray-800 flex flex-col shadow-2xl overflow-hidden"
+				}
 			>
-				{/* Header */}
-				<div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-950/50 backdrop-blur-md sticky top-0 z-10">
-					<div>
-						<h3 className="text-white font-bold text-lg leading-tight">
-							Diskusi
-						</h3>
-						<p className="text-xs text-gray-500">
-							Berbagi pandangan tentang buku ini
-						</p>
+				{/* Header (Hanya untuk Modal Pop-up) */}
+				{!isStandalonePage && (
+					<div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-950/50 backdrop-blur-md sticky top-0 z-10">
+						<div>
+							<h3 className="text-white font-bold text-lg leading-tight">
+								Diskusi
+							</h3>
+							<p className="text-xs text-gray-500">
+								Berbagi pandangan tentang buku ini
+							</p>
+						</div>
+						<button
+							onClick={onClose}
+							className="text-gray-400 p-2 hover:bg-gray-800 rounded-full transition"
+						>
+							<X size={22} />
+						</button>
 					</div>
-					<button
-						onClick={onClose}
-						className="text-gray-400 p-2 hover:bg-gray-800 rounded-full transition"
-					>
-						<X size={22} />
-					</button>
-				</div>
+				)}
 
 				{/* Scrollable Comment List */}
-				<div className="flex-1 overflow-y-auto custom-scrollbar">
+				<div
+					className={
+						isStandalonePage
+							? "flex-1 bg-gray-950"
+							: "flex-1 overflow-y-auto custom-scrollbar"
+					}
+				>
+					{/* CATATAN: Di halaman standalone, kita matikan 'overflow-y-auto' agar scrollbar utama browser yang bekerja secara alami */}
 					<div className="border-b border-gray-800 bg-gray-900/20">
 						{type === "analysis" ? (
-							// Pastikan AnalysisPost sudah di-import di atas
 							<AnalysisPost
 								key={`analysis-${currentPost.comments}`}
 								post={currentPost as AnalysisPostType}
 								isModalView={true}
+								disableCommentLink={isStandalonePage}
 							/>
 						) : (
 							<ReviewPost
 								key={`review-${currentPost.comments}`}
 								post={currentPost as ReviewPostType}
 								isModalView={true}
+								disableCommentLink={isStandalonePage}
 							/>
 						)}
 					</div>
@@ -511,7 +532,7 @@ export default function CommentModal({
 
 					<div className="p-5 space-y-6">
 						{loading ? (
-							<div className="flex flex-col items-center justify-center h-full space-y-3">
+							<div className="flex flex-col items-center justify-center h-full min-h-[200px] space-y-3">
 								<div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
 								<p className="text-gray-500 text-sm animate-pulse">
 									Memuat komentar...
@@ -530,22 +551,20 @@ export default function CommentModal({
 								</p>
 							</div>
 						) : focusedComment ? (
-							/* MODE FOKUS: Render satu dahan saja */
 							<CommentItem
 								key={focusedComment.id}
 								comment={focusedComment}
 								postId={postId}
 								currentUserId={currentUserId}
-								depth={0} // Reset depth jadi 0 agar menempel ke kiri
-								isReply={false} // Hilangkan garis vertikal parent
+								depth={0}
+								isReply={false}
 								handleDelete={handleDelete}
 								handleToggleLike={handleToggleLike}
 								handleReplyClick={handleReplyClick}
 								setReportTarget={setReportTarget}
-								onFocusThread={handleFocusThread} // Oper fungsi focus
+								onFocusThread={handleFocusThread}
 							/>
 						) : (
-							/* MODE UTAMA: Render semua komentar seperti biasa */
 							comments.map((c) => (
 								<CommentItem
 									key={c.id}
@@ -565,10 +584,15 @@ export default function CommentModal({
 				</div>
 
 				{/* Bottom Input Area */}
-				<div className="p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md">
-					{/* Indikator Balasan: Muncul hanya jika replyTo tidak null */}
+				<div
+					className={
+						isStandalonePage
+							? "fixed bottom-0 left-1/2 -translate-x-1/2 z-30 p-4 border-t border-gray-800 bg-gray-950/95 backdrop-blur-md w-full max-w-[600px]"
+							: "p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md"
+					}
+				>
 					{replyTo && (
-						<div className="flex justify-between items-center bg-blue-500/10 border-l-2 border-blue-500 px-3 py-1.5 mb-2 rounded-r-lg animate-in fade-in slide-in-from-left-2">
+						<div className="flex justify-between items-center bg-blue-500/10 border-l-2 border-blue-500 px-3 py-1.5 mb-2 rounded-r-lg">
 							<p className="text-[10px] text-blue-400">
 								Membalas{" "}
 								<span className="font-bold">
@@ -586,7 +610,7 @@ export default function CommentModal({
 
 					<div className="flex gap-3 items-end">
 						<textarea
-							ref={inputRef} // Pasang ref di sini
+							ref={inputRef}
 							value={commentText}
 							onChange={(e) => setCommentText(e.target.value)}
 							placeholder={
@@ -617,7 +641,10 @@ export default function CommentModal({
 		</div>
 	);
 
-	// 3. Portal ke Body
+	if (isStandalonePage) {
+		return modalContent;
+	}
+
 	if (typeof document === "undefined") return null;
 	return createPortal(modalContent, document.body);
 }

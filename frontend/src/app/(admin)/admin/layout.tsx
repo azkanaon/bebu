@@ -63,7 +63,30 @@ export default function AdminLayout({
 			</div>
 
 			<CreatePostModal />
-			<Toaster position="top-center" />
+			<Toaster
+				position="top-center"
+				toastOptions={{
+					style: {
+						background: "#09090B",
+						color: "#F4F4F5",
+						border: "1px solid rgba(255,255,255,0.1)",
+						fontSize: "12px",
+						borderRadius: "12px",
+					},
+					success: {
+						iconTheme: {
+							primary: "#10B981", // Default warna hijau emerald untuk semua toast sukses
+							secondary: "#09090B",
+						},
+					},
+					error: {
+						iconTheme: {
+							primary: "#EF4444", // Default warna merah untuk semua toast gagal
+							secondary: "#09090B",
+						},
+					},
+				}}
+			/>
 		</>
 	);
 }

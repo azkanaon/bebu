@@ -4,16 +4,17 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type Book struct {
 	BookID          uint           `gorm:"column:book_id;primaryKey"`
-	PublicID        string         `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
+	PublicID        uuid.UUID      `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	Title           string         `gorm:"column:title;size:255;not null"`
 	Synopsis        string         `gorm:"column:synopsis;type:text"`
 	CoverImgURL     string         `gorm:"column:cover_img_url;type:text"`
-	GoogleBookID 	string `gorm:"column:google_book_id;size:255;unique"`
+	GoogleBookID 	string 		   `gorm:"column:google_book_id;size:255;unique;default:null"`
 	PublicationYear int16          `gorm:"column:publication_year"`
 	Language        string         `gorm:"column:language;size:50"`
 	TotalPages      int            `gorm:"column:total_pages"`
@@ -32,7 +33,7 @@ type Book struct {
 
 type Author struct {
 	AuthorID   uint           `gorm:"column:author_id;primaryKey"`
-	PublicID   string         `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
+	PublicID   uuid.UUID      `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	AuthorName string         `gorm:"column:author_name;size:200;not null"`
 	Slug       string         `gorm:"column:slug;size:220;unique;not null"`
 	CreatedAt  time.Time      `gorm:"column:created_at;autoCreateTime"`

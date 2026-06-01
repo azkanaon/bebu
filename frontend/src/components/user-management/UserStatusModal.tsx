@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { X, User, ShieldAlert, Clock3, CheckCircle2 } from "lucide-react";
-
+import {
+	X,
+	User,
+	ShieldAlert,
+	Clock3,
+	CheckCircle2,
+	ExternalLink,
+} from "lucide-react";
 import { updateUserStatusAPI } from "@/lib/api";
 
 interface UserStatusModalProps {
@@ -172,36 +178,77 @@ export default function UserStatusModal({
 						</div>
 					)}
 
-					{/* CURRENT STATUS DETAILS CARD (Tetap menampilkan 4 macam status asli dari backend) */}
+					{/* CURRENT STATUS DETAILS CARD */}
 					<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 flex items-center justify-between">
-						<div className="flex items-center gap-3">
-							<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/[0.10] text-blue-300">
-								<User size={18} />
-							</div>
-							<div>
-								<h3 className="text-sm font-semibold text-white">
-									@{user.username}
-								</h3>
-								{/* Menampilkan informasi durasi penahanan jika statusnya shadowbanned/suspended */}
-								{(user.status === "suspended" ||
-									user.status === "shadowbanned") &&
-								user.duration_days ? (
-									<p className="text-[11px] text-zinc-400 mt-0.5">
-										Restriction remaining:{" "}
-										<span className="text-amber-300 font-medium">
-											{user.duration_days === -1
-												? "Indefinite"
-												: `${user.duration_days} days`}
-										</span>
-									</p>
-								) : (
+						{/* CONTAINER UTAMA: Menggunakan conditional rendering berdasarkan status banned */}
+						{user.status === "banned" ? (
+							/* Tampilan biasa (Static/Disabled) jika user berstatus Banned */
+							<div className="flex items-center gap-3 p-1.5 -m-1.5 opacity-60 select-none">
+								<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/[0.10] text-red-400">
+									<User size={18} />
+								</div>
+								<div>
+									<h3 className="text-sm font-semibold text-zinc-400 line-through">
+										@{user.username}
+									</h3>
 									<p className="text-[11px] text-zinc-500">
 										System Identifier #{user.user_id}
 									</p>
-								)}
+								</div>
 							</div>
-						</div>
+						) : (
+							/* Tampilan tautan aktif (Clickable) jika status user BUKAN Banned */
+							<a
+								href={`/${user.username}`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="
+				group/profile flex items-center gap-3 rounded-2xl p-1.5 -m-1.5
+				transition-all duration-200 
+				hover:bg-white/[0.04] hover:ring-1 hover:ring-white/10
+				cursor-pointer
+			"
+							>
+								<div
+									className="
+				flex h-10 w-10 items-center justify-center rounded-xl 
+				bg-blue-500/[0.10] text-blue-300
+				transition-colors duration-200
+				group-hover/profile:bg-blue-500/[0.20] group-hover/profile:text-blue-200
+			"
+								>
+									<User size={18} />
+								</div>
+								<div>
+									<h3 className="flex items-center gap-1.5 text-sm font-semibold text-white">
+										@{user.username}
+										<ExternalLink
+											size={12}
+											className="text-zinc-500 transition-colors duration-200 group-hover/profile:text-blue-400"
+										/>
+									</h3>
+									{/* Menampilkan informasi durasi penahanan jika statusnya shadowbanned/suspended */}
+									{(user.status === "suspended" ||
+										user.status === "shadowbanned") &&
+									user.duration_days ? (
+										<p className="text-[11px] text-zinc-400 mt-0.5">
+											Restriction remaining:{" "}
+											<span className="text-amber-300 font-medium">
+												{user.duration_days === -1
+													? "Indefinite"
+													: `${user.duration_days} days`}
+											</span>
+										</p>
+									) : (
+										<p className="text-[11px] text-zinc-500 transition-colors duration-200 group-hover/profile:text-zinc-400">
+											System Identifier #{user.user_id}
+										</p>
+									)}
+								</div>
+							</a>
+						)}
 
+						{/* BADGE STATUS */}
 						<div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/5 px-2.5 py-1 text-[11px]">
 							<span className="text-zinc-500">Status:</span>
 							<span

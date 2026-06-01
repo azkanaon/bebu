@@ -44,6 +44,7 @@ export type UserDetailReport = {
 };
 
 export type PostDetailReport = {
+	public_id: string;
 	description: string;
 	post_type: string;
 	username: string;

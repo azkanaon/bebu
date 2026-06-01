@@ -10,7 +10,7 @@ func ToReviewPostResponse(p models.Post, currentUserID uint) dto.ReviewPostRespo
 	var res dto.ReviewPostResponse
 
 	res.ID = p.PostID
-	res.PostPublicID = p.PublicID
+	res.PostPublicID = p.PublicID.String()
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
 	res.CreatedAt = p.CreatedAt
@@ -73,7 +73,7 @@ func ToAnalysisPostResponse(p models.Post, currentUserID uint) dto.AnalysisPostR
 	var res dto.AnalysisPostResponse
 
 	res.ID = p.PostID
-	res.PostPublicID = p.PublicID
+	res.PostPublicID = p.PublicID.String()
 	res.Type = strings.ToLower(p.PostType)
 	res.Content = p.Description
 	res.Image = p.ImgURL

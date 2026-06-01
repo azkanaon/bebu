@@ -16,16 +16,18 @@ export default function RightSidebar() {
 
 	return (
 		<div className="space-y-4 pr-8 my-4">
-			<FriendRecommendation />
+			{!pathname.includes("/post/") && <FriendRecommendation />}
 
-			{pathname !== "/books" && !pathname.includes("/books/") && (
-				<CategoryBubble
-					onAddClick={() => setIsOpen(true)}
-					refresh={refresh}
-				/>
-			)}
-			{pathname !== "/books" && <TrendingBooks />}
+			{pathname !== "/books" &&
+				!pathname.includes("/books/") &&
+				!pathname.includes("/post/") && (
+					<CategoryBubble
+						onAddClick={() => setIsOpen(true)}
+						refresh={refresh}
+					/>
+				)}
 			<Leaderboard />
+			{pathname !== "/books" && <TrendingBooks />}
 			<Footer />
 
 			{isOpen && (

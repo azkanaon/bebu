@@ -67,6 +67,10 @@ func main() {
 	postManagementRepo := repositories.NewPostManagementRepository(db)
     postManagementService := services.NewPostManagementService(postManagementRepo)
     postManagementHandler := handlers.NewPostManagementHandler(postManagementService)
+	
+	bookManagementRepo := repositories.NewBookManagementRepository(db)
+    bookManagementService := services.NewBookManagementService(bookManagementRepo)
+    bookManagementHandler := handlers.NewBookManagementHandler(bookManagementService)
 
 	shareRepo := repositories.NewPostShareRepository(db)
 	shareService := services.NewPostShareService(shareRepo)
@@ -97,13 +101,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, bookManagementHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, bookManagementHandler *handlers.BookManagementHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -209,6 +213,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		{
 			posts.POST("", authMiddleware.RequiredAuth(), postHandler.CreatePost)
 			posts.GET("", authMiddleware.OptionalAuth(), postHandler.GetPosts)
+			posts.GET("/:id", authMiddleware.OptionalAuth(), postHandler.GetPostByPublicID)
 			posts.DELETE("/:id", authMiddleware.RequiredAuth(), postHandler.DeletePost)
 			posts.GET("/:id/comments", authMiddleware.OptionalAuth(), postHandler.GetPostComments)
 			posts.POST("/:id/save", authMiddleware.RequiredAuth(), postHandler.ToggleSave)
@@ -249,6 +254,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		}
 
 		admin := v1.Group("/admin")
+		admin.Use(authMiddleware.RequiredAuth())
 		{
 			admin.GET("/reports", reportHandler.GetReportDashboard)
 			admin.GET("/reports/:id/detail", reportHandler.GetPopUpDetail)
@@ -257,6 +263,20 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			admin.PUT("/users/:id/status", userManagementHandler.UpdateStatus)
 			admin.GET("/posts", postManagementHandler.GetPosts)
     		admin.PUT("/posts/:id/status", postManagementHandler.UpdatePostStatus)
+		
+			adminBook := admin.Group("/books")
+			{
+				// Master Books Catalogue
+				adminBook.GET("", bookManagementHandler.GetBooks)
+				adminBook.POST("", bookManagementHandler.CreateBook)
+				adminBook.PUT("/:id", bookManagementHandler.UpdateBook)
+				adminBook.DELETE("/:id", bookManagementHandler.DeleteBook)
+
+				// User Submissions Management
+				adminBook.GET("/submissions", bookManagementHandler.GetSubmissions)
+				adminBook.POST("/submissions/:id/approve", bookManagementHandler.ApproveSubmission)
+				adminBook.POST("/submissions/:id/reject", bookManagementHandler.RejectSubmission)
+			}
 		}
 
 		v1.GET("/ws", authMiddleware.RequiredAuth(), wsHandler.HandleWS)
@@ -265,5 +285,9 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		v1.GET("/platforms", platformHandler.GetAllPlatforms)
 
 		v1.POST("/report", authMiddleware.RequiredAuth(), reportHandler.CreateReport)
+
+		// Search Authors
+		v1.GET("/authors/search", authMiddleware.RequiredAuth(), bookManagementHandler.SearchAuthors)
+		v1.GET("/genres/search", authMiddleware.RequiredAuth(), bookManagementHandler.SearchGenres)
 	}
 }

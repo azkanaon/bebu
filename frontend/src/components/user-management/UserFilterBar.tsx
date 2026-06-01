@@ -105,16 +105,16 @@ export default function UserFilterBar({
 								value: "active",
 							},
 							{
+								label: "Shadowbanned",
+								value: "shadowbanned",
+							},
+							{
 								label: "Suspended",
 								value: "suspended",
 							},
 							{
 								label: "Banned",
 								value: "banned",
-							},
-							{
-								label: "Shadowbanned",
-								value: "shadowbanned",
 							},
 						]}
 					/>

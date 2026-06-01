@@ -2,13 +2,22 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { X, FileText, Globe, Trash2, ShieldAlert, Clock3 } from "lucide-react";
+import {
+	X,
+	FileText,
+	Globe,
+	Trash2,
+	ShieldAlert,
+	Clock3,
+	ExternalLink,
+} from "lucide-react";
 
 import { updatePostStatusAPI } from "@/lib/api";
 
 interface PostStatusModalProps {
 	post: {
 		post_id: number;
+		public_id: string;
 		book_title: string;
 		username: string;
 		publish_status: "published" | "soft_deleted" | string;
@@ -192,22 +201,68 @@ export default function PostStatusModal({
 
 					{/* CURRENT STATUS DETAILS CARD */}
 					<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 flex items-center justify-between">
-						<div className="flex items-center gap-3">
-							<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/[0.10] text-blue-300">
-								<FileText size={18} />
+						{/* CONTAINER UTAMA: Menggunakan conditional rendering berdasarkan status soft_deleted */}
+						{post.publish_status === "soft_deleted" ? (
+							/* Tampilan Statis (Disabled) jika postingan sudah di-Soft Delete */
+							<div className="flex items-center gap-3 p-1.5 -m-1.5 opacity-60 select-none">
+								<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/[0.10] text-amber-400">
+									<FileText size={18} />
+								</div>
+								<div>
+									<h3 className="truncate max-w-[260px] text-sm font-semibold text-zinc-400 line-through">
+										{post.book_title || "Untitled Review"}
+									</h3>
+									<p className="text-[11px] text-zinc-500">
+										Author: @{post.username} · ID #
+										{post.post_id}
+									</p>
+								</div>
 							</div>
-							<div>
-								<h3 className="truncate max-w-[260px] text-sm font-semibold text-white">
-									{post.book_title || "Untitled Review"}
-								</h3>
-								<p className="text-[11px] text-zinc-500">
-									Author: @{post.username} · ID #
-									{post.post_id}
-								</p>
-							</div>
-						</div>
+						) : (
+							/* Tampilan Tautan Aktif (Clickable) jika status postingan aktif / published */
+							<a
+								href={`/post/${post.public_id}`}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="
+				group/post flex items-center gap-3 rounded-2xl p-1.5 -m-1.5
+				transition-all duration-200 
+				hover:bg-white/[0.04] hover:ring-1 hover:ring-white/10
+				cursor-pointer
+			"
+							>
+								<div
+									className="
+				flex h-10 w-10 items-center justify-center rounded-xl 
+				bg-blue-500/[0.10] text-blue-300
+				transition-colors duration-200
+				group-hover/post:bg-blue-500/[0.20] group-hover/post:text-blue-200
+			"
+								>
+									<FileText size={18} />
+								</div>
+								<div>
+									<h3 className="flex items-center gap-1.5 text-sm font-semibold text-white">
+										<span className="truncate max-w-[240px]">
+											{post.book_title ||
+												"Untitled Review"}
+										</span>
+										{/* Ikon indikator link eksternal */}
+										<ExternalLink
+											size={12}
+											className="text-zinc-500 transition-colors duration-200 group-hover/post:text-blue-400 shrink-0"
+										/>
+									</h3>
+									<p className="text-[11px] text-zinc-500 transition-colors duration-200 group-hover/post:text-zinc-400">
+										Author: @{post.username} · ID #
+										{post.post_id}
+									</p>
+								</div>
+							</a>
+						)}
 
-						<div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/5 px-2.5 py-1 text-[11px]">
+						{/* BADGE STATUS */}
+						<div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/5 px-2.5 py-1 text-[11px] shrink-0">
 							<span className="text-zinc-500">Status:</span>
 							<span
 								className={clsx(
