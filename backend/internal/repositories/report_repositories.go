@@ -219,6 +219,7 @@ func (r *reportRepository) GetTargetPostData(postID uint) (*dto.PostDetailReport
 	slugTitle = strings.ReplaceAll(slugTitle, " ", "-") // Penggantian dasar space ke dash
 
 	res = dto.PostDetailReport{
+		PublicID:      raw.PublicID,
 		Description:   raw.Description,
 		PostType:      raw.PostType,
 		Username:      raw.Username,

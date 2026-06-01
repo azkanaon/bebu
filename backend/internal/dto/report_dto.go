@@ -54,6 +54,7 @@ type UserDetailReport struct {
 }
 
 type PostDetailReport struct {
+	PublicID   	  string  `json:"public_id"`
 	Description   string  `json:"description"`
 	PostType      string  `json:"post_type"`
 	Username      string  `json:"username"`

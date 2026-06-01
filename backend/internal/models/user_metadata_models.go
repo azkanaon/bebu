@@ -3,11 +3,12 @@ package models
 
 import (
 	"time"
+	"github.com/google/uuid"
 )
 
 type Platform struct {
 	PlatformID       uint      `gorm:"column:platform_id;primaryKey;autoIncrement"`
-	PublicID         string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
+	PublicID         uuid.UUID `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	PlatformName     string    `gorm:"column:platform_name;size:100;not null"`
 	Slug         	 string    `gorm:"column:slug;size:100;not null;unique"`
 	CreatedAt        time.Time `gorm:"column:created_at;autoCreateTime"`
@@ -16,7 +17,7 @@ type Platform struct {
 
 type UserSocialLink struct {
 	UserSocialLinkID uint      `gorm:"column:user_social_link_id;primaryKey;autoIncrement"`
-	PublicID         string    `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
+	PublicID         uuid.UUID `gorm:"column:public_id;type:uuid;default:gen_random_uuid();unique;not null"`
 	UserID           uint      `gorm:"column:user_id;not null"`
 	PlatformID       uint      `gorm:"column:platform_id;not null"`
 	SocialURL        string    `gorm:"column:social_url;size:255;not null"`

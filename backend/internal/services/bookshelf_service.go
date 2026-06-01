@@ -108,9 +108,9 @@ func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername str
 		itemDTO := dto.BookshelfItemDTO{
 			// --- PERBAIKAN PUBLIC ID ---
 			ID:          bs.UserBookshelfID,
-			PublicID:    bs.PublicID, // Langsung gunakan, tanpa .String()
+			PublicID:    bs.PublicID.String(), // Langsung gunakan, tanpa .String()
 			Book: dto.BookSummaryDTO{
-				PublicID:    bs.Book.PublicID, // Langsung gunakan, tanpa .String()
+				PublicID:    bs.Book.PublicID.String(), // Langsung gunakan, tanpa .String()
 				Title:       bs.Book.Title,
 				CoverImgURL: bs.Book.CoverImgURL,
 				TotalPages: bs.Book.TotalPages,
@@ -241,9 +241,9 @@ func mapBookshelfToDTO(bs *models.UserBookshelf) *dto.BookshelfItemDTO {
 	
 	dto := &dto.BookshelfItemDTO{
 		ID:          bs.UserBookshelfID,
-		PublicID:    bs.PublicID,
+		PublicID:    bs.PublicID.String(),
 		Book: dto.BookSummaryDTO{
-			PublicID:    bs.Book.PublicID,
+			PublicID:    bs.Book.PublicID.String(),
 			Title:       bs.Book.Title,
 			CoverImgURL: bs.Book.CoverImgURL,
 			Authors:     authorNames,
@@ -403,9 +403,9 @@ func mapBookshelfToDetailDTO(bs *models.UserBookshelf) *dto.BookshelfDetailDTO {
 	}
 	
 	detailDTO := &dto.BookshelfDetailDTO{
-		PublicID:    bs.PublicID,
+		PublicID:    bs.PublicID.String(),
 		Book: dto.BookSummaryDTO{
-			PublicID:    bs.Book.PublicID,
+			PublicID:    bs.Book.PublicID.String(),
 			Title:       bs.Book.Title,
 			CoverImgURL: bs.Book.CoverImgURL,
 			TotalPages: bs.Book.TotalPages,

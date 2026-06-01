@@ -28,6 +28,16 @@ import {
 	PostQueryParams,
 	PaginatedPostAPIResponse,
 } from "@/types/post-management";
+import {
+	BookQueryParams,
+	PaginatedBookResponse,
+	UpsertBookRequest,
+	SubmissionQueryParams,
+	PaginatedSubmissionResponse,
+	RejectSubmissionRequest,
+	AuthorResponse,
+	GenreResponse,
+} from "@/types/book-management";
 import api from "@/lib/axios";
 
 export async function getPostsAPI(
@@ -44,6 +54,11 @@ export async function getPostsAPI(
 			category_id: categoryId || undefined, // Kirim jika ada
 		},
 	});
+	return res.data;
+}
+
+export async function getPostByPublicIdAPI(publicId: string) {
+	const res = await api.get(`/v1/posts/${publicId}`);
 	return res.data;
 }
 
@@ -338,5 +353,90 @@ export async function updatePostStatusAPI(
 	status: "published" | "soft_delete" | "hard_delete" | "shadowbanned",
 ): Promise<{ message: string }> {
 	const res = await api.put(`/v1/admin/posts/${postID}/status`, { status });
+	return res.data;
+}
+
+/* --- BOOK MANAGEMENT --- */
+
+// ==========================================
+// MASTER BOOKS INTEGRATION
+// ==========================================
+
+export async function getMasterBooksAPI(
+	params: BookQueryParams,
+): Promise<PaginatedBookResponse> {
+	const res = await api.get("/v1/admin/books", { params });
+	return res.data;
+}
+
+export async function createBookAPI(data: UpsertBookRequest) {
+	const res = await api.post("/v1/admin/books", data);
+	return res.data;
+}
+
+export async function updateBookAPI(bookId: number, data: UpsertBookRequest) {
+	const res = await api.put(`/v1/admin/books/${bookId}`, data);
+	return res.data;
+}
+
+export async function deleteBookAPI(bookId: number) {
+	const res = await api.delete(`/v1/admin/books/${bookId}`);
+	return res.data;
+}
+
+// ==========================================
+// BOOK SUBMISSIONS INTEGRATION
+// ==========================================
+
+export async function getBookSubmissionsAPI(
+	params: SubmissionQueryParams,
+): Promise<PaginatedSubmissionResponse> {
+	const res = await api.get("/v1/admin/books/submissions", { params });
+	return res.data;
+}
+
+// Opsi Aksi 1 & 2: Approve & Publish (Menggunakan request form buku master baru)
+export async function approveSubmissionAPI(
+	submissionId: number,
+	data: UpsertBookRequest,
+) {
+	const res = await api.post(
+		`/v1/admin/books/submissions/${submissionId}/approve`,
+		data,
+	);
+	return res.data;
+}
+
+// Opsi Aksi 3: Reject / Mark as Duplicate
+export async function rejectSubmissionAPI(
+	submissionId: number,
+	data: RejectSubmissionRequest,
+) {
+	const res = await api.post(
+		`/v1/admin/books/submissions/${submissionId}/reject`,
+		data,
+	);
+	return res.data;
+}
+
+export async function searchAuthorsAPI(
+	query: string,
+): Promise<{ data: AuthorResponse[] }> {
+	const res = await api.get(
+		`/v1/authors/search?q=${encodeURIComponent(query)}`,
+	);
+
+	// Jika instance `api` Anda adalah Axios, kembalikan `res.data`
+	return res.data;
+}
+
+export async function searchGenresAPI(
+	query: string,
+): Promise<{ data: GenreResponse[] }> {
+	const res = await api.get(
+		`/v1/genres/search?q=${encodeURIComponent(query)}`,
+	);
+
+	// Jika instance `api` Anda adalah Axios, kembalikan `res.data`
 	return res.data;
 }

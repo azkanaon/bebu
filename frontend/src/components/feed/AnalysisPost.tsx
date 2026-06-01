@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { usePostStore } from "@/stores/usePostStore";
-import { AnalysisPostType, CommentType, } from "@/types/post";
+import { AnalysisPostType, CommentType } from "@/types/post";
 import PostMenu from "./PostMenu";
 import {
 	ThumbsUp,
@@ -26,13 +26,19 @@ import ShareModal from "./ShareModal";
 import { timeAgo } from "@/lib/utils";
 import ReportModal from "./ReportModal";
 import ClientPortal from "../ClientPortal";
+import Link from "next/link";
 
 type Props = {
 	post: AnalysisPostType;
 	isModalView?: boolean;
+	disableCommentLink?: boolean;
 };
 
-export default function AnalysisPost({ post, isModalView = false }: Props) {
+export default function AnalysisPost({
+	post,
+	isModalView = false,
+	disableCommentLink = false,
+}: Props) {
 	const [isLoading, setIsLoading] = useState(false);
 
 	const {
@@ -138,7 +144,7 @@ export default function AnalysisPost({ post, isModalView = false }: Props) {
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
 	const user = parsedStorage?.state?.user;
 	const currentUserId = user?.user_public_id;
-	
+
 	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
 	const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -221,6 +227,25 @@ export default function AnalysisPost({ post, isModalView = false }: Props) {
 			document.body.style.overflow = "unset";
 		};
 	}, [isImageOpen]);
+
+	const commentButtonContent = (
+		<motion.button
+			whileTap={disableCommentLink ? {} : { scale: 0.97 }} // opsional: matikan efek membalas/tekan jika link mati, atau biarkan saja
+			className={`
+        flex items-center gap-1.5
+        px-2 py-1.5
+        rounded-full
+        text-gray-500
+        transition-all duration-200
+        hover:bg-white/[0.03]
+        hover:text-green-400
+        ${disableCommentLink ? "cursor-default" : "cursor-pointer"} 
+      `}
+		>
+			<MessageCircle size={18} strokeWidth={2.3} />
+			<span className="font-medium tabular-nums">{post.comments}</span>
+		</motion.button>
+	);
 
 	return (
 		<motion.div
@@ -414,25 +439,16 @@ export default function AnalysisPost({ post, isModalView = false }: Props) {
 					</motion.button>
 
 					{/* Comment */}
-					<motion.button
-						whileTap={{ scale: 0.97 }}
-						onClick={() => !isModalView && setShowComments(true)}
-						className="
-				flex items-center gap-1.5
-				px-2 py-1.5
-				rounded-full
-				text-gray-500
-				transition-all duration-200
-				hover:bg-white/[0.03]
-				hover:text-green-400
-			"
-					>
-						<MessageCircle size={18} strokeWidth={2.3} />
-
-						<span className="font-medium tabular-nums">
-							{localCommentsCount}
-						</span>
-					</motion.button>
+					{disableCommentLink ? (
+						commentButtonContent
+					) : (
+						<Link
+							href={`/post/${post.post_public_id}`}
+							scroll={false}
+						>
+							{commentButtonContent}
+						</Link>
+					)}
 
 					{/* Share */}
 					<motion.button
@@ -794,20 +810,25 @@ export default function AnalysisPost({ post, isModalView = false }: Props) {
 					))}
 
 					{/* View All Comments */}
-					{localCommentsCount > 2 && (
-						<button
-							onClick={() => setShowComments(true)}
-							className="
-					text-xs
-					font-medium
-					text-gray-400
-					hover:text-gray-300
-					transition-colors
-					pl-12
-				"
+					{!disableCommentLink && localCommentsCount > 2 && (
+						<Link
+							href={`/post/${post.post_public_id}`}
+							scroll={false}
 						>
-							Lihat semua {localCommentsCount} komentar
-						</button>
+							<button
+								className="
+                text-xs
+                font-medium
+                text-gray-400
+                hover:text-gray-300
+                transition-colors
+                pl-12
+                text-left
+            "
+							>
+								Lihat semua {localCommentsCount} komentar
+							</button>
+						</Link>
 					)}
 
 					{/* Quick Comment Input */}

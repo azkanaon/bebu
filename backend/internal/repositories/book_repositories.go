@@ -220,7 +220,7 @@ func (r *bookRepository) SearchBooks(query string, genre string, author string, 
 		}
 
 		result = append(result, dto.BookSearchItem{
-			PublicID:        book.PublicID,
+			PublicID:        book.PublicID.String(),
 			Title:           book.Title,
 			Synopsis:        book.Synopsis,
 			CoverImgURL:     book.CoverImgURL,
@@ -416,7 +416,7 @@ func (r *bookRepository) GetPopularBooks(timeRange string, limit int,) ([]dto.Po
 		result = append(
 			result,
 			dto.PopularBookItem{
-				PublicID: book.PublicID,
+				PublicID: book.PublicID.String(),
 				Title: book.Title,
 				CoverImgURL: book.CoverImgURL,
 				Rating: book.BookStat.OverallRating,
@@ -535,7 +535,7 @@ func (r *bookRepository) mapBooksToSearchItems(books []models.Book,) []dto.BookS
 		items = append(
 			items,
 			dto.BookSearchItem{
-				PublicID: book.PublicID,
+				PublicID: book.PublicID.String(),
 				Title: book.Title,
 				Synopsis: book.Synopsis,
 				CoverImgURL: book.CoverImgURL,
@@ -619,7 +619,7 @@ func (r *bookRepository) GetHighlyRatedBooks(limit int,) ([]dto.HighlyRatedBookI
 		result = append(
 			result,
 			dto.HighlyRatedBookItem{
-				PublicID: book.PublicID,
+				PublicID: book.PublicID.String(),
 				Title: book.Title,
 				CoverImgURL: book.CoverImgURL,
 				Rating: book.BookStat.OverallRating,
@@ -794,7 +794,7 @@ func (r *bookRepository) GetAllBooks(page int, limit int, sort string,) (*dto.Al
 		items = append(
 			items,
 			dto.BookSearchItem{
-				PublicID: book.PublicID,
+				PublicID: book.PublicID.String(),
 				Title: book.Title,
 				Synopsis: book.Synopsis,
 				CoverImgURL: book.CoverImgURL,

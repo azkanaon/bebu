@@ -157,7 +157,7 @@ func (s *bookService) GetBookProfile(ctx context.Context, slug string) (*dto.Boo
 	var authorsDTO []dto.AuthorDTO
 	for _, ba := range book.BookAuthors {
 		authorsDTO = append(authorsDTO, dto.AuthorDTO{
-			PublicID:   ba.Author.PublicID,
+			PublicID:   ba.Author.PublicID.String(),
 			AuthorName: ba.Author.AuthorName,
 			Slug:       ba.Author.Slug,
 		})
@@ -188,7 +188,7 @@ func (s *bookService) GetBookProfile(ctx context.Context, slug string) (*dto.Boo
 	// 4. Gabungkan ke Response Utama
 	response := &dto.BookProfileResponse{
 		BookID:        	 book.BookID,
-		PublicID:        book.PublicID,
+		PublicID:        book.PublicID.String(),
 		Title:           book.Title,
 		Synopsis:        book.Synopsis,
 		CoverImgURL:     book.CoverImgURL,
@@ -247,7 +247,7 @@ func (s *bookService) GetBookRecommendations(ctx context.Context, slug string) (
 			}
 
 			list = append(list, dto.RecommendationBookItem{
-				PublicID:        b.PublicID,
+				PublicID:        b.PublicID.String(),
 				Title:           b.Title,
 				CoverImgURL:     b.CoverImgURL,
 				FirstAuthor:     firstAuthor,

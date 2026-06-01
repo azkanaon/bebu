@@ -7,7 +7,6 @@ import clsx from "clsx";
 import {
 	X,
 	ShieldAlert,
-	User,
 	FileText,
 	Clock3,
 	CalendarClock,
@@ -16,6 +15,7 @@ import {
 	AlertTriangle,
 	EyeOff,
 	Trash2,
+	ExternalLink
 } from "lucide-react";
 
 import { getReportDetailAPI, executeAdminActionAPI } from "@/lib/api";
@@ -344,15 +344,26 @@ export default function ReportDetailModal({
 							{/* ENTITY CARD */}
 							<div
 								className="
-									rounded-[24px]
-									border border-white/10
-									bg-white/[0.03]
-									p-5
-								"
+		rounded-[24px]
+		border border-white/10
+		bg-white/[0.03]
+		p-5
+	"
 							>
+								{/* SCENARIO A: ENTITY TYPE IS USER */}
 								{detail.entity_type === "user" &&
 									detail.user_data && (
-										<div className="flex gap-4">
+										<a
+											href={`/${detail.user_data.username}`}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="
+				group/report-user flex gap-4 rounded-2xl p-2 -m-2
+				transition-all duration-200
+				hover:bg-white/[0.04] hover:ring-1 hover:ring-white/10
+				cursor-pointer
+			"
+										>
 											<img
 												src={
 													detail.user_data
@@ -360,37 +371,34 @@ export default function ReportDetailModal({
 													"/images/default_avatar.png"
 												}
 												className="
-													h-16 w-16 shrink-0
-													rounded-2xl
-													object-cover
-
-													ring-1
-													ring-white/10
-												"
+					h-16 w-16 shrink-0
+					rounded-2xl
+					object-cover
+					ring-1
+					ring-white/10
+					transition-transform duration-200
+					group-hover/report-user:scale-[1.02]
+				"
 											/>
 
 											<div className="min-w-0 flex-1">
 												<div className="flex items-center gap-2">
-													<div
-														className="
-															flex h-8 w-8 items-center justify-center
-															rounded-xl
-															bg-blue-500/[0.10]
-															text-blue-300
-														"
-													>
-														<User size={14} />
-													</div>
-
-													<div>
-														<h3 className="text-base font-semibold text-white">
-															{
-																detail.user_data
-																	.display_name
-															}
+													<div className="min-w-0 flex-1">
+														<h3 className="flex items-center gap-1.5 text-base font-semibold text-white">
+															<span className="truncate">
+																{
+																	detail
+																		.user_data
+																		.display_name
+																}
+															</span>
+															<ExternalLink
+																size={14}
+																className="text-zinc-500 transition-colors duration-200 group-hover/report-user:text-blue-400 shrink-0"
+															/>
 														</h3>
 
-														<p className="text-xs text-zinc-500">
+														<p className="text-xs text-zinc-500 truncate">
 															@
 															{
 																detail.user_data
@@ -400,11 +408,11 @@ export default function ReportDetailModal({
 													</div>
 												</div>
 
-												<p className="mt-3 max-w-xl text-xs leading-relaxed text-zinc-400">
+												<p className="mt-3 max-w-xl text-xs leading-relaxed text-zinc-400 line-clamp-2 group-hover/report-user:text-zinc-300">
 													{detail.user_data.bio}
 												</p>
 
-												<div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+												<div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 pointer-events-none">
 													<MetricCard
 														label="Followers"
 														value={
@@ -412,7 +420,6 @@ export default function ReportDetailModal({
 																.total_followers
 														}
 													/>
-
 													<MetricCard
 														label="Posts"
 														value={
@@ -420,14 +427,12 @@ export default function ReportDetailModal({
 																.total_posts
 														}
 													/>
-
 													<MetricCard
 														label="Hot Score"
 														value={detail.user_data.hot_score.toFixed(
 															1,
 														)}
 													/>
-
 													<MetricCard
 														label="Status"
 														value={
@@ -437,59 +442,84 @@ export default function ReportDetailModal({
 													/>
 												</div>
 											</div>
-										</div>
+										</a>
 									)}
 
+								{/* SCENARIO B: ENTITY TYPE IS POST */}
 								{detail.entity_type === "post" &&
 									detail.post_data && (
 										<div className="space-y-4">
-											<div className="flex items-center gap-3">
+											{/* Dibungkus sebagai anchor tag interaktif khusus bagian header konten */}
+											<a
+												href={`/post/${detail.post_data.public_id}`}
+												target="_blank"
+												rel="noopener noreferrer"
+												className="
+					group/report-post flex items-center gap-3 rounded-2xl p-2 -m-2
+					transition-all duration-200
+					hover:bg-white/[0.04] hover:ring-1 hover:ring-white/10
+					cursor-pointer
+				"
+											>
 												<div
 													className="
-														flex h-9 w-9 items-center justify-center
-														rounded-2xl
-														bg-purple-500/[0.10]
-														text-purple-300
-													"
+						flex h-9 w-9 shrink-0 items-center justify-center
+						rounded-2xl
+						bg-purple-500/[0.10] text-purple-300
+						transition-colors duration-200
+						group-hover/report-post:bg-purple-500/[0.20] group-hover/report-post:text-purple-200
+					"
 												>
 													<FileText size={16} />
 												</div>
 
-												<div>
+												<div className="min-w-0 flex-1">
 													<p className="text-[10px] uppercase tracking-[0.18em] text-purple-300/80">
 														Reported Content
 													</p>
 
-													<h3 className="mt-1 text-sm font-semibold text-white">
-														{
-															detail.post_data
-																.book_title
-														}
+													<h3 className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-white">
+														<span className="truncate max-w-[400px]">
+															{
+																detail.post_data
+																	.book_title
+															}
+														</span>
+														<ExternalLink
+															size={12}
+															className="text-zinc-500 transition-colors duration-200 group-hover/report-post:text-blue-400 shrink-0"
+														/>
 													</h3>
 												</div>
-											</div>
+											</a>
 
-											<p className="max-w-2xl text-xs leading-relaxed text-zinc-300">
-												&ldquo;
-												{detail.post_data.description}
-												&rdquo;
-											</p>
-
-											{detail.post_data.img_url && (
-												<img
-													src={
-														detail.post_data.img_url
+											{/* Area deskripsi dan gambar dibuat statis agar teks review tetap mudah diseleksi admin */}
+											<div className="space-y-4 pl-0">
+												<p className="max-w-2xl text-xs leading-relaxed text-zinc-300 bg-white/[0.01] border border-white/5 rounded-2xl p-3">
+													&ldquo;
+													{
+														detail.post_data
+															.description
 													}
-													className="
-														max-h-[220px]
-														w-full
-														rounded-2xl
-														object-cover
+													&rdquo;
+												</p>
 
-														border border-white/10
-													"
-												/>
-											)}
+												{detail.post_data.img_url && (
+													<div className="relative overflow-hidden rounded-2xl border border-white/10">
+														<img
+															src={
+																detail.post_data
+																	.img_url
+															}
+															className="
+								max-h-[220px]
+								w-full
+								object-cover
+							"
+														/>
+													</div>
+												)}
+											</div>
 										</div>
 									)}
 							</div>

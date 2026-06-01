@@ -102,6 +102,7 @@ func (r *postManagementRepository) GetPaginatedPosts(ctx context.Context, params
 
 		listData = append(listData, dto.PostManageableResponse{
 			PostID:        p.PostID,
+			PublicID:      p.PublicID.String(),
 			Description:   p.Description,
 			PostType:      p.PostType,
 			Rating:        p.Rating,

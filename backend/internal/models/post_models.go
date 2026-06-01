@@ -3,13 +3,13 @@ package models
 
 import (
 	"time"
-
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type Post struct {
 	PostID        uint           `gorm:"column:post_id;primaryKey;autoIncrement"`
-	PublicID      string         `gorm:"column:public_id"`
+	PublicID      uuid.UUID      `gorm:"column:public_id"`
 	UserID        uint           `gorm:"column:user_id"`
 	BookID        uint           `gorm:"column:book_id"`
 	Description   string         `gorm:"column:description"`

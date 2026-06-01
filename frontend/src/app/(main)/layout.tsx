@@ -1,137 +1,149 @@
-'use client'
+// src/app/(main)/layout.tsx
+"use client";
 
-import { useEffect, useState, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
-import Sidebar from '@/components/leftbar/Sidebar'
-import RightSidebar from '@/components/rightbar/RightSidebar'
-import CreatePostModal from '@/components/feed/CreatePostModal'
-import { Toaster } from 'react-hot-toast'
-import { useAuthStore } from '@/stores/useAuthStore'
+import { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
+import Sidebar from "@/components/leftbar/Sidebar";
+import RightSidebar from "@/components/rightbar/RightSidebar";
+import CreatePostModal from "@/components/feed/CreatePostModal";
+import { Toaster } from "react-hot-toast";
+import { useAuthStore } from "@/stores/useAuthStore";
 
-export default function Layout({ children }: { children: React.ReactNode }) {
-  const searchParams = useSearchParams()
-  const currentTab = searchParams.get('tab')
-  const disableSidebarScroll = useRef(false)
-  const [offset, setOffset] = useState(0)
-  const [isResetting, setIsResetting] = useState(false)
-  const { user } = useAuthStore()
+type Props = {
+	children: React.ReactNode;
+	modal: React.ReactNode; // 1. Tambahkan prop modal di sini
+};
 
-  const [isAppLoading, setIsAppLoading] = useState(false)
-  useEffect(() => {
-    const handleLoadingEvent = (e: Event) => {
-      const customEvent = e as CustomEvent
-      setIsAppLoading(customEvent.detail)
-    }
+export default function Layout({ children, modal }: Props) {
+	// ... (Sisa kode useEffect, state, dan logic Anda biarkan tetap sama) ...
+	const searchParams = useSearchParams();
+	const currentTab = searchParams.get("tab");
+	const disableSidebarScroll = useRef(false);
+	const [offset, setOffset] = useState(0);
+	const [isResetting, setIsResetting] = useState(false);
+	const { user } = useAuthStore();
 
-    window.addEventListener('app-loading', handleLoadingEvent)
-    return () => window.removeEventListener('app-loading', handleLoadingEvent)
-  }, [])
+	const [isAppLoading, setIsAppLoading] = useState(false);
+	useEffect(() => {
+		const handleLoadingEvent = (e: Event) => {
+			const customEvent = e as CustomEvent;
+			setIsAppLoading(customEvent.detail);
+		};
 
-  useEffect(() => {
-    let lastScrollY = window.scrollY
+		window.addEventListener("app-loading", handleLoadingEvent);
+		return () =>
+			window.removeEventListener("app-loading", handleLoadingEvent);
+	}, []);
 
-    const handleScroll = () => {
-      const sidebar = document.getElementById('right-sidebar')
-      if (!sidebar || disableSidebarScroll.current || isAppLoading) return
+	useEffect(() => {
+		let lastScrollY = window.scrollY;
 
-      const sidebarHeight = sidebar.offsetHeight
-      const viewportHeight = window.innerHeight
-      const currentScrollY = window.scrollY
+		const handleScroll = () => {
+			const sidebar = document.getElementById("right-sidebar");
+			if (!sidebar || disableSidebarScroll.current || isAppLoading)
+				return;
 
-      const padding = 16
-      if (sidebarHeight + padding * 2 <= viewportHeight) {
-        setOffset(0)
-        lastScrollY = currentScrollY
-        return
-      }
+			const sidebarHeight = sidebar.offsetHeight;
+			const viewportHeight = window.innerHeight;
+			const currentScrollY = window.scrollY;
 
-      const delta = currentScrollY - lastScrollY
-      const maxScrollTop = sidebarHeight + padding - (viewportHeight - padding)
+			const padding = 16;
+			if (sidebarHeight + padding * 2 <= viewportHeight) {
+				setOffset(0);
+				lastScrollY = currentScrollY;
+				return;
+			}
 
-      setOffset((prev) => {
-        let next = prev + delta
-        if (next < 0) next = 0
-        if (next > maxScrollTop) next = maxScrollTop
-        return next
-      })
+			const delta = currentScrollY - lastScrollY;
+			const maxScrollTop =
+				sidebarHeight + padding - (viewportHeight - padding);
 
-      lastScrollY = currentScrollY
-    }
+			setOffset((prev) => {
+				let next = prev + delta;
+				if (next < 0) next = 0;
+				if (next > maxScrollTop) next = maxScrollTop;
+				return next;
+			});
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [disableSidebarScroll, isAppLoading])
+			lastScrollY = currentScrollY;
+		};
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout
+		window.addEventListener("scroll", handleScroll, { passive: true });
+		return () => window.removeEventListener("scroll", handleScroll);
+	}, [disableSidebarScroll, isAppLoading]);
 
-    disableSidebarScroll.current = true
+	useEffect(() => {
+		let timer: NodeJS.Timeout;
 
-    requestAnimationFrame(() => {
-      setIsResetting(true)
-      setOffset(0)
+		disableSidebarScroll.current = true;
 
-      timer = setTimeout(() => {
-        setIsResetting(false)
-        disableSidebarScroll.current = false
-      }, 300)
-    })
+		requestAnimationFrame(() => {
+			setIsResetting(true);
+			setOffset(0);
 
-    return () => clearTimeout(timer)
-  }, [currentTab])
+			timer = setTimeout(() => {
+				setIsResetting(false);
+				disableSidebarScroll.current = false;
+			}, 300);
+		});
 
-  // RESET RIGHT SIDEBAR SAAT TAB BERPINDAH
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      setOffset(0)
-    })
-  }, [currentTab])
+		return () => clearTimeout(timer);
+	}, [currentTab]);
 
-  if (!user) return <div>Loading...</div>
+	useEffect(() => {
+		requestAnimationFrame(() => {
+			setOffset(0);
+		});
+	}, [currentTab]);
 
-  return (
-    <>
-      <div className="flex justify-center gap-6 min-h-screen">
-        {/* Background */}
-        <div
-          className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat pointer-events-none"
-          style={{ backgroundImage: "url('/images/bg_desktop.png')" }}
-        />
+	if (!user) return <div>Loading...</div>;
 
-        {/* Left Sidebar */}
-        <aside className="w-84 hidden lg:block">
-          <div className="sticky top-0 h-screen">
-            <Sidebar user={user} />
-          </div>
-        </aside>
+	return (
+		<>
+			<div className="flex justify-center gap-6 min-h-screen">
+				{/* Background */}
+				<div
+					className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+					style={{ backgroundImage: "url('/images/bg_desktop.png')" }}
+				/>
 
-        {/* Main Content */}
-        <main className="flex-1 w-full max-w-[600px] z-0 px-3 sm:px-0 min-h-[120vh]">
-          {children}
-        </main>
+				{/* Left Sidebar */}
+				<aside className="w-84 hidden lg:block">
+					<div className="sticky top-0 h-screen">
+						<Sidebar user={user} />
+					</div>
+				</aside>
 
-        {/* Right Sidebar */}
-        <aside className="w-84 hidden xl:block relative">
-          <div
-            id="right-sidebar"
-            className="sticky top-4 h-fit" // Kunci agar tetap di viewport
-            style={{
-              transform: `translateY(-${offset}px)`,
-              transition: isResetting
-                ? 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)'
-                : 'none',
-            }}
-          >
-            <RightSidebar />
-          </div>
-        </aside>
-      </div>
+				{/* Main Content */}
+				<main className="flex flex-col flex-1 w-full max-w-[600px] z-0 px-3 sm:px-0 min-h-screen h-fit">
+					{children}
+				</main>
 
-      {/* GLOBAL MODAL */}
-      <CreatePostModal />
+				{/* Right Sidebar */}
+				<aside className="w-84 hidden xl:block relative">
+					<div
+						id="right-sidebar"
+						className="sticky top-4 h-fit"
+						style={{
+							transform: `translateY(-${offset}px)`,
+							transition: isResetting
+								? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
+								: "none",
+						}}
+					>
+						<RightSidebar />
+					</div>
+				</aside>
+			</div>
 
-      {/* TOASTER */}
-      <Toaster position="top-center" />
-    </>
-  )
+			{/* 2. Render slot modal di luar struktur layout utama agar bertindak sebagai overlay */}
+			{modal}
+
+			{/* GLOBAL MODAL */}
+			<CreatePostModal />
+
+			{/* TOASTER */}
+			<Toaster position="top-center" />
+		</>
+	);
 }

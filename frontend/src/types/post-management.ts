@@ -7,6 +7,7 @@ export interface PostQueryParams {
 
 export interface PostManageableResponse {
 	post_id: number;
+	public_id: string;
 	description: string;
 	post_type: string;
 	rating: number;

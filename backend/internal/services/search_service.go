@@ -146,7 +146,7 @@ func (s *searchService) mapBooksToDTO(books []models.Book) []dto.BookSearchItem 
 		}
 
 		dtos = append(dtos, dto.BookSearchItem{
-			PublicID:        b.PublicID,
+			PublicID:        b.PublicID.String(),
 			Title:           b.Title,
 			Synopsis:        b.Synopsis,
 			CoverImgURL:     b.CoverImgURL,
@@ -193,7 +193,7 @@ func (s *searchService) mapPostsToDTO(posts []models.Post) []dto.PostSummaryDTO 
 		pubAt := p.PublishedAt 
 
 		postDTO := dto.PostSummaryDTO{
-			PublicID:    p.PublicID,
+			PublicID:    p.PublicID.String(),
 			Description: p.Description,
 			ImgURL:      p.ImgURL,
 			PostType:    p.PostType,

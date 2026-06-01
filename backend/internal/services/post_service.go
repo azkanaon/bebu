@@ -16,6 +16,7 @@ import (
 
 type PostService interface {
 	GetPosts(userID uint, tab string, cursor uint, limit int, categoryID uint) ([]interface{}, error)
+	GetPostByPublicID(userID uint, publicID string) (interface{}, error)
 	CreatePost(req dto.CreatePostRequest) error
 	DeletePost(publicID string, userID uint) error
 	GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
@@ -66,6 +67,22 @@ func (s *postService) GetPosts(userID uint, tab string, cursor uint, limit int, 
     return result, nil
 }
 
+func (s *postService) GetPostByPublicID(userID uint, publicID string) (interface{}, error) {
+	post, err := s.postRepo.GetPostByPublicID(userID, publicID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Menggunakan mapper yang disesuaikan dengan PostType
+	if post.PostType == "review" {
+		return mapper.ToReviewPostResponse(post, userID), nil
+	} else if post.PostType == "analysis" {
+		return mapper.ToAnalysisPostResponse(post, userID), nil
+	}
+
+	return nil, errors.New("invalid post type")
+}
+
 func (s *postService) CreatePost(req dto.CreatePostRequest) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		txRepo := s.postRepo.WithTx(tx)
@@ -74,7 +91,7 @@ func (s *postService) CreatePost(req dto.CreatePostRequest) error {
 
 		// A. Simpan data Post utama
 		post := &models.Post{
-			PublicID:      uuid.New().String(),
+			PublicID:      uuid.New(),
 			UserID:        req.UserID,
 			BookID:        req.BookID,
 			Description:   req.Description,
@@ -331,7 +348,7 @@ func (s *postService) mapPostsToSummaryDTOs(posts []models.Post) []dto.PostSumma
 		rating := float32(post.Rating)
 		publishedAt := post.PublishedAt
 		postDTO := dto.PostSummaryDTO{
-			PublicID:    post.PublicID,
+			PublicID:    post.PublicID.String(),
 			Description: post.Description,
 			ImgURL:      post.ImgURL,
 			PostType:    post.PostType,
@@ -356,7 +373,7 @@ func (s *postService) mapPostsToSummaryDTOs(posts []models.Post) []dto.PostSumma
 				}
 			}
 			postDTO.Book = &dto.BookSummaryDTO{
-				PublicID:    post.Book.PublicID,
+				PublicID:    post.Book.PublicID.String(),
 				Title:       post.Book.Title,
 				CoverImgURL: post.Book.CoverImgURL,
 				Authors:     authorNames,
