@@ -8,7 +8,7 @@ import (
 	"backend-bebu/internal/mapper"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
-	"backend-bebu/internal/utils"
+	"backend-bebu/pkg/utils"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -228,118 +228,76 @@ func (s *postService) DeletePost(publicID string, userID uint) error {
 }
 
 func (s *postService) GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error) {
-	// 1. Cek akses
-	targetUser, hasAccess, err := s.hasProfileAccess(viewerID, targetUsername)
+	// GANTI fungsi lokal dengan fungsi GLOBAL utils
+	targetUser, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, targetUsername)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// Jika profil privat dan viewer tidak punya akses (bukan follower/owner)
 	if !hasAccess {
-		return make([]dto.PostSummaryDTO, 0), dto.NewPaginationDTO(0, page, limit), nil
+		return []dto.PostSummaryDTO{}, dto.NewPaginationDTO(0, page, limit), nil
 	}
 
-	// 2. Panggil repository
-	posts, total, err := s.postRepo.GetPostsByUserID(targetUser.UserID, page, limit)
+	// Ambil data dari repo
+	var vID uint
+	if viewerID != nil {
+		vID = *viewerID // Ambil ID jika user login
+	}
+
+	// Masukkan vID sebagai argumen pertama
+	posts, total, err := s.postRepo.GetPostsByUserID(vID, targetUser.UserID, page, limit)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// 3. Map ke DTO dan buat paginasi
-	dtos := s.mapPostsToSummaryDTOs(posts)
-	pagination := dto.NewPaginationDTO(total, page, limit)
-
-	return dtos, pagination, nil
+	return s.mapPostsToSummaryDTOs(posts), dto.NewPaginationDTO(total, page, limit), nil
 }
 
+// 2. GET USER LIKED POSTS (HANYA PEMILIK)
 func (s *postService) GetUserLikedPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error) {
-	// 1. Cek akses (menggunakan kembali helper yang sama)
-	targetUser, hasAccess, err := s.hasProfileAccess(viewerID, targetUsername)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !hasAccess {
-		return make([]dto.PostSummaryDTO, 0), dto.NewPaginationDTO(0, page, limit), nil
-	}
-
-	// 2. Panggil repository yang berbeda
-	posts, total, err := s.postRepo.GetLikedPostsByUserID(targetUser.UserID, page, limit)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// 3. Map ke DTO dan buat paginasi (menggunakan kembali helper yang sama)
-	dtos := s.mapPostsToSummaryDTOs(posts)
-	pagination := dto.NewPaginationDTO(total, page, limit)
-
-	return dtos, pagination, nil
-}
-
-func (s *postService) GetUserSavedPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error) {
-	// 1. Cek akses (menggunakan kembali helper yang sama)
-	targetUser, hasAccess, err := s.hasProfileAccess(viewerID, targetUsername)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !hasAccess {
-		return make([]dto.PostSummaryDTO, 0), dto.NewPaginationDTO(0, page, limit), nil
-	}
-
-	// 2. Panggil repository yang berbeda (untuk saved posts)
-	posts, total, err := s.postRepo.GetSavedPostsByUserID(targetUser.UserID, page, limit)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// 3. Map ke DTO dan buat paginasi (menggunakan kembali helper yang sama)
-	dtos := s.mapPostsToSummaryDTOs(posts)
-	pagination := dto.NewPaginationDTO(total, page, limit)
-
-	return dtos, pagination, nil
-}
-
-
-
-func (s *postService) hasProfileAccess(viewerID *uint, targetUsername string) (*models.User, bool, error) {
+	// Cari user target dulu
 	targetUser, err := s.userRepo.FindByUsername(targetUsername)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, false, nil // Tidak ditemukan, akses tidak ada, tapi bukan error
-		}
-		return nil, false, err // Error database
+		return nil, nil, err
 	}
 
-	if viewerID != nil {
-		isOwnProfile := (*viewerID == targetUser.UserID)
-		if isOwnProfile {
-			return targetUser, true, nil // Pemilik selalu punya akses
-		}
-		
-		isBlocked, err := s.userRepo.IsBlocked(targetUser.UserID, *viewerID)
-		if err != nil {
-			return nil, false, err
-		}
-		if isBlocked {
-			return nil, false, nil // Jika diblokir, tidak ada akses
-		}
+	// ATURAN KHUSUS: Hanya pemilik (viewerID == targetUser.UserID) yang boleh lihat
+	if viewerID == nil || *viewerID != targetUser.UserID {
+		// Kembalikan array kosong seolah-olah tidak ada data (demi keamanan)
+		return []dto.PostSummaryDTO{}, dto.NewPaginationDTO(0, page, limit), nil
 	}
 
-	isProfilePublic := (targetUser.Settings == nil || targetUser.Settings.IsProfilePublic)
-	if isProfilePublic {
-		return targetUser, true, nil // Profil publik, semua punya akses
-	}
+	vID := *viewerID
 
-	if viewerID != nil {
-		followStatus, err := s.userRepo.GetFollowStatus(*viewerID, targetUser.UserID)
-		if err != nil {
-			return nil, false, err
-		}
-		if followStatus == "accepted" {
-			return targetUser, true, nil // Follower yang diterima punya akses
-		}
-	}
+	// Panggil repo dengan vID
+	posts, total, err := s.postRepo.GetLikedPostsByUserID(vID, targetUser.UserID, page, limit)
+	if err != nil { return nil, nil, err }
 
-	// Jika semua kondisi di atas tidak terpenuhi (profil privat, bukan follower), tidak ada akses.
-	return targetUser, false, nil
+
+	// 1. Panggil helper mapping yang sudah ada
+	dtos := s.mapPostsToSummaryDTOs(posts)
+
+	return dtos, dto.NewPaginationDTO(total, page, limit), nil
 }
+
+
+func (s *postService) GetUserSavedPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error) {
+	targetUser, err := s.userRepo.FindByUsername(targetUsername)
+	if err != nil { return nil, nil, err }
+
+	if viewerID == nil || *viewerID != targetUser.UserID {
+		return []dto.PostSummaryDTO{}, dto.NewPaginationDTO(0, page, limit), nil
+	}
+
+	vID := *viewerID
+
+	posts, total, err := s.postRepo.GetSavedPostsByUserID(vID, targetUser.UserID, page, limit)
+	if err != nil { return nil, nil, err }
+
+	return s.mapPostsToSummaryDTOs(posts), dto.NewPaginationDTO(total, page, limit), nil
+}
+
 
 // mapPostsToSummaryDTOs adalah helper untuk mengubah slice model Post ke slice DTO.
 func (s *postService) mapPostsToSummaryDTOs(posts []models.Post) []dto.PostSummaryDTO {
@@ -347,6 +305,11 @@ func (s *postService) mapPostsToSummaryDTOs(posts []models.Post) []dto.PostSumma
 	for _, post := range posts {
 		rating := float32(post.Rating)
 		publishedAt := post.PublishedAt
+		displayName := post.User.Profile.DisplayName
+		if displayName == "" {
+			displayName = post.User.Username
+		}
+
 		postDTO := dto.PostSummaryDTO{
 			PublicID:    post.PublicID.String(),
 			Description: post.Description,
@@ -355,6 +318,13 @@ func (s *postService) mapPostsToSummaryDTOs(posts []models.Post) []dto.PostSumma
 			Rating:      &rating,
 			PublishedAt: &publishedAt,
 			Stats:       dto.PostStatsDTO{},
+			IsLiked:     post.IsLiked, // Ambil hasil subquery dari DB
+			IsSaved:     post.IsSaved, // Ambil hasil subquery dari DB
+			User: dto.PostUserDTO{
+				Username:    post.User.Username,
+				DisplayName: displayName,
+				AvatarURL:   post.User.Profile.AvatarUrl,
+			},
 		}
 
 		if post.Stats.PostID > 0 {

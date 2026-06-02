@@ -8,8 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// HasProfileAccess adalah fungsi global untuk mengecek apakah seorang viewer boleh melihat data lengkap target.
-// Kita mengirimkan userRepo sebagai argumen agar fungsi ini bisa melakukan query.
 func HasProfileAccess(userRepo repositories.UserRepository, viewerID *uint, targetUsername string) (*models.User, bool, error) {
 	// 1. Cari user target
 	targetUser, err := userRepo.FindByUsername(targetUsername)
@@ -40,7 +38,6 @@ func HasProfileAccess(userRepo repositories.UserRepository, viewerID *uint, targ
 	// 3. Cek Status Akun (Public vs Private)
 	isProfilePublic := true 
 	
-    // Ganti .Settings atau .Setting sesuai nama field di models/user.go Anda
 	if targetUser.Settings != nil { 
 		isProfilePublic = targetUser.Settings.IsProfilePublic
 	}

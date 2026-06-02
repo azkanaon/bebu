@@ -1,28 +1,160 @@
+'use client'
+
+import { PostType, UserPost } from '@/types/user-posts'
+import { Heart, MessageSquare, Star, Bookmark } from 'lucide-react'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
+import Link from 'next/link'
 
-export default function PostCard() {
+interface PostCardProps {
+  post: UserPost
+  viewType: PostType
+}
+
+export default function PostCard({ post, viewType }: PostCardProps) {
+  const isReview = viewType === 'review'
+
+  // --- MODE REVIEW (Grid) ---
+  if (isReview) {
+    return (
+      <Link href={`/posts/${post.publicId}`} className="group block h-full">
+        <div className="bg-[#0B1220]/80 border border-white/5 rounded-3xl overflow-hidden flex flex-col h-full transition-all duration-300 hover:border-blue-500/30 hover:bg-[#0D1525]">
+          {/* IMAGE CONTAINER */}
+          <div className="relative aspect-[3/4] w-full bg-slate-900 overflow-hidden">
+            {post.book.coverImgUrl ? (
+              <Image
+                src={post.book.coverImgUrl}
+                alt={post.book.title}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-105" // Subtle Zoom
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-700 uppercase font-black">
+                No Image
+              </div>
+            )}
+
+            {/* RATING */}
+            <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md px-2 py-1 rounded-xl border border-white/10 flex items-center gap-1.5">
+              <Star size={10} fill="#fbbf24" className="text-amber-400" />
+              <span className="text-[10px] font-bold text-white">
+                {post.rating}
+              </span>
+            </div>
+          </div>
+
+          {/* INFO */}
+          <div className="p-4 flex flex-col flex-1">
+            <h4 className="text-xs font-semibold text-slate-200 leading-snug line-clamp-2 transition-colors group-hover:text-blue-400">
+              {post.book.title}
+            </h4>
+
+            <div className="mt-auto pt-4 flex items-center gap-4 text-slate-500">
+              <div className="flex items-center gap-1.5">
+                <Heart
+                  size={14}
+                  className={post.is_liked ? 'text-pink-500' : 'text-slate-600'}
+                  fill={post.is_liked ? 'currentColor' : 'none'}
+                />
+                <span className="text-[10px] font-bold">
+                  {post.stats.likeCount}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <MessageSquare size={14} className="text-slate-600" />
+                <span className="text-[10px] font-bold">
+                  {post.stats.commentCount}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    )
+  }
+
+  // --- MODE ANALYSIS (List/Feed) ---
   return (
-    <motion.div
-      whileHover={{ y: -6, scale: 1.02 }}
-      transition={{ type: 'spring', stiffness: 250 }}
-      className="bg-[#0B1220] border border-white/10 rounded-xl overflow-hidden cursor-pointer"
-    >
-      <div className="bg-[#0B1220] border border-white/10 rounded-xl overflow-hidden">
-        <img
-          src="https://picsum.photos/300/400"
-          className="w-full h-56 sm:h-48 object-cover"
-        />
+    <Link href={`/posts/${post.publicId}`} className="group block">
+      <div className="bg-[#0B1220]/40 border border-white/5 rounded-[2rem] p-6 transition-all duration-300 hover:bg-white/[0.02] hover:border-white/10">
+        <div className="flex items-center gap-4 mb-4">
+          {/* CONTAINER KOMBINASI BUKU + USER */}
+          <div className="relative shrink-0 w-12 h-16">
+            {' '}
+            {/* Ukuran container diperbesar dikit */}
+            {/* 1. GAMBAR BUKU (Lapisan Bawah) */}
+            <div className="relative w-10 h-14 rounded-lg overflow-hidden border border-white/10 bg-slate-800 transition-colors group-hover:border-blue-500/20 shadow-lg">
+              {post.book.coverImgUrl ? (
+                <Image
+                  src={post.book.coverImgUrl}
+                  alt={post.book.title}
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-slate-600">
+                  {post.book.authors[0]?.substring(0, 2).toUpperCase() || 'UN'}
+                </div>
+              )}
+            </div>
+            {/* 2. AVATAR USER (Lapisan Atas / Overlay) */}
+            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full border-2 border-[#0B1220] overflow-hidden z-20 shadow-xl">
+              <Image
+                src={post.user?.avatarUrl || '/default-avatar.png'} // Arahkan ke default jika kosong
+                alt={post.user?.displayName || 'User'}
+                fill
+                className="object-cover"
+              />
+            </div>
+          </div>
 
-        <div className="p-3">
-          <h3 className="text-sm text-white font-medium">Sample Book Title</h3>
+          <div className="min-w-0">
+            <h4 className="text-sm font-semibold text-white truncate transition-colors group-hover:text-blue-400">
+              {post.book.title}
+            </h4>
 
-          <div className="flex justify-between text-xs text-gray-400 mt-2">
-            <span>❤️ 200</span>
-            <span>💬 50</span>
+            {/* Info User & Tanggal */}
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+              <span className="text-slate-300 font-bold group-hover:text-blue-300 transition-colors">
+                {post.user?.displayName || 'Anonymous'}
+              </span>
+              <span className="mx-1.5 opacity-30">•</span>
+              {new Date(post.publishedAt).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-sm text-slate-400 leading-relaxed line-clamp-3 mb-6 font-medium">
+          {post.description}
+        </p>
+
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Heart
+              size={16}
+              className={post.is_liked ? 'text-pink-500' : 'text-slate-500'}
+              fill={post.is_liked ? 'currentColor' : 'none'}
+            />
+            <span className="text-[11px] font-bold text-slate-500">
+              {post.stats.likeCount}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <MessageSquare size={16} className="text-slate-500" />
+            <span className="text-[11px] font-bold text-slate-500">
+              {post.stats.commentCount}
+            </span>
+          </div>
+
+          <div className="ml-auto">
+            <Bookmark
+              size={16}
+              className={post.is_saved ? 'text-blue-500' : 'text-slate-500'}
+              fill={post.is_saved ? 'currentColor' : 'none'}
+            />
           </div>
         </div>
       </div>
-    </motion.div>
+    </Link>
   )
 }

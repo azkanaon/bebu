@@ -20,9 +20,9 @@ type PostRepository interface {
 	DeletePostWithTx(tx *gorm.DB, postID uint, userID uint) error
 	ClearPostCategories(tx *gorm.DB, postID uint) error
 	DecrementCategoryUsage(tx *gorm.DB, categoryIDs []uint) error
-	GetPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error)
-	GetLikedPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error)
-	GetSavedPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error)
+	GetPostsByUserID(viewerID uint, targetUserID uint, page, limit int) ([]models.Post, int64, error)
+	GetLikedPostsByUserID(viewerID uint, targetUserID uint, page, limit int) ([]models.Post, int64, error)
+    GetSavedPostsByUserID(viewerID uint, targetUserID uint, page, limit int) ([]models.Post, int64, error)
 	ToggleLike(postID uint, userID uint) (bool, error)
 	ToggleSave(userID uint, postID uint) (bool, error)
 	UpdateSaveCount(postID uint, increment int) error
@@ -139,30 +139,29 @@ func (r *postRepository) GetPostByPublicID(userID uint, publicID string) (models
 	return post, nil
 }
 
-func (r *postRepository) GetPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error) {
+func (r *postRepository) GetPostsByUserID(viewerID uint, targetUserID uint, page, limit int) ([]models.Post, int64, error) {
 	var posts []models.Post
 	var total int64
 	offset := (page - 1) * limit
 
 	query := r.db.Model(&models.Post{}).
-		Where("user_id = ? AND publish_status = ?", userID, "published")
+		Where("user_id = ? AND publish_status = ?", targetUserID, "published")
 
-	err := query.Count(&total).Error
-	if err != nil {
-		return nil, 0, err
-	}
+	query.Count(&total)
 
-	err = query.
+	err := query.
+		// --- TAMBAHKAN SUBQUERY INI ---
+		Select(`posts.*, 
+            (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
+            (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
+            viewerID, viewerID).
+		// ------------------------------
 		Preload("Stats").
+		Preload("User.Profile").
 		Preload("Book.BookAuthors.Author").
-		Offset(offset).
-		Limit(limit).
+		Offset(offset).Limit(limit).
 		Order("published_at DESC").
 		Find(&posts).Error
-
-	if err != nil {
-		return nil, 0, err
-	}
 
 	return posts, total, err
 }
@@ -215,71 +214,66 @@ func (r *postRepository) DecrementCategoryUsage(tx *gorm.DB, categoryIDs []uint)
 		Update("usage_count", gorm.Expr("usage_count - 1")).Error
 }
 
-func (r *postRepository) GetLikedPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error) {
+func (r *postRepository) GetLikedPostsByUserID(viewerID uint, targetUserID uint, page, limit int) ([]models.Post, int64, error) {
 	var posts []models.Post
 	var total int64
 	offset := (page - 1) * limit
 
 	countQuery := r.db.Model(&models.Post{}).
 		Joins("JOIN post_likes ON post_likes.post_id = posts.post_id").
-		Where("post_likes.user_id = ? AND posts.publish_status = ?", userID, "published")
+		Where("post_likes.user_id = ? AND posts.publish_status = ?", targetUserID, "published")
 
 	err := countQuery.Count(&total).Error
-	if err != nil {
-		return nil, 0, err
-	}
+	if err != nil { return nil, 0, err }
 
-	// Query untuk mengambil data halaman ini
-	dataQuery := r.db.
+	err = r.db.
+		// --- SUBQUERY UNTUK STATUS LIKE/SAVE ---
+		Select(`posts.*, 
+            (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
+            (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
+            viewerID, viewerID).
+		// ----------------------------------------
 		Joins("JOIN post_likes ON post_likes.post_id = posts.post_id").
-		Where("post_likes.user_id = ? AND posts.publish_status = ?", userID, "published").
-		Preload("User.Profile"). // Preload pemilik asli post
+		Where("post_likes.user_id = ? AND posts.publish_status = ?", targetUserID, "published").
+		Preload("User.Profile").
 		Preload("Stats").
 		Preload("Book.BookAuthors.Author").
-		Offset(offset).
-		Limit(limit).
-		Order("post_likes.created_at DESC"). // Urutkan berdasarkan kapan post itu di-like
-		Find(&posts)
+		Offset(offset).Limit(limit).
+		Order("post_likes.created_at DESC").
+		Find(&posts).Error
 
-	if dataQuery.Error != nil {
-		return nil, 0, dataQuery.Error
-	}
-
-	return posts, total, nil
+	return posts, total, err
 }
 
-func (r *postRepository) GetSavedPostsByUserID(userID uint, page, limit int) ([]models.Post, int64, error) {
+func (r *postRepository) GetSavedPostsByUserID(viewerID uint, targetUserID uint, page, limit int) ([]models.Post, int64, error) {
 	var posts []models.Post
 	var total int64
 	offset := (page - 1) * limit
 
-	// Query dasar untuk menghitung total
 	countQuery := r.db.Model(&models.Post{}).
 		Joins("JOIN post_saves ON post_saves.post_id = posts.post_id").
-		Where("post_saves.user_id = ? AND posts.publish_status = ?", userID, "published")
+		Where("post_saves.user_id = ? AND posts.publish_status = ?", targetUserID, "published")
 
 	err := countQuery.Count(&total).Error
-	if err != nil {
-		return nil, 0, err
-	}
+	if err != nil { return nil, 0, err }
 
-	// Query untuk mengambil data halaman ini
-	dataQuery := r.db.
+	err = r.db.
+		// --- SUBQUERY UNTUK STATUS LIKE/SAVE ---
+		Select(`posts.*, 
+            (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
+            (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
+            viewerID, viewerID).
+		// ----------------------------------------
 		Joins("JOIN post_saves ON post_saves.post_id = posts.post_id").
-		Where("post_saves.user_id = ? AND posts.publish_status = ?", userID, "published").
-		Preload("User.Profile"). // Preload pemilik asli post
+		Where("post_saves.user_id = ? AND posts.publish_status = ?", targetUserID, "published").
+		Preload("User.Profile").
 		Preload("Stats").
 		Preload("Book.BookAuthors.Author").
-		Offset(offset).
-		Limit(limit).
-		Order("post_saves.created_at DESC"). // Urutkan berdasarkan kapan post itu di-save
-		Find(&posts)
+		Offset(offset).Limit(limit).
+		Order("post_saves.created_at DESC").
+		Find(&posts).Error
 
-	if dataQuery.Error != nil {
-		return nil, 0, dataQuery.Error
-	}
-
-	return posts, total, nil
+	return posts, total, err
 }
 
 func (r *postRepository) ToggleLike(postID uint, userID uint) (bool, error) {
