@@ -82,6 +82,12 @@ type CreatePostRequest struct {
 	Categories  []string `json:"categories"` // 🔥 nama kategori
 }
 
+type PostUserDTO struct {
+	Username    string `json:"username"`
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl"`
+}
+
 type PostSummaryDTO struct {
 	PublicID    string          `json:"publicId"`
 	Description string          `json:"description,omitempty"`
@@ -91,6 +97,9 @@ type PostSummaryDTO struct {
 	PublishedAt *time.Time      `json:"publishedAt,omitempty"`
 	Stats       PostStatsDTO    `json:"stats"`
 	Book        *BookSummaryDTO `json:"book,omitempty"` // Buku bisa jadi opsional
+	User 		PostUserDTO `json:"user"` 
+	IsLiked bool `json:"is_liked"` // Ganti jadi snake_case
+    IsSaved bool `json:"is_saved"` // Ganti jadi snake_case
 }
 
 type PostStatsDTO struct {

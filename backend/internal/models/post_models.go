@@ -34,8 +34,8 @@ type Post struct {
 
 	// Virtual Column
 	TotalLikes int  `gorm:"-" json:"likes"`
-	IsLiked    bool `gorm:"->;column:is_liked" json:"is_liked"`
-	IsSaved    bool `gorm:"->;column:is_saved" json:"is_saved"`
+	IsLiked bool `gorm:"->"` 
+    IsSaved bool `gorm:"->"`
 }
 
 type PostCategory struct {

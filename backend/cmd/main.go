@@ -88,6 +88,10 @@ func main() {
 	searchService := services.NewSearchService(searchRepo, userRepo)
 	searchHandler := handlers.NewSearchHandler(searchService)
 
+	submissionRepo := repositories.NewBookSubmissionRepository(db)
+	submissionService := services.NewBookSubmissionService(submissionRepo, db)
+	submissionHandler := handlers.NewBookSubmissionHandler(submissionService)
+
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
 
 	worker.InitStreakWorker(bookshelfRepo)
@@ -101,13 +105,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, bookManagementHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, submissionHandler, bookManagementHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, bookManagementHandler *handlers.BookManagementHandler) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, submissionHandler *handlers.BookSubmissionHandler, bookManagementHandler *handlers.BookManagementHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -144,8 +148,8 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			users.GET("/:username/bookshelves", authMiddleware.OptionalAuth(), bookshelfHandler.GetUserBookshelves)
 
 			users.GET("/:username/posts", authMiddleware.OptionalAuth(), postHandler.GetUserPosts)
-			users.GET("/:username/likes", authMiddleware.OptionalAuth(), postHandler.GetUserLikedPosts)
-			users.GET("/:username/saves", authMiddleware.OptionalAuth(), postHandler.GetUserSavedPosts)
+			users.GET("/:username/likes", authMiddleware.RequiredAuth(), postHandler.GetUserLikedPosts)
+			users.GET("/:username/saves", authMiddleware.RequiredAuth(), postHandler.GetUserSavedPosts)
 			users.GET("/search", authMiddleware.RequiredAuth(), userHandler.SearchUsers)
 
 			users.GET("/:username/followers", authMiddleware.OptionalAuth(), userHandler.GetFollowers)
@@ -277,6 +281,14 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 				adminBook.POST("/submissions/:id/approve", bookManagementHandler.ApproveSubmission)
 				adminBook.POST("/submissions/:id/reject", bookManagementHandler.RejectSubmission)
 			}
+		}
+
+		sub := v1.Group("/submissions").Use(authMiddleware.RequiredAuth())
+		{
+			sub.POST("", submissionHandler.Submit)
+			sub.GET("/my", submissionHandler.GetMySubmissions)
+			sub.PATCH("/:id", submissionHandler.Update) 
+			sub.DELETE("/:id", submissionHandler.Delete)
 		}
 
 		v1.GET("/ws", authMiddleware.RequiredAuth(), wsHandler.HandleWS)
