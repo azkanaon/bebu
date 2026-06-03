@@ -14,14 +14,14 @@ import (
 type SearchService interface {
 	// Untuk Tab 'TOP' (Cuplikan 3 kategori sekaligus)
 	SearchTop(viewerID *uint, query string) (*dto.SearchTopResponseDTO, error)
-	
-	// Untuk Tab Spesifik (Paginasi lengkap)
 	SearchBooks(query string, page, limit int) ([]dto.BookSearchItem, *dto.PaginationDTO, error)
 	SearchUsers(viewerID *uint, query string, page, limit int) ([]dto.UserSummaryDTO, *dto.PaginationDTO, error)
 	SearchPosts(query string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error)
 	GetMySearchHistory(userID uint) ([]dto.SearchHistoryDTO, error) 
 	DeleteHistoryItem(userID uint, logID uint) error
 	ClearAllHistory(userID uint) error
+	SearchAuthors(query string) ([]dto.SubmissionItemInput, error)
+	SearchGenres(query string) ([]dto.SubmissionItemInput, error)
 }
 
 type searchService struct {
@@ -234,4 +234,34 @@ func (s *searchService) DeleteHistoryItem(userID uint, logID uint) error {
 
 func (s *searchService) ClearAllHistory(userID uint) error {
 	return s.searchRepo.ClearAllSearchHistory(userID)
+}
+
+// Implementasi SearchAuthors
+func (s *searchService) SearchAuthors(query string) ([]dto.SubmissionItemInput, error) {
+	res, err := s.searchRepo.SearchAuthorsOnly(query, 3) // Limit 15 saran
+	if err != nil { return nil, err }
+
+	dtos := make([]dto.SubmissionItemInput, 0, len(res))
+	for _, a := range res {
+		dtos = append(dtos, dto.SubmissionItemInput{
+			ID:   a.AuthorID,
+			Name: a.AuthorName,
+		})
+	}
+	return dtos, nil
+}
+
+// Implementasi SearchGenres
+func (s *searchService) SearchGenres(query string) ([]dto.SubmissionItemInput, error) {
+	res, err := s.searchRepo.SearchGenresOnly(query, 3)
+	if err != nil { return nil, err }
+
+	dtos := make([]dto.SubmissionItemInput, 0, len(res))
+	for _, g := range res {
+		dtos = append(dtos, dto.SubmissionItemInput{
+			ID:   g.GenreID,
+			Name: g.GenreName,
+		})
+	}
+	return dtos, nil
 }

@@ -175,3 +175,23 @@ func (h *SearchHandler) ClearAllHistory(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "all search history cleared"})
 }
+
+func (h *SearchHandler) SearchAuthors(c *gin.Context) {
+	query := c.Query("q")
+	authors, err := h.service.SearchAuthors(query)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"data": authors})
+}
+
+func (h *SearchHandler) SearchGenres(c *gin.Context) {
+	query := c.Query("q")
+	genres, err := h.service.SearchGenres(query)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "failed to search genres"})
+		return
+	}
+	c.JSON(200, gin.H{"data": genres})
+}

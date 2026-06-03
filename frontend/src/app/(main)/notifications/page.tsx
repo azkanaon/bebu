@@ -89,7 +89,7 @@ export default function NotificationsPage() {
   }, [allNotifications, activeTab])
 
   return (
-    <div className="max-w-150 mx-auto min-h-screen pb-20">
+    <div className="max-w-150 min-h-screen pb-20">
       <header className="sticky top-0 z-10 bg-[#0B1220]/80 backdrop-blur-md border-b border-white/5">
         <div className="px-6 py-5">
           <h1 className="text-lg font-semibold text-white tracking-tight">

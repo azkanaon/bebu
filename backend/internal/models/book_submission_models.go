@@ -31,14 +31,17 @@ type BookSubmission struct {
 	CoverImgURL        *string        `gorm:"column:cover_img_url;type:text"`
 	UserNote           *string        `gorm:"column:user_note;type:text"`
 	AdminNote          *string        `gorm:"column:admin_note;type:text"`
+	PublicationYear *int16 `gorm:"column:publication_year"`
 	// ----------------------------
 
-	Status             string         `gorm:"column:status;size:30;default:pending"`
+	Status BookSubmissionStatus `gorm:"column:status;size:30;default:pending"`
 	ReviewedAt         *time.Time     `gorm:"column:reviewed_at"`
 	CreatedAt          time.Time      `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt          time.Time      `gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt          gorm.DeletedAt `gorm:"column:deleted_at;index"`
 
+	SubmittedByUser User  `gorm:"foreignKey:SubmittedByUserID"`
+	ReviewedByUser  *User `gorm:"foreignKey:ReviewedByUserID"`
 	// Relasi tetap sama
 	SubmissionAuthors  []BookSubmissionAuthor `gorm:"foreignKey:BookSubmissionID"`
 	SubmissionGenres   []BookSubmissionGenre  `gorm:"foreignKey:BookSubmissionID"`

@@ -244,6 +244,9 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			search.GET("/users", authMiddleware.OptionalAuth(), searchHandler.SearchUsers)
 			search.GET("/posts", authMiddleware.OptionalAuth(), searchHandler.SearchPosts)
 			search.GET("/history", authMiddleware.RequiredAuth(), searchHandler.GetHistory)
+
+			search.GET("/authors", searchHandler.SearchAuthors)
+    		search.GET("/genres", searchHandler.SearchGenres)
 			
 			search.DELETE("/history/all",authMiddleware.RequiredAuth(), searchHandler.ClearAllHistory)
 			search.DELETE("/history/:id",authMiddleware.RequiredAuth(), searchHandler.DeleteHistory)

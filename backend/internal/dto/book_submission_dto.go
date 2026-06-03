@@ -12,6 +12,7 @@ type CreateBookSubmissionRequest struct {
 	Authors []SubmissionItemInput `json:"authors" binding:"required,min=1"`
 	Genres  []SubmissionItemInput `json:"genres" binding:"required,min=1"`
 	RemoveCover *bool `json:"remove_cover"`
+	PublicationYear int `json:"publication_year"`
 	Synopsis   string   `json:"synopsis"`
 	TotalPages int      `json:"total_pages"`
 	Language   string   `json:"language"`
@@ -37,6 +38,7 @@ type MySubmissionResponse struct {
 	ISBN        *string   `json:"isbn,omitempty"`
 	UserNote    *string   `json:"userNote"`
 	AdminNote   *string   `json:"adminNote"`
+	PublicationYear *int16 `json:"publicationYear,omitempty"`
 	// ----------------------------
 	Authors     []string  `json:"authors"`
 	Genres      []string  `json:"genres"`

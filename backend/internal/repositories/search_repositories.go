@@ -18,6 +18,8 @@ type SearchRepository interface {
 	GetRecentSearches(userID uint, limit int) ([]models.SearchLog, error)
 	DeleteSearchHistory(userID uint, logID uint) error
 	ClearAllSearchHistory(userID uint) error
+	SearchAuthorsOnly(query string, limit int) ([]models.Author, error)
+	SearchGenresOnly(query string, limit int) ([]models.Genre, error)
 }
 
 type searchRepository struct {
@@ -177,4 +179,24 @@ func (r *searchRepository) DeleteSearchHistory(userID uint, logID uint) error {
 
 func (r *searchRepository) ClearAllSearchHistory(userID uint) error {
 	return r.db.Where("user_id = ?", userID).Delete(&models.SearchLog{}).Error
+}
+
+// Implementasi SearchAuthorsOnly
+func (r *searchRepository) SearchAuthorsOnly(query string, limit int) ([]models.Author, error) {
+	var authors []models.Author
+	err := r.db.Where("LOWER(author_name) LIKE ?", "%"+strings.ToLower(query)+"%").
+		Limit(limit).
+		Order("author_name ASC").
+		Find(&authors).Error
+	return authors, err
+}
+
+// Implementasi SearchGenresOnly
+func (r *searchRepository) SearchGenresOnly(query string, limit int) ([]models.Genre, error) {
+	var genres []models.Genre
+	err := r.db.Where("LOWER(genre_name) LIKE ?", "%"+strings.ToLower(query)+"%").
+		Limit(limit).
+		Order("genre_name ASC").
+		Find(&genres).Error
+	return genres, err
 }
