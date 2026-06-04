@@ -1,16 +1,15 @@
 package repositories
 
 import (
+	"backend-bebu/internal/dto"
+	"backend-bebu/internal/models"
 	"context"
 	"fmt"
 	"math"
 	"strings"
-	"backend-bebu/internal/dto"
-	"backend-bebu/internal/models"
 
 	"github.com/gosimple/slug"
 	"gorm.io/gorm"
-
 )
 
 type BookManagementRepository interface {
@@ -167,8 +166,8 @@ func (r *bookManagementRepository) GetPaginatedSubmissions(ctx context.Context, 
 	listData := make([]dto.ManageSubmissionResponse, 0)
 	for _, s := range subs {
 		authors := []string{}
-		for _, a := range s.Authors {
-			authors = append(authors, a.AuthorName)
+		for _, a := range s.SubmissionAuthors {
+			authors = append(authors, *a.AuthorName)
 		}
 
 		// Ambil DisplayName secara aman dari relasi Profile (antisipasi jika profile data bernilai nil)
@@ -183,13 +182,13 @@ func (r *bookManagementRepository) GetPaginatedSubmissions(ctx context.Context, 
 			BookSubmissionID: s.BookSubmissionID,
 			SubmittedByByInfo: subBy,
 			Title:            s.Title,
-			TotalPages:       s.TotalPages,
-			Language:         s.Language,
-			ISBN:             s.ISBN,
-			Synopsis:         s.Synopsis,
-			CoverImgURL:      s.CoverImgURL,
-			UserNote:         s.UserNote,
-			AdminNote:        s.AdminNote,
+			TotalPages:       *s.TotalPages,
+			Language:         *s.Language,
+			ISBN:             *s.ISBN,
+			Synopsis:         *s.Synopsis,
+			CoverImgURL:      *s.CoverImgURL,
+			UserNote:         *s.UserNote,
+			AdminNote:        *s.AdminNote,
 			Status:           string(s.Status),
 			Authors:          authors,
 			CreatedAt:        s.CreatedAt,

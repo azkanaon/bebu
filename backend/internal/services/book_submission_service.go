@@ -53,7 +53,10 @@ func (s *bookSubmissionService) CreateSubmission(userID uint, req dto.CreateBook
 	if req.Language != "" { submission.Language = &req.Language }
 	if req.ISBN != ""     { submission.ISBN = &req.ISBN }
 	if req.UserNote != "" { submission.UserNote = &req.UserNote }
-	
+	if req.PublicationYear > 0 {
+        year := int16(req.PublicationYear)
+        submission.PublicationYear = &year
+    }
 	if req.TotalPages > 0 {
 		val := req.TotalPages
 		submission.TotalPages = &val
@@ -123,10 +126,11 @@ func (s *bookSubmissionService) GetMySubmissions(userID uint, status string, pag
 		responseDTOs = append(responseDTOs, dto.MySubmissionResponse{
 			ID:          sub.BookSubmissionID,
 			Title:       sub.Title,
-			Status:      sub.Status,
+			Status:      string(sub.Status),
 			CoverImgURL: sub.CoverImgURL,
 			Authors:     authors,
 			Genres:      genres,
+			PublicationYear: sub.PublicationYear,
 			UserNote:    sub.UserNote,
 			AdminNote:   sub.AdminNote,
 			CreatedAt:   sub.CreatedAt,
@@ -141,52 +145,48 @@ func (s *bookSubmissionService) GetMySubmissions(userID uint, status string, pag
 }
 
 func (s *bookSubmissionService) UpdateSubmission(userID uint, subID uint, req dto.CreateBookSubmissionRequest, coverFile *multipart.FileHeader) error {
-	// 1. Ambil data lama
 	sub, err := s.repo.FindSubmissionByID(subID)
 	if err != nil {
 		return errors.New("submission not found")
 	}
 
-	// 2. Security Check: Hanya pemilik yang bisa edit
+	// Cek pemilik pengajuan
 	if sub.SubmittedByUserID != userID {
 		return errors.New("forbidden: this is not your submission")
 	}
 
-	// 3. Status Check: Hanya boleh edit jika masih pending atau perlu revisi
+	// Cek status pengajuan
 	if sub.Status != "pending" && sub.Status != "needs_revision" {
 		return errors.New("cannot edit: submission is already processed")
 	}
 
-	// 4. Proses Cover baru jika diupload
+	// Proses Cover baru jika diupload
 	if coverFile != nil {
-		// Kondisi 1: User upload file baru
 		url, err := utils.UploadToCloudinary(coverFile, "bebu/submissions")
 		if err == nil {
 			sub.CoverImgURL = &url
 		}
 	} else if req.RemoveCover != nil && *req.RemoveCover == true {
-		// Kondisi 2: User ingin menghapus cover (set ke NULL)
 		sub.CoverImgURL = nil 
 	}
 
-	// 5. Jalankan Transaksi Database
-	// Kita gunakan anonymous function agar Rollback otomatis jika ada error
+	// Transaction
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		txRepo := s.repo.WithTx(tx)
-		// Update data teks utama (Hanya jika diisi di request)
 		if req.Title != "" { sub.Title = req.Title }
 		if req.Synopsis != "" { sub.Synopsis = &req.Synopsis }
 		if req.Language != "" { sub.Language = &req.Language }
 		if req.ISBN != "" { sub.ISBN = &req.ISBN }
 		if req.UserNote != "" { sub.UserNote = &req.UserNote }
 		if req.TotalPages > 0 { sub.TotalPages = &req.TotalPages }
-
-		// Simpan perubahan tabel induk
+		if req.PublicationYear > 0 {
+			year := int16(req.PublicationYear)
+			sub.PublicationYear = &year
+		}
 		if err := s.repo.UpdateSubmission(tx, sub); err != nil { return err }
 
-		// --- Update Relasi Penulis (Delete & Re-insert) ---
+		// Update Relasi Genre
 		if len(req.Authors) > 0 {
-			// GUNAKAN txRepo, jangan s.repo!
 			if err := txRepo.DeleteSubmissionAuthors(subID); err != nil {
 				return err
 			}
@@ -199,16 +199,15 @@ func (s *bookSubmissionService) UpdateSubmission(userID uint, subID uint, req dt
 					nameCopy := a.Name
 					authorEntry.AuthorName = &nameCopy
 				}
-				// Gunakan tx (transaksi) untuk Create
+
 				if err := tx.Create(&authorEntry).Error; err != nil {
 					return err
 				}
 			}
 		}
 
-		// --- Update Relasi Genre (Delete & Re-insert) ---
+		// Update Relasi Genre
 		if len(req.Genres) > 0 {
-			// GUNAKAN txRepo, jangan s.repo!
 			if err := txRepo.DeleteSubmissionGenres(subID); err != nil {
 				return err
 			}
@@ -221,7 +220,7 @@ func (s *bookSubmissionService) UpdateSubmission(userID uint, subID uint, req dt
 					nameCopy := g.Name
 					genreEntry.GenreName = &nameCopy
 				}
-				// Gunakan tx (transaksi) untuk Create
+				
 				if err := tx.Create(&genreEntry).Error; err != nil {
 					return err
 				}

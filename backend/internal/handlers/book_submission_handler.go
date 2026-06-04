@@ -30,7 +30,8 @@ func (h *BookSubmissionHandler) Submit(c *gin.Context) {
 	req.Language = c.PostForm("language")
 	req.ISBN = c.PostForm("isbn")
 	req.UserNote = c.PostForm("user_note")
-	
+	year, _ := strconv.Atoi(c.PostForm("publication_year"))
+    req.PublicationYear = year
 	totalPages, _ := strconv.Atoi(c.PostForm("total_pages"))
 	req.TotalPages = totalPages
 
@@ -109,6 +110,8 @@ func (h *BookSubmissionHandler) Update(c *gin.Context) {
 	req.Language = c.PostForm("language")
 	req.ISBN = c.PostForm("isbn")
 	req.UserNote = c.PostForm("user_note")
+	year, _ := strconv.Atoi(c.PostForm("publication_year"))
+    req.PublicationYear = year
 	tp, _ := strconv.Atoi(c.PostForm("total_pages"))
 	req.TotalPages = tp
 	

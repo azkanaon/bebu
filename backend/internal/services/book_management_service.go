@@ -3,8 +3,8 @@ package services
 import (
 	"context"
 	"errors"
-	"time"
 	"strings"
+	"time"
 
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/models"
@@ -110,7 +110,7 @@ func (s *bookManagementService) RejectSubmission(ctx context.Context, submission
 	sub.Status = models.BookSubmissionRejected
 	sub.ReviewedByUserID = &adminID
 	sub.ReviewedAt = &now
-	sub.AdminNote = req.AdminNote
+	sub.AdminNote = &req.AdminNote
 
 	return s.repo.UpdateSubmissionTx(db, &sub)
 }
