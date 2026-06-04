@@ -89,7 +89,7 @@ export default function MySubmissionsPage() {
             <p className="text-sm font-medium">No pending requests found.</p>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="mt-4 text-blue-500 text-xs font-bold uppercase tracking-widest cursor-pointer hover:text-blue-400"
+              className="mt-4 text-blue-500 text-xs font-bold uppercase tracking-widest cursor-pointer hover:text-blue-400 transition-colors"
             >
               Start a new request
             </button>
