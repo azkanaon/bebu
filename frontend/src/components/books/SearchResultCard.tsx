@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Image from "next/image";
 import { Clock3, Globe2, FileText } from "lucide-react";
 
@@ -10,29 +11,31 @@ type Props = {
 
 export default function SearchResultCard({ book }: Props) {
 	return (
-		<div
+		<Link
+			href={`/books/${book.slug}`} // Mengarah ke ./books/[slug]
 			className="
-				group
-				relative
+		group
+		relative
+		block               {/* Tambahkan block atau inline-block agar layouting div tidak rusak */}
+		overflow-hidden
 
-				overflow-hidden
+		border
+		border-blue-400/[0.06]
 
-				border
-				border-blue-400/[0.06]
+		bg-[#0B1220]/55
 
-				bg-[#0B1220]/55
+		px-4 py-3.5
 
-				px-4 py-3.5
+		backdrop-blur-xl
 
-				backdrop-blur-xl
+		transition-all
+		duration-300
 
-				transition-all
-				duration-300
-
-				hover:border-blue-400/[0.14]
-				hover:bg-[#0B1220]/78
-				hover:shadow-[0_0_40px_rgba(59,130,246,0.06)]
-			"
+		hover:border-blue-400/[0.14]
+		hover:bg-[#0B1220]/78
+		hover:shadow-[0_0_40px_rgba(59,130,246,0.06)]
+		cursor-pointer      {/* Tambahkan cursor-pointer agar kursor berubah jadi tangan */}
+	"
 		>
 			{/* HOVER GLOW */}
 			<div
@@ -240,6 +243,6 @@ export default function SearchResultCard({ book }: Props) {
 					</p>
 				</div>
 			</div>
-		</div>
+		</Link>
 	);
 }

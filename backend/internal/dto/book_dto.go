@@ -25,6 +25,7 @@ type BookSearchItem struct {
 	TotalPages      int      `json:"total_pages"`
 	Rating          float32  `json:"rating"`
 	GoogleBookID    string   `json:"google_books_id"`
+	Slug	        string   `json:"slug"`
 }
 
 type BookSearchResponse struct {
@@ -38,6 +39,7 @@ type BookSearchResponse struct {
 type PopularBookItem struct {
 	PublicID        string   `json:"public_id"`
 	Title           string   `json:"title"`
+	Slug            string   `json:"slug"`
 	CoverImgURL     string   `json:"cover_img_url"`
 	Rating          float32  `json:"rating"`
 	TotalPages      int      `json:"total_pages"`
@@ -54,6 +56,7 @@ type PopularBooksResponse struct {
 type HighlyRatedBookItem struct {
 	PublicID        string   `json:"public_id"`
 	Title           string   `json:"title"`
+	Slug            string   `json:"slug"`
 	CoverImgURL     string   `json:"cover_img_url"`
 	Rating          float32  `json:"rating"`
 	WeightedScore   float64  `json:"weighted_score"`

@@ -4,13 +4,16 @@ import (
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/dto"
 	"gorm.io/gorm"
+
 	"fmt"
 	"strings"
 	"context"
+	"time"
+	"errors"
 )
 
 type ReportRepository interface {
-	CreateReport(report *models.Report) error
+	CreateReportWithSummary(userID uint, entityID int, entityType string, reason string) error
 	// Report Summary
 	GetDashboardSummaries(filters dto.ReportFilterRequest) ([]dto.ReportDashboardResponse, int64, error)
 	// Report Summary Detail
@@ -34,8 +37,77 @@ func NewReportRepository(db *gorm.DB) ReportRepository {
 	return &reportRepository{db}
 }
 
-func (r *reportRepository) CreateReport(report *models.Report) error {
-	return r.db.Create(report).Error
+func (r *reportRepository) CreateReportWithSummary(userID uint, entityID int, entityType string, reason string) error {
+	// Menggunakan GORM Transaction closure otomatis (Auto Rollback jika return err)
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var summary models.ReportSummary
+		now := time.Now()
+
+		// 1. Cek apakah Summary untuk entitas ini sudah ada atau belum
+		err := tx.Where("entity_id = ? AND entity_type = ?", entityID, entityType).
+			First(&summary).Error
+
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// Kasus A: JIKA BELUM ADA SUMMARY (Laporan Pertama untuk entitas ini)
+				summary = models.ReportSummary{
+					EntityID:      entityID,
+					EntityType:    entityType,
+					TotalReports:  1,
+					UniqueReports: 1, // Pelapor pertama pasti unik
+					Status:        "Not reviewed",
+					FirstReport:   now,
+					LastReport:    now,
+				}
+				if err := tx.Create(&summary).Error; err != nil {
+					return err
+				}
+			} else {
+				// Jika ada error DB lainnya
+				return err
+			}
+		} else {
+			// Kasus B: JIKA SUMMARY SUDAH ADA (Entitas ini sudah pernah dilaporkan oleh orang lain)
+			
+			// Opsional: Cek apakah user ini sudah pernah melaporkan entitas ini sebelumnya (untuk unique_reports)
+			var count int64
+			tx.Model(&models.Report{}).
+				Where("report_summary_id = ? AND user_id = ?", summary.ReportSummaryID, userID).
+				Count(&count)
+
+			uniqueIncrement := 0
+			if count == 0 {
+				uniqueIncrement = 1 // User baru pertama kali melapor entitas ini
+			}
+
+			// Update Summary yang sudah ada
+			err := tx.Model(&summary).Updates(map[string]interface{}{
+				"total_reports":  gorm.Expr("total_reports + ?", 1),
+				"unique_reports": gorm.Expr("unique_reports + ?", uniqueIncrement),
+				"last_report":    now,
+				"status":         "Not reviewed", // Kembalikan status ke Not Reviewed jika ada laporan baru masuk
+			}).Error
+			if err != nil {
+				return err
+			}
+		}
+
+		// 2. Buat Log Report baru yang mengikat ke ReportSummaryID yang didapatkan
+		report := models.Report{
+			ReportSummaryID: summary.ReportSummaryID, // Foreign key didapat dari step atas
+			UserID:          userID,
+			EntityID:        entityID,
+			EntityType:      entityType,
+			ReasonText:      &reason,
+			CreatedAt:       now,
+		}
+
+		if err := tx.Create(&report).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 /* --- REPORT SUMMARY --- */

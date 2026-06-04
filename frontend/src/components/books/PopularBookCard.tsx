@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 import { BookOpen, Clock3, MessageSquareText } from "lucide-react";
 
@@ -12,14 +13,16 @@ type Props = {
 
 export default function PopularBookCard({ book }: Props) {
 	return (
-		<div
-			className="
-				group
-
-				w-[190px]
-				shrink-0
-			"
-		>
+		<Link
+    href={`/books/${book.slug}`} // Mengarah ke ./books/[slug] (sesuaikan dengan properti slug buku kamu)
+    className="
+        group
+        w-[190px]
+        shrink-0
+        block       {/* Ditambahkan agar perilaku layouting Link sama seperti div asli */}
+        cursor-pointer
+    "
+>
 			<div
 				className="
 					overflow-hidden
@@ -176,6 +179,6 @@ export default function PopularBookCard({ book }: Props) {
 					</div>
 				</div>
 			</div>
-		</div>
+		</Link>
 	);
 }

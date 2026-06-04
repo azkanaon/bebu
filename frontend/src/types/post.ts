@@ -49,6 +49,7 @@ export interface ReviewPostType extends BasePost {
     cover: string;
     genres: string[];
     rating: number;
+    slug: string;
   };
   is_liked: boolean;
   is_saved: boolean;
@@ -64,6 +65,7 @@ export interface AnalysisPostType extends BasePost {
 	book: {
 		title: string;
 		cover: string;
+		slug: string;
 	};
 	image?: string;
 	likes: number;

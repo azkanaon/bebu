@@ -38,6 +38,7 @@ import {
 	AuthorResponse,
 	GenreResponse,
 } from "@/types/book-management";
+import { FriendRecommendationItem } from "@/types/user";
 import api from "@/lib/axios";
 
 export async function getPostsAPI(
@@ -438,5 +439,14 @@ export async function searchGenresAPI(
 	);
 
 	// Jika instance `api` Anda adalah Axios, kembalikan `res.data`
+	return res.data;
+}
+
+/* Aside Right Sidebar */
+// Friend Recommendation
+export async function getFriendRecommendationsAPI(): Promise<
+	FriendRecommendationItem[]
+> {
+	const res = await api.get("/v1/users/recommendation");
 	return res.data;
 }

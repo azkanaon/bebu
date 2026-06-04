@@ -20,6 +20,7 @@ import ReportModal from "./ReportModal";
 import AnalysisPost from "./AnalysisPost";
 import ReviewPost from "./ReviewPost";
 import CommentItem from "./CommentItem";
+import { usePathname, useRouter } from "next/navigation";
 
 type Props = {
 	postId: number;
@@ -40,6 +41,56 @@ export default function CommentModal({
 	type,
 	isStandalonePage = false,
 }: Props) {
+	const router = useRouter();
+	const pathname = usePathname();
+
+	useEffect(() => {
+		// Logika ini HANYA berjalan jika ini adalah pop-up modal, bukan standalone page
+		if (isStandalonePage) return;
+
+		const handleGlobalClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			// Cari apakah elemen yang diklik (atau parent-nya) adalah sebuah Link/Anchor tag
+			const anchor = target.closest("a");
+
+			// Jika yang diklik adalah link, memiliki href, dan href-nya mengarah ke rute internal aplikasi
+			if (
+				anchor &&
+				anchor.href &&
+				anchor.href.startsWith(window.location.origin)
+			) {
+				// Ambil path tujuannya saja (misal: /[username] atau /books/[slug])
+				const targetPath = anchor.href.replace(
+					window.location.origin,
+					"",
+				);
+
+				// Jika link tujuan sama dengan URL modal saat ini, abaikan
+				if (targetPath === pathname) return;
+
+				// 1. Cegah navigasi bawaan Next.js/Browser agar tidak terjadi tabrakan history
+				e.preventDefault();
+				e.stopPropagation();
+
+				// 2. Tutup slot @modal secara resmi dengan memerintahkan router mundur 1 langkah
+				router.back();
+
+				// 3. Berikan jeda super singkat (micro-task) agar rute intersep mati total dari layar,
+				// kemudian arahkan router Next.js ke halaman tujuan asli secara absolut.
+				setTimeout(() => {
+					router.push(targetPath);
+				}, 50);
+			}
+		};
+
+		// Daftarkan event listener klik di seluruh area modal
+		document.addEventListener("click", handleGlobalClick, true);
+
+		return () => {
+			document.removeEventListener("click", handleGlobalClick, true);
+		};
+	}, [isStandalonePage, router, pathname]);
+
 	const authStorage = localStorage.getItem("bebu-auth-storage");
 	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
 
@@ -464,7 +515,7 @@ export default function CommentModal({
 				transition={{ type: "spring", damping: 25, stiffness: 200 }}
 				className={
 					isStandalonePage
-						? "relative w-full flex flex-col flex-1 pb-32"
+						? "relative w-full flex flex-col flex-1 bg-gray-950/40 rounded-2xl border border-gray-800 overflow-hidden pb-[84px]"
 						: "relative bg-gray-950 w-full max-w-2xl h-full sm:h-[90vh] rounded-t-[2rem] sm:rounded-2xl border-t sm:border border-gray-800 flex flex-col shadow-2xl overflow-hidden"
 				}
 			>
@@ -492,7 +543,7 @@ export default function CommentModal({
 				<div
 					className={
 						isStandalonePage
-							? "flex-1 bg-gray-950"
+							? "flex-1 flex flex-col min-h-[calc(100vh-68px)] bg-gray-950"
 							: "flex-1 overflow-y-auto custom-scrollbar"
 					}
 				>
@@ -530,7 +581,9 @@ export default function CommentModal({
 						</div>
 					)}
 
-					<div className="p-5 space-y-6">
+					<div
+						className={`p-5 space-y-6 ${isStandalonePage ? "flex-1" : ""}`}
+					>
 						{loading ? (
 							<div className="flex flex-col items-center justify-center h-full min-h-[200px] space-y-3">
 								<div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -587,7 +640,7 @@ export default function CommentModal({
 				<div
 					className={
 						isStandalonePage
-							? "fixed bottom-0 left-1/2 -translate-x-1/2 z-30 p-4 border-t border-gray-800 bg-gray-950/95 backdrop-blur-md w-full max-w-[600px]"
+							? "fixed bottom-0 left-auto right-auto z-30 p-4 border-t border-x border-gray-800 bg-gray-950/95 backdrop-blur-md w-full max-w-[calc(100vw-24px)] sm:max-w-[600px] rounded-t-none"
 							: "p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md"
 					}
 				>

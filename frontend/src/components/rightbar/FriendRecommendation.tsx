@@ -1,99 +1,183 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { followUserAPI, unfollowUserAPI } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { getFriendRecommendationsAPI } from "@/lib/api";
+import { useFollowUser } from "@/api/profile/useFollowUser";
+import { useUnfollowUser } from "@/api/profile/useUnfollowUser";
 import { formatCompactNumber } from "@/lib/utils";
-
-type User = {
-	id: number;
-	name: string;
-	username: string;
-	avatar: string;
-	verified?: boolean;
-	mutualUsers?: string[];
-	bio?: string;
-	total_followers: number;
-	total_following: number;
-};
+import { FriendRecommendationItem } from "@/types/user";
+import { UserProfileResponse } from "@/types/profile";
+import { FaCheck } from "react-icons/fa";
 
 export function FriendRecommendation() {
-	const [users, setUsers] = useState<User[]>([]);
+	const [users, setUsers] = useState<FriendRecommendationItem[]>([]);
+	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [hovered, setHovered] = useState<number | null>(null);
 	const [followStatus, setFollowStatus] = useState<Record<number, string>>(
 		{},
 	);
-
-	useEffect(() => {
-		fetch("http://localhost:8080/api/v1/users/recommendation")
-			.then((res) => res.json())
-			.then((data) =>
-				setUsers(
-					(Array.isArray(data) ? data : []).map((u: User) => ({
-						...u,
-						verified: Math.random() > 0.7,
-						mutualUsers: ["Alice", "Bob", "Charlie"].slice(
-							0,
-							Math.floor(Math.random() * 3) + 1,
-						),
-					})),
-				),
-			);
-	}, []);
-
-	const toggleFollow = async (user: User) => {
-		const currentStatus = followStatus[user.id];
-
-		try {
-			// Jika sudah follow atau sedang pending, maka UNFOLLOW
-			if (currentStatus === "accepted" || currentStatus === "pending") {
-				await unfollowUserAPI(user.username);
-
-				// Hapus status dari state agar tombol kembali jadi "Follow"
-				setFollowStatus((prev) => {
-					const newState = { ...prev };
-					delete newState[user.id];
-					return newState;
-				});
-				console.log(`Berhasil unfollow ${user.username}`);
-			}
-			// Jika belum follow, maka FOLLOW
-			else {
-				const res = await followUserAPI(user.username);
-
-				setFollowStatus((prev) => ({
-					...prev,
-					[user.id]: res.status, // "accepted" atau "pending"
-				}));
-			}
-		} catch (err) {
-			console.error("Follow error:", err);
-		}
-	};
 	const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(
 		null,
 	);
 
+	const queryClient = useQueryClient();
+	const { mutate: followUser, isPending: isFollowPending } = useFollowUser();
+	const { mutate: unfollowUser, isPending: isUnfollowPending } =
+		useUnfollowUser();
+
+	const isActionPending = isFollowPending || isUnfollowPending;
+
+	// Fetch data rekomendasi asli dari BE Scoring System
+	useEffect(() => {
+		const fetchRecommendations = async () => {
+			try {
+				setIsLoading(true);
+				const data = await getFriendRecommendationsAPI();
+				setUsers(data || []);
+			} catch (error) {
+				console.error("Gagal memuat rekomendasi teman:", error);
+				setUsers([]);
+			} finally {
+				setIsLoading(false);
+			}
+		};
+
+		fetchRecommendations();
+	}, []);
+
+	const toggleFollow = (user: FriendRecommendationItem) => {
+		if (isActionPending) return;
+
+		const currentStatus = followStatus[user.id];
+
+		// Skenario 1: Jika sudah follow atau sedang pending, maka UNFOLLOW
+		if (currentStatus === "accepted" || currentStatus === "pending") {
+			unfollowUser(user.username, {
+				onSuccess: () => {
+					// 1. Hapus status dari state lokal komponen
+					setFollowStatus((prev) => {
+						const newState = { ...prev };
+						delete newState[user.id];
+						return newState;
+					});
+
+					// 2. Sinkronisasi global cache React Query untuk ProfileHeader (jika sedang dibuka)
+					queryClient.setQueryData(
+						["profile", user.username],
+						(oldData: UserProfileResponse | undefined) => {
+							if (!oldData) return oldData;
+							return {
+								...oldData,
+								stats: {
+									...oldData.stats,
+									totalFollowers: oldData.viewerContext
+										?.isFollowing
+										? Math.max(
+												oldData.stats.totalFollowers -
+													1,
+												0,
+											)
+										: oldData.stats.totalFollowers,
+								},
+								viewerContext: oldData.viewerContext
+									? {
+											...oldData.viewerContext,
+											isFollowing: false,
+											isPending: false,
+										}
+									: undefined,
+							};
+						},
+					);
+					queryClient.invalidateQueries({
+						queryKey: ["followers", user.username],
+					});
+				},
+			});
+			return;
+		}
+
+		// Skenario 2: Jika belum follow, maka FOLLOW
+		followUser(user.username, {
+			onSuccess: (response) => {
+				// 1. Update status di state lokal berdasarkan respons backend ('accepted' atau 'pending')
+				setFollowStatus((prev) => ({
+					...prev,
+					[user.id]: response.status,
+				}));
+
+				// 2. Sinkronisasi global cache React Query untuk ProfileHeader
+				queryClient.setQueryData(
+					["profile", user.username],
+					(oldData: UserProfileResponse | undefined) => {
+						if (!oldData) return oldData;
+						return {
+							...oldData,
+							stats: {
+								...oldData.stats,
+								totalFollowers:
+									response.status === "accepted"
+										? oldData.stats.totalFollowers + 1
+										: oldData.stats.totalFollowers,
+							},
+							viewerContext: oldData.viewerContext
+								? {
+										...oldData.viewerContext,
+										isFollowing:
+											response.status === "accepted",
+										isPending:
+											response.status === "pending",
+									}
+								: undefined,
+						};
+					},
+				);
+				if (response.status === "accepted") {
+					queryClient.invalidateQueries({
+						queryKey: ["followers", user.username],
+					});
+				}
+			},
+		});
+	};
+
+	// 1. TAMPILAN LOADING SKELETON
+	if (isLoading) {
+		return (
+			<div className="bg-gradient-to-br from-[#0f172a] to-[#020617] p-4 rounded-2xl border border-white/10 shadow-lg animate-pulse">
+				<div className="h-6 w-36 bg-gray-800 rounded mb-4" />
+				<div className="space-y-3">
+					{[...Array(4)].map((_, i) => (
+						<div
+							key={i}
+							className="h-[70px] w-full bg-white/5 rounded-xl border border-white/5"
+						/>
+					))}
+				</div>
+			</div>
+		);
+	}
+
+	// 2. JIKA TIDAK ADA DATA REKOMENDASI
+	if (users.length === 0) return null;
+
 	return (
 		<div className="bg-gradient-to-br from-[#0f172a] to-[#020617] p-4 rounded-2xl border border-white/10 shadow-lg">
-			<h2 className="font-semibold text-lg text-white mb-4">
-				👤 Who to follow
+			<h2 className="font-semibold text-sm text-white mb-4 flex items-center gap-2">
+				👥 Who to follow
 			</h2>
 
 			<div className="space-y-3">
 				{users.map((u) => {
-					const MAX_VISIBLE = 2;
 					const currentStatus = followStatus[u.id];
-
-					const visibleMutuals =
-						u.mutualUsers?.slice(0, MAX_VISIBLE) || [];
-					const remaining =
-						(u.mutualUsers?.length || 0) - MAX_VISIBLE;
 
 					return (
 						<div key={u.id} className="relative">
-							{/* CARD */}
+							{/* CARD PEMBUNGKUS */}
 							<motion.div
 								onMouseEnter={() => {
 									if (hoverTimeout)
@@ -103,91 +187,90 @@ export function FriendRecommendation() {
 								onMouseLeave={() => {
 									const t = setTimeout(() => {
 										setHovered(null);
-									}, 80); // kecil aja biar smooth
+									}, 120);
 									setHoverTimeout(t);
 								}}
-								whileHover={{ y: -3 }}
+								whileHover={{ y: -2 }}
 								className="group flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition"
 							>
-								<div className="flex items-center gap-3">
+								{/* Link navigasi profil */}
+								<Link
+									href={`/${u.username}`}
+									className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+								>
 									<Image
 										src={
 											u.avatar ||
 											`https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`
 										}
 										alt={u.name}
-										width={44}
-										height={44}
-										className="rounded-full border border-white/20"
+										width={40}
+										height={40}
+										className="rounded-full border border-white/20 object-cover flex-shrink-0"
 									/>
 
-									<div>
+									<div className="min-w-0 flex-1">
 										<div className="flex items-center gap-1">
-											<p className="text-sm font-semibold text-white max-w-[100px] truncate">
+											<p className="text-xs font-semibold text-white truncate group-hover:text-blue-400 transition-colors">
 												{u.name}
 											</p>
 										</div>
 
-										<p className="text-xs text-gray-400 max-w-[90px] truncate">
+										<p className="text-[10px] text-gray-400 truncate">
 											@{u.username}
 										</p>
 
-										{/* MUTUAL AVATARS */}
-										<div className="flex items-center mt-1">
-											<div className="flex -space-x-2">
-												{visibleMutuals.map((m, i) => (
-													<div
-														key={i}
-														className="w-6 h-6 rounded-full bg-gray-600 border-1 border-white/10 text-[10px] flex items-center justify-center font-medium text-white"
-													>
-														{m[0]}
-													</div>
-												))}
-
-												{remaining > 0 && (
-													<div className="w-6 h-6 rounded-full bg-white/10 border-1 border-white/10 text-[10px] flex items-center justify-center text-gray-300">
-														+{remaining}
-													</div>
-												)}
-											</div>
-
-											{/* optional label */}
-											<span className="text-[11px] text-gray-400 ml-2">
-												{u.mutualUsers?.length} mutual
-											</span>
-										</div>
+										{u.bio && (
+											<p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5 italic">
+												&quot;{u.bio}&quot;
+											</p>
+										)}
 									</div>
-								</div>
+								</Link>
 
 								{/* FOLLOW BUTTON */}
 								<motion.button
 									key={u.id}
-									onClick={() => toggleFollow(u)}
-									className={`px-3 py-1.5 text-xs rounded-full font-medium transition-all ${
+									onClick={(e) => {
+										e.preventDefault();
+										toggleFollow(u);
+									}}
+									disabled={isActionPending}
+									className={`px-3 py-1.5 text-[11px] rounded-full font-medium transition-all ml-2 flex-shrink-0 cursor-pointer ${
 										currentStatus === "accepted"
-											? "bg-white/10 text-white border border-white/20"
+											? "bg-white/10 text-white border border-white/20 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20"
 											: currentStatus === "pending"
 												? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"
-												: "bg-white text-black"
+												: "bg-white text-black hover:bg-white/90"
 									}`}
 								>
-									<span className="relative z-10">
-										{currentStatus === "accepted"
-											? "Following"
-											: currentStatus === "pending"
-												? "Pending"
-												: "Follow"}
+									<span className="relative z-10 flex items-center gap-1">
+										{currentStatus === "accepted" ? (
+											<>
+												<FaCheck
+													size={10}
+													className="inline group-hover:hidden"
+												/>
+												<span className="group-hover:block">
+													Following
+												</span>
+											</>
+										) : currentStatus === "pending" ? (
+											"Requested"
+										) : (
+											"Follow"
+										)}
 									</span>
 								</motion.button>
 							</motion.div>
 
-							{/* 🔥 POPOVER */}
+							{/* POPOVER PROFIL DETAIL */}
 							<AnimatePresence>
 								{hovered === u.id && (
 									<motion.div
-										initial={{ opacity: 0, y: 10 }}
+										initial={{ opacity: 0, y: 6 }}
 										animate={{ opacity: 1, y: 0 }}
-										exit={{ opacity: 0, y: 10 }}
+										exit={{ opacity: 0, y: 6 }}
 										className="absolute left-0 top-full mt-2 w-64 p-4 rounded-xl bg-[#020617] border border-white/10 shadow-xl z-50 pointer-events-none"
 									>
 										<div className="flex items-center gap-3">
@@ -197,38 +280,40 @@ export function FriendRecommendation() {
 													`https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`
 												}
 												alt={u.name}
-												width={50}
-												height={50}
-												className="rounded-full"
+												width={46}
+												height={46}
+												className="rounded-full object-cover"
 											/>
 
-											<div>
-												<p className="text-white font-semibold max-w-[140px] truncate">
+											<div className="min-w-0 flex-1">
+												<p className="text-white text-xs font-semibold truncate">
 													{u.name}
 												</p>
-												<p className="text-gray-400 text-sm max-w-[140px] truncate">
+												<p className="text-gray-400 text-[11px] truncate">
 													@{u.username}
 												</p>
 											</div>
 										</div>
 
-										<p className="text-xs text-gray-400 mt-2">
-											{u.bio}
-										</p>
+										{u.bio && (
+											<p className="text-[11px] text-gray-400 mt-2.5 line-clamp-2 bg-white/[0.02] p-2 rounded-lg border border-white/5">
+												{u.bio}
+											</p>
+										)}
 
-										<div className="flex justify-between text-xs text-gray-400 mt-3">
+										<div className="flex justify-between text-[11px] text-gray-400 mt-3 px-1">
 											<span>
-												<b className="text-white">
+												<b className="text-white font-semibold">
 													{formatCompactNumber(
-														u.total_following,
+														u.total_following || 0,
 													)}
 												</b>{" "}
 												Following
 											</span>
 											<span>
-												<b className="text-white">
+												<b className="text-white font-semibold">
 													{formatCompactNumber(
-														u.total_followers,
+														u.total_followers || 0,
 													)}
 												</b>{" "}
 												Followers

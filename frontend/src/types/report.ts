@@ -1,6 +1,6 @@
 export interface ReportRequest {
 	entity_id: number;
-	entity_type: "post" | "user";
+	entity_type: "post" | "user" | "comment";
 	reason_text: string;
 }
 

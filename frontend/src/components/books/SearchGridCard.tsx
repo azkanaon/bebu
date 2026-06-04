@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Image from "next/image";
 import { BookOpen, Clock3 } from "lucide-react";
 
@@ -10,21 +11,24 @@ type Props = {
 
 export default function SearchGridCard({ book }: Props) {
 	return (
-		<div
+		<Link
+			href={`/books/${book.slug}`} // Mengarah ke ./books/[slug]
 			className="
-				group
+        group
+        block
+        cursor-pointer
 
-				border
-				border-blue-400/[0.08]
+        border
+        border-blue-400/[0.08]
 
-				bg-[#0B1220]/60
+        bg-[#0B1220]/60
 
-				transition-all
-				duration-300
+        transition-all
+        duration-300
 
-				hover:border-blue-400/[0.16]
-				hover:bg-[#0B1220]/78
-			"
+        hover:border-blue-400/[0.16]
+        hover:bg-[#0B1220]/78
+    "
 		>
 			{/* COVER */}
 			<div
@@ -118,6 +122,6 @@ export default function SearchGridCard({ book }: Props) {
 					</div>
 				</div>
 			</div>
-		</div>
+		</Link>
 	);
 }

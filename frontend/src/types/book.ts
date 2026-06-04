@@ -15,6 +15,7 @@ export type BookSearchItem = {
 	genres: string[];
 	total_pages: number;
 	rating: number;
+	slug: string;
 };
 
 export type SearchBooksResponse = {
@@ -28,6 +29,7 @@ export type SearchBooksResponse = {
 export type PopularBookItem = {
 	public_id: string;
 	title: string;
+	slug: string;
 	cover_img_url: string;
 	rating: number;
 	total_pages: number;
@@ -44,6 +46,7 @@ export type PopularBooksResponse = {
 export type HighlyRatedBookItem = {
 	public_id: string;
 	title: string;
+	slug: string;
 	cover_img_url: string;
 	rating: number;
 	weighted_score: number;

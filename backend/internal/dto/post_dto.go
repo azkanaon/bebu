@@ -38,6 +38,7 @@ type ReviewPostResponse struct {
 		Cover  string   `json:"cover"`
 		Genres []string `json:"genres"`
 		Rating int      `json:"rating"`
+		Slug   string   `json:"slug"`
 	} `json:"book"`
 }
 
@@ -62,11 +63,13 @@ type AnalysisPostResponse struct {
 		PublicID    uuid.UUID `json:"publicID"`
 		DisplayName string `json:"displayName"`
 		Avatar      string `json:"avatar"`
+		Username    string `json:"username"`
 	} `json:"user"`
 
 	Book struct {
 		Title string `json:"title"`
 		Cover string `json:"cover"`
+		Slug  string `json:"slug"`
 	} `json:"book"`
 
 	Categories []CategoryResponse `json:"categories"`
