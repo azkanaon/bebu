@@ -166,30 +166,19 @@ export default function BookCarouselSection({
 					"
 				>
 					{books.map((book) => (
-						<Link
+						<PopularBookCard
 							key={book.public_id}
-							href={`/books/${book.slug}`}
-							className="
-								group
-								shrink-0
-								transition-all
-								duration-300
-								hover:-translate-y-1
-							"
-						>
-							<PopularBookCard
-								key={book.public_id}
-								book={{
-									public_id: book.public_id,
-									title: book.title,
-									cover_img_url: book.cover_img_url,
-									rating: book.rating,
-									total_pages: book.total_pages,
-									authors: [book.first_author],
-									publication_year: book.publication_year,
-								}}
-							/>
-						</Link>
+							book={{
+								public_id: book.public_id,
+								title: book.title,
+								cover_img_url: book.cover_img_url,
+								rating: book.rating,
+								total_pages: book.total_pages,
+								authors: [book.first_author],
+								publication_year: book.publication_year,
+								slug: book.slug,
+							}}
+						/>
 					))}
 				</div>
 			</div>

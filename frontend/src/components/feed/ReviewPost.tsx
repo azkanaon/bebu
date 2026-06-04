@@ -33,13 +33,15 @@ type Props = {
 	disableCommentLink?: boolean;
 };
 
+const MotionLink = motion(Link);
+
 export default function ReviewPost({
 	post,
 	isModalView = false,
 	disableCommentLink = false,
 }: Props) {
 	const [isLoading, setIsLoading] = useState(false);
-
+	
 	const {
 		interactions,
 		initPost,
@@ -302,7 +304,10 @@ export default function ReviewPost({
 		>
 			{/* Header */}
 			<div className="flex items-start justify-between">
-				<div className="flex gap-2.5 cursor-pointer group">
+				<Link
+					href={`/${post.user.username}`}
+					className="flex gap-2.5 cursor-pointer group"
+				>
 					<img
 						src={
 							post.user.avatar ||
@@ -324,7 +329,7 @@ export default function ReviewPost({
 								className="
 									font-semibold text-white leading-snug
 									transition-colors
-									group-hover:text-blue-100
+									group-hover:text-blue-400
 								"
 							>
 								{post.user.displayName}
@@ -343,7 +348,7 @@ export default function ReviewPost({
 							</div>
 						</div>
 					</div>
-				</div>
+				</Link>
 
 				<PostMenu
 					postId={post.id}
@@ -358,18 +363,21 @@ export default function ReviewPost({
 			</p>
 
 			{/* Book Card */}
-			<motion.div
+			<MotionLink
+				href={`/books/${post.book.slug}`} // Mengarah ke ./books/[slug]
 				whileHover={{ y: -1 }}
 				transition={{ duration: 0.18 }}
 				className="
-		relative flex gap-4
-		bg-gradient-to-br from-gray-800/70 to-gray-900/80
-		border border-gray-700/40
-		backdrop-blur-md
-		p-3
-		rounded-2xl
-		overflow-hidden
-	"
+        relative flex gap-4
+        bg-gradient-to-br from-gray-800/70 to-gray-900/80
+        border border-gray-700/40
+        backdrop-blur-md
+        p-3
+        rounded-2xl
+        overflow-hidden
+        cursor-pointer
+        block
+    "
 			>
 				{/* Subtle ambient glow */}
 				<div className="absolute inset-0 bg-gradient-to-r from-blue-500/[0.03] to-purple-500/[0.03] pointer-events-none" />
@@ -473,7 +481,7 @@ export default function ReviewPost({
 
 					<span>{post.book.rating.toFixed(1)}</span>
 				</div>
-			</motion.div>
+			</MotionLink>
 
 			{/* Actions */}
 			<div className="flex items-center justify-between">
@@ -610,15 +618,19 @@ export default function ReviewPost({
 							{/* Content */}
 							<div className="flex-1 min-w-0">
 								<div className="flex items-baseline gap-2 flex-wrap">
-									<span
+									<Link
+										href={`/${c.username}`}
 										className="
-									font-medium
-									text-gray-200
-									text-sm
-								"
+											font-medium
+											text-gray-200
+											text-sm
+											hover:text-blue-400
+											transition-colors
+											cursor-pointer
+										"
 									>
-										{c.username}
-									</span>
+										@{c.username}
+									</Link>
 
 									<span className="text-[11px] text-gray-600">
 										{timeAgo(post.createdAt)}
@@ -843,7 +855,7 @@ export default function ReviewPost({
 															onClick={() => {
 																setReportTarget(
 																	{
-																		id: c.id,
+																		id: c.user_id,
 																		type: "comment",
 																	},
 																);

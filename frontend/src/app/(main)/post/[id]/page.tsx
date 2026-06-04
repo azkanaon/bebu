@@ -43,7 +43,7 @@ export default function PostDetailPage() {
 
 	return (
 		// Pembungkus ini memastikan komponen memiliki tinggi yang pas dengan kolom tengah layout Anda
-		<div className="w-full flex-1 flex flex-col">
+		<div className="w-full flex-1 flex flex-col min-h-screen">
 			<CommentModal
 				postId={post.id}
 				post={post}

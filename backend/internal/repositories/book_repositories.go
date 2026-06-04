@@ -230,7 +230,8 @@ func (r *bookRepository) SearchBooks(query string, genre string, author string, 
 			Genres:          genres,
 			TotalPages: 	 book.TotalPages,
 			Rating:			 book.BookStat.OverallRating,
-			GoogleBookID:   book.GoogleBookID,
+			GoogleBookID:    book.GoogleBookID,
+			Slug:    		 book.Slug,
 		})
 	}
 
@@ -418,6 +419,7 @@ func (r *bookRepository) GetPopularBooks(timeRange string, limit int,) ([]dto.Po
 			dto.PopularBookItem{
 				PublicID: book.PublicID.String(),
 				Title: book.Title,
+				Slug: book.Slug,
 				CoverImgURL: book.CoverImgURL,
 				Rating: book.BookStat.OverallRating,
 				TotalPages: book.TotalPages,
@@ -545,6 +547,7 @@ func (r *bookRepository) mapBooksToSearchItems(books []models.Book,) []dto.BookS
 				Genres: genres,
 				TotalPages: book.TotalPages,
 				Rating: book.BookStat.OverallRating,
+				Slug: book.Slug,
 			},
 		)
 	}
@@ -621,6 +624,7 @@ func (r *bookRepository) GetHighlyRatedBooks(limit int,) ([]dto.HighlyRatedBookI
 			dto.HighlyRatedBookItem{
 				PublicID: book.PublicID.String(),
 				Title: book.Title,
+				Slug: book.Slug,
 				CoverImgURL: book.CoverImgURL,
 				Rating: book.BookStat.OverallRating,
 				WeightedScore: scoreMap[book.BookID],
@@ -804,6 +808,7 @@ func (r *bookRepository) GetAllBooks(page int, limit int, sort string,) (*dto.Al
 				Genres: genres,
 				TotalPages: book.TotalPages,
 				Rating: book.BookStat.OverallRating,
+				Slug: book.Slug,
 			},
 		)
 	}

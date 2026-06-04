@@ -26,8 +26,8 @@ export default function RightSidebar() {
 						refresh={refresh}
 					/>
 				)}
-			<Leaderboard />
 			{pathname !== "/books" && <TrendingBooks />}
+			<Leaderboard />
 			<Footer />
 
 			{isOpen && (

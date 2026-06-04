@@ -27,6 +27,7 @@ func ToReviewPostResponse(p models.Post, currentUserID uint) dto.ReviewPostRespo
 		res.Book.Title = p.Book.Title
 		res.Book.Cover = p.Book.CoverImgURL
 		res.Book.Pages = p.Book.TotalPages
+		res.Book.Slug  = p.Book.Slug
 
 		res.Book.Author = "Unknown Author"
 		if len(p.Book.BookAuthors) > 0 {
@@ -83,11 +84,13 @@ func ToAnalysisPostResponse(p models.Post, currentUserID uint) dto.AnalysisPostR
 		res.User.PublicID = p.User.PublicID
 		res.User.DisplayName = p.User.Profile.DisplayName
 		res.User.Avatar = p.User.Profile.AvatarUrl
+		res.User.Username = p.User.Username
 	}
 
 	if p.Book != nil {
 		res.Book.Title = p.Book.Title
 		res.Book.Cover = p.Book.CoverImgURL
+		res.Book.Slug  = p.Book.Slug
 	}
 
 	res.IsLiked = p.IsLiked

@@ -103,3 +103,17 @@ type FollowerContextDTO struct {
 	IsPending    bool `json:"isPending"`
 }
 
+type FriendRecommendationResponse struct {
+	ID             uint   `json:"id"`
+	Name           string `json:"name"`
+	Username       string `json:"username"`
+	Avatar         string `json:"avatar"`
+	Bio            string `json:"bio"`
+	TotalFollowers int    `json:"total_followers"`
+	TotalFollowing int    `json:"total_following"`
+
+	MatchScore     int    `json:"match_score"`
+	MutualScore    int    `json:"mutual_score"`
+	GenreScore     int    `json:"genre_score"`
+	ActivityScore  int    `json:"activity_score"`
+}

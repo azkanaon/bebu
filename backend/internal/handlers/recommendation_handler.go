@@ -2,65 +2,37 @@ package handlers
 
 import (
 	"net/http"
-
-	"backend-bebu/config"
-	"backend-bebu/internal/models"
-
+	"backend-bebu/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
-type RecommendationResponse struct {
-	ID       uint   `json:"id"`
-	Name     string `json:"name"`
-	Username string `json:"username"`
-	Avatar   string `json:"avatar"`
-	Bio   	 string `json:"bio"`
-	TotalFollowers int `json:"total_followers"`
-	TotalFollowing int `json:"total_following"`
+type RecommendationHandler struct {
+	service services.RecommendationService
 }
 
-func GetUserRecommendations(c *gin.Context) {
-	// ⚠️ sementara hardcode (nanti ambil dari auth middleware)
-	currentUserID := uint(1)
+func NewRecommendationHandler(service services.RecommendationService) *RecommendationHandler {
+	return &RecommendationHandler{service}
+}
 
-	var users []models.User
-
-	// Query ke database
-	err := config.DB.
-		Preload("Profile").
-		Preload("Stats").
-		Where("user_id != ?", currentUserID). // ❌ exclude diri sendiri
-		Order("RANDOM()").                    // 🎲 random biar variatif
-		Limit(4).                             // ambil 4 saja
-		Find(&users).Error
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to fetch recommendations",
-		})
+func (h *RecommendationHandler) GetFriendRecommendations(c *gin.Context) {
+	// Ambil userID dari Login Context Middleware secara dinamis & aman
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User tidak terautentikasi"})
 		return
 	}
 
-	// Mapping ke response
-	var response []RecommendationResponse
-
-	for _, user := range users {
-		avatar := user.Profile.AvatarUrl
-
-		if avatar == "" {
-			avatar = "https://i.pravatar.cc/150"
-		}
-
-		response = append(response, RecommendationResponse{
-			ID:       user.UserID,
-			Name:     user.Profile.DisplayName,
-			Username: user.Username,
-			Avatar:   avatar,
-			Bio:	  user.Profile.Bio,
-			TotalFollowers: user.Stats.TotalFollowers,
-			TotalFollowing: user.Stats.TotalFollowing,
-		})
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Format format user ID salah"})
+		return
 	}
 
-	c.JSON(http.StatusOK, response)
+	recommendations, err := h.service.GetFriendRecommendations(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, recommendations)
 }

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { MoreVertical, Trash2, Flag, Heart, AlertTriangle } from "lucide-react";
 import { CommentType } from "@/types/post";
 import { timeAgo } from "@/lib/utils";
+import Link from "next/link";
 
 interface CommentItemProps {
 	comment: CommentType;
@@ -50,9 +51,17 @@ const CommentItem: React.FC<CommentItemProps> = ({
 					<div className="bg-gray-900/30 border border-gray-800/50 rounded-2xl p-3 relative group-hover:bg-gray-900 transition-colors">
 						<div className="flex justify-between items-center mb-1 pr-6">
 							<div className="flex items-center gap-2">
-								<p className="text-sm font-bold text-blue-400">
+								<Link
+									href={`/${comment.username}`}
+									className="
+										text-sm font-bold text-gray-200
+										hover:text-blue-300
+										transition-colors duration-150 
+										cursor-pointer inline-block
+									"
+								>
 									@{comment.username}
-								</p>
+								</Link>
 								<span className="text-[11px] text-gray-600">
 									{timeAgo(comment.created_at)}
 								</span>
@@ -134,7 +143,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 										<button
 											onClick={() => {
 												setReportTarget({
-													id: comment.id,
+													id: comment.user_id,
 													type: "comment",
 												});
 												setOpenMenuId(null);
@@ -147,7 +156,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 								</div>
 							</div>
 						</div>
-						<p className="text-sm text-gray-200 leading-relaxed">
+						<p className="text-sm text-gray-400 leading-relaxed">
 							{comment.comment}
 						</p>
 					</div>

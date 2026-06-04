@@ -20,7 +20,7 @@ func NewReportHandler(service services.ReportService) *ReportHandler {
 type ReportRequest struct {
 	EntityID   int    `json:"entity_id" binding:"required"`
 	EntityType string `json:"entity_type" binding:"required"`
-	Reason     string `json:"reason_text" binding:"required"` // Kategori pilihan user
+	Reason     string `json:"reason_text" binding:"required"` 
 }
 
 func (h *ReportHandler) CreateReport(c *gin.Context) {
@@ -31,8 +31,20 @@ func (h *ReportHandler) CreateReport(c *gin.Context) {
 		return
 	}
 
-	userID := uint(1) // Placeholder untuk testing
+	// ✅ Ambil userID yang sedang login dari Gin Context (Set dari Auth Middleware Anda)
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+	
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID format in context"})
+		return
+	}
 
+	// Kirim userID hasil login yang valid ke service
 	err := h.service.ReportEntity(userID, req.EntityID, req.EntityType, req.Reason)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

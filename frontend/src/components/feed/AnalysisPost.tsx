@@ -296,20 +296,28 @@ export default function AnalysisPost({
 					{/* Info */}
 					<div>
 						<div className="pt-[1px]">
-							<div
+							<Link
+								href={`/books/${post.book.slug}`}
 								className="
 									font-semibold text-white leading-snug
-									transition-colors
-									group-hover:text-blue-100
+									block width-fit
+									hover:text-blue-400
+									hover:underline
+									decoration-blue-400/40
+									underline-offset-2
+									transition-all duration-200
 								"
 							>
 								{post.book.title}
-							</div>
+							</Link>
 
 							<div className="flex items-center gap-1 text-xs">
-								<span className="text-gray-400">
+								<Link
+									href={`/${post.user.username}`}
+									className="text-gray-400 hover:text-white hover:underline decoration-gray-500 underline-offset-2 transition-colors duration-150 ease-in-out cursor-pointer"
+								>
 									{post.user.displayName}
-								</span>
+								</Link>
 
 								<span className="text-gray-600">•</span>
 
@@ -539,15 +547,19 @@ export default function AnalysisPost({
 							{/* Content */}
 							<div className="flex-1 min-w-0">
 								<div className="flex items-baseline gap-2 flex-wrap">
-									<span
+									<Link
+										href={`/${c.username}`}
 										className="
-									font-medium
-									text-gray-200
-									text-sm
-								"
+											font-medium
+											text-gray-200
+											text-sm
+											hover:text-blue-400
+											transition-colors
+											cursor-pointer
+										"
 									>
-										{c.username}
-									</span>
+										@{c.username}
+									</Link>
 
 									<span className="text-[11px] text-gray-600">
 										{timeAgo(post.createdAt)}
@@ -772,7 +784,7 @@ export default function AnalysisPost({
 															onClick={() => {
 																setReportTarget(
 																	{
-																		id: c.id,
+																		id: c.user_id,
 																		type: "comment",
 																	},
 																);

@@ -242,6 +242,7 @@ export default function HighlyRatedBooksSection() {
 									total_pages: book.total_pages,
 									authors: book.authors,
 									publication_year: book.publication_year,
+									slug: book.slug,
 								}}
 							/>
 						))}

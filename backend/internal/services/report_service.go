@@ -27,20 +27,21 @@ func NewReportService(repo repositories.ReportRepository) ReportService {
 }
 
 func (s *reportService) ReportEntity(userID uint, entityID int, entityType string, reason string) error {
-	// Validasi EntityType agar tidak sembarang string masuk
-	validTypes := map[string]bool{"post": true, "user": true, "comment": true}
+	if entityType == "comment" {
+		entityType = "user"
+	}
+
+	validTypes := map[string]bool{
+		"post": true, 
+		"user": true, 
+	}
+	
 	if !validTypes[entityType] {
 		return errors.New("invalid entity type")
 	}
 
-	report := models.Report{
-		UserID:     userID,
-		EntityID:   entityID,
-		EntityType: entityType,
-		ReasonText: &reason, // Kategori yang dipilih user dari FE
-	}
-
-	return s.repo.CreateReport(&report)
+	// 3. PROSES KE DB: Kirim nilai entityType yang sudah bersih ("user") ke repository
+	return s.repo.CreateReportWithSummary(userID, entityID, entityType, reason)
 }
 
 func (s *reportService) GetReports(ctx context.Context, filters dto.ReportFilterRequest) (*dto.PaginatedReportResponse, error) {
