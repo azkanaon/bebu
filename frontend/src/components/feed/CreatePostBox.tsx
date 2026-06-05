@@ -2,9 +2,12 @@
 
 import { motion } from "framer-motion";
 import { usePostModal } from "@/stores/postModal";
+import { useAuthStore } from "@/stores/useAuthStore";
+import UserAvatar from "@/components/UserAvatar";
 
 export default function CreatePostBox() {
 	const open = usePostModal((state) => state.open);
+	const { user } = useAuthStore();
 	
 	return (
 		<motion.div
@@ -25,9 +28,11 @@ export default function CreatePostBox() {
 		>
 			<div className="flex items-center gap-3">
 				{/* Avatar */}
-				<div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-					A
-				</div>
+				<UserAvatar
+					user={user}
+					size={40}
+					className="border border-white/20 shadow-md" // Menghilangkan border default jika kurang cocok di box ini
+				/>
 
 				{/* Fake input with send icon */}
 				<div className="flex-1 relative">

@@ -15,7 +15,11 @@ import {
 	AlertTriangle,
 	EyeOff,
 	Trash2,
-	ExternalLink
+	ExternalLink,
+	Users,
+	UserPlus,
+	BookOpen,
+	Flame,
 } from "lucide-react";
 
 import { getReportDetailAPI, executeAdminActionAPI } from "@/lib/api";
@@ -24,6 +28,7 @@ import {
 	ReportSummaryDetailResponse,
 	AdminActionRequest,
 } from "@/types/report";
+import UserAvatar from "@/components/UserAvatar";
 
 interface ReportDetailModalProps {
 	summaryID: number | null;
@@ -241,7 +246,7 @@ export default function ReportDetailModal({
 			<div
 				className="
 					relative
-					w-full max-w-3xl
+					w-full max-w-2xl
 					overflow-hidden
 
 					rounded-3xl
@@ -347,7 +352,7 @@ export default function ReportDetailModal({
 		rounded-[24px]
 		border border-white/10
 		bg-white/[0.03]
-		p-5
+		p-4
 	"
 							>
 								{/* SCENARIO A: ENTITY TYPE IS USER */}
@@ -358,88 +363,213 @@ export default function ReportDetailModal({
 											target="_blank"
 											rel="noopener noreferrer"
 											className="
-				group/report-user flex gap-4 rounded-2xl p-2 -m-2
-				transition-all duration-200
-				hover:bg-white/[0.04] hover:ring-1 hover:ring-white/10
-				cursor-pointer
-			"
+			group/report-user
+			block
+			overflow-hidden
+			from-white/[0.04]
+			to-white/[0.02]
+			transition-all duration-200
+		"
 										>
-											<img
-												src={
-													detail.user_data
-														.avatar_url ||
-													"/images/default_avatar.png"
-												}
-												className="
-					h-16 w-16 shrink-0
-					rounded-2xl
-					object-cover
-					ring-1
-					ring-white/10
-					transition-transform duration-200
-					group-hover/report-user:scale-[1.02]
-				"
-											/>
+											<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+												{/* LEFT */}
+												<div className="flex min-w-0 gap-3.5">
+													{/* AVATAR */}
+													<div
+														className="
+						h-[52px]
+						w-[52px]
+						shrink-0
+						overflow-hidden
+						rounded-full
+						ring-1 ring-white/10
+						bg-white/[0.03]
+					"
+													>
+														<UserAvatar
+															user={{
+																avatar_url:
+																	detail
+																		.user_data
+																		.avatar_url,
+																display_name:
+																	detail
+																		.user_data
+																		.display_name,
+															}}
+															size={52}
+															className="h-full w-full rounded-full border-0"
+														/>
+													</div>
 
-											<div className="min-w-0 flex-1">
-												<div className="flex items-center gap-2">
-													<div className="min-w-0 flex-1">
-														<h3 className="flex items-center gap-1.5 text-base font-semibold text-white">
-															<span className="truncate">
+													{/* USER INFO */}
+													<div className="min-w-0">
+														<p className="text-[10px] uppercase tracking-[0.18em] text-blue-300/80">
+															Reported User
+														</p>
+
+														<div className="mt-0.5 flex items-center gap-1.5">
+															<h3
+																className="
+		truncate
+		text-base
+		font-semibold
+		tracking-tight
+		text-white
+
+		transition-all
+		duration-200
+
+		group-hover/report-user:text-blue-100
+		group-hover/report-user:drop-shadow-[0_0_10px_rgba(96,165,250,0.18)]
+	"
+															>
 																{
 																	detail
 																		.user_data
 																		.display_name
 																}
-															</span>
-															<ExternalLink
-																size={14}
-																className="text-zinc-500 transition-colors duration-200 group-hover/report-user:text-blue-400 shrink-0"
-															/>
-														</h3>
+															</h3>
 
-														<p className="text-xs text-zinc-500 truncate">
+															<ExternalLink
+																size={13}
+																className="
+		shrink-0
+		text-zinc-600
+		transition-all
+		duration-200
+
+		group-hover/report-user:text-blue-400
+		group-hover/report-user:translate-x-[1px]
+		group-hover/report-user:-translate-y-[1px]
+	"
+															/>
+														</div>
+
+														<p className="text-xs text-zinc-400">
 															@
 															{
 																detail.user_data
 																	.username
 															}
 														</p>
+
+														{detail.user_data
+															.bio && (
+															<p className="mt-2.5 max-w-xl text-xs leading-relaxed text-zinc-400">
+																{" "}
+																{
+																	detail
+																		.user_data
+																		.bio
+																}{" "}
+															</p>
+														)}
+
+														{/* INLINE STATS */}
+														<div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-zinc-400 bg-white/[0.02] border border-white/5 w-fit px-2.5 py-1 rounded-lg">
+															<InlineStat
+																icon={
+																	<Users
+																		size={
+																			13
+																		}
+																	/>
+																}
+																label="Followers"
+																value={
+																	detail
+																		.user_data
+																		.total_followers
+																}
+															/>
+
+															<span className="text-zinc-700 text-[10px]">
+																•
+															</span>
+
+															<InlineStat
+																icon={
+																	<UserPlus
+																		size={
+																			13
+																		}
+																	/>
+																}
+																label="Following"
+																value={
+																	detail
+																		.user_data
+																		.total_following
+																}
+															/>
+
+															<span className="text-zinc-700 text-[10px]">
+																•
+															</span>
+
+															<InlineStat
+																icon={
+																	<BookOpen
+																		size={
+																			13
+																		}
+																	/>
+																}
+																label="Posts"
+																value={
+																	detail
+																		.user_data
+																		.total_posts
+																}
+															/>
+
+															<span className="text-zinc-700 text-[10px]">
+																•
+															</span>
+
+															<InlineStat
+																icon={
+																	<Flame
+																		size={
+																			13
+																		}
+																		className="text-orange-400"
+																	/>
+																}
+																label="Hot Score"
+																value={detail.user_data.hot_score.toFixed(
+																	1,
+																)}
+															/>
+														</div>
 													</div>
 												</div>
 
-												<p className="mt-3 max-w-xl text-xs leading-relaxed text-zinc-400 line-clamp-2 group-hover/report-user:text-zinc-300">
-													{detail.user_data.bio}
-												</p>
-
-												<div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 pointer-events-none">
-													<MetricCard
-														label="Followers"
-														value={
+												{/* STATUS */}
+												<div
+													className={`inline-flex h-fit items-center gap-1.5 rounded-full border px-2.5 py-1 sm:mt-0 mt-2 self-start ${
+														detail.user_data
+															.status === "active"
+															? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400"
+															: "border-red-500/20 bg-red-500/[0.06] text-red-400"
+													}`}
+												>
+													<div
+														className={`h-1.5 w-1.5 rounded-full ${
 															detail.user_data
-																.total_followers
-														}
+																.status ===
+															"active"
+																? "bg-emerald-400"
+																: "bg-red-400"
+														}`}
 													/>
-													<MetricCard
-														label="Posts"
-														value={
-															detail.user_data
-																.total_posts
-														}
-													/>
-													<MetricCard
-														label="Hot Score"
-														value={detail.user_data.hot_score.toFixed(
-															1,
-														)}
-													/>
-													<MetricCard
-														label="Status"
-														value={
+													<span className="text-[11px] font-medium capitalize">
+														{
 															detail.user_data
 																.status
 														}
-													/>
+													</span>
 												</div>
 											</div>
 										</a>
@@ -455,7 +585,7 @@ export default function ReportDetailModal({
 												target="_blank"
 												rel="noopener noreferrer"
 												className="
-					group/report-post flex items-center gap-3 rounded-2xl p-2 -m-2
+					group/report-post flex items-center gap-3 rounded-2xl p-2 -m-2 mb-2
 					transition-all duration-200
 					hover:bg-white/[0.04] hover:ring-1 hover:ring-white/10
 					cursor-pointer
@@ -996,27 +1126,23 @@ export default function ReportDetailModal({
 	);
 }
 
-function MetricCard({
+{
+	/* NEW REUSABLE INLINE STAT COMPONENT */
+}
+function InlineStat({
+	icon,
 	label,
 	value,
 }: {
+	icon: React.ReactNode;
 	label: string;
 	value: string | number;
 }) {
 	return (
-		<div
-			className="
-				rounded-2xl
-				border border-white/10
-				bg-black/20
-				p-3
-			"
-		>
-			<p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-				{label}
-			</p>
-
-			<p className="mt-2 text-xs font-semibold text-zinc-100">{value}</p>
+		<div className="flex items-center gap-1">
+			<div className="text-blue-400 shrink-0">{icon}</div>
+			<span className="text-white font-medium">{value}</span>
+			<span className="text-zinc-500 text-[11px]">{label}</span>
 		</div>
 	);
 }

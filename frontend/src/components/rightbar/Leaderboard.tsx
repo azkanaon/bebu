@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import UserAvatar from "@/components/UserAvatar";
 
 type User = {
 	id: number;
@@ -111,16 +111,12 @@ export function Leaderboard() {
 									>
 										{u.rank}
 									</div>
-
-									<Image
-										src={
-											u.avatar ||
-											`https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`
-										}
-										alt={u.name}
-										width={40}
-										height={40}
-										className="rounded-full object-cover border-2 border-white/30"
+									<UserAvatar
+										user={{
+											avatar_url: u.avatar,
+										}}
+										size={40}
+										className="border-2 border-white/30"
 									/>
 
 									<div>

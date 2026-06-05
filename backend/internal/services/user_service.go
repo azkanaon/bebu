@@ -184,6 +184,7 @@ func (s *userService) mapToPublicProfileDTO(
 
 	// 4. Merakit DTO utama
 	dto := &dto.ProfileResponseDTO{
+		UserID: user.UserID,
 		PublicID: user.PublicID.String(),
 		Username: user.Username,
 		IsPrivateAccount: isPrivateAcc,
@@ -230,6 +231,7 @@ func (s *userService) mapToPrivateProfileDTO(user *models.User, stats *models.Us
 
 	// 4. Merakit DTO utama
 	dto := &dto.ProfileResponseDTO{
+		UserID: user.UserID,
 		PublicID: user.PublicID.String(),
 		Username: user.Username,
         IsPrivate: true,

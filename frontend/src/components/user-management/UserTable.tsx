@@ -9,7 +9,7 @@ import {
 	Mail,
 	MailCheck,
 } from "lucide-react";
-import Image from "next/image";
+import UserAvatar from "@/components/UserAvatar";
 
 import { UserManageableResponse } from "@/types/user-management";
 
@@ -90,16 +90,13 @@ export default function UserTable({
 							{/* IDENTITY PROFILE INFO */}
 							<div className="col-span-4 pr-6">
 								<div className="flex items-center gap-3">
-									<div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-800">
-										<Image
-											src={
-												user.avatar_url ||
-												"/avatar-placeholder.png"
-											}
-											alt={user.username}
-											fill
-											sizes="40px"
-											className="object-cover"
+									<div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/10 bg-zinc-800">
+										<UserAvatar
+											user={{
+												avatar_url: user.avatar_url,
+											}}
+											size={40}
+											className="border-2 border-white/30"
 										/>
 									</div>
 

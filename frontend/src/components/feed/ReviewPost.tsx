@@ -26,6 +26,8 @@ import ShareModal from "./ShareModal";
 import { timeAgo } from "@/lib/utils";
 import ReportModal from "./ReportModal";
 import Link from "next/link";
+import UserAvatar from "@/components/UserAvatar";
+import BookCover from "@/components/BookCover";
 
 type Props = {
 	post: ReviewPostType;
@@ -41,7 +43,7 @@ export default function ReviewPost({
 	disableCommentLink = false,
 }: Props) {
 	const [isLoading, setIsLoading] = useState(false);
-	
+
 	const {
 		interactions,
 		initPost,
@@ -308,19 +310,12 @@ export default function ReviewPost({
 					href={`/${post.user.username}`}
 					className="flex gap-2.5 cursor-pointer group"
 				>
-					<img
-						src={
-							post.user.avatar ||
-							"https://ui-avatars.com/api/?name=" +
-								post.user.username
-						}
-						className="
-							w-10 h-10 rounded-full
-							ring-2 ring-gray-700
-							transition
-							group-hover:ring-blue-500/50
-							group-hover:scale-[1.03]
-						"
+					<UserAvatar
+						user={{
+							avatar_url: post.user.avatar,
+						}}
+						size={40}
+						className="border border-white/20 transition group-hover:ring-blue-500/50 group-hover:scale-[1.03]"
 					/>
 
 					<div>
@@ -390,17 +385,17 @@ export default function ReviewPost({
 
 				{/* Cover */}
 				<div className="relative shrink-0">
-					<img
+					<BookCover
 						src={post.book.cover}
-						alt={post.book.title}
+						title={post.book.title}
+						width={80}
+						height={112}
 						className="
-				w-20 h-28
-				object-cover
-				rounded-lg
-				border border-white/10
-				ring-1 ring-white/5
-				shadow-[0_8px_24px_rgba(0,0,0,0.35)]
-			"
+    rounded-lg
+    border border-white/10
+    ring-1 ring-white/5
+    shadow-[0_8px_24px_rgba(0,0,0,0.35)]
+  "
 					/>
 				</div>
 
@@ -600,19 +595,12 @@ export default function ReviewPost({
 	`}
 						>
 							{/* Avatar */}
-							<img
-								src={
-									c.avatar ||
-									"https://ui-avatars.com/api/?name=" +
-										c.username
-								}
-								className="
-							w-7 h-7
-							rounded-full
-							object-cover
-							mt-0.5
-							ring-1 ring-white/5
-						"
+							<UserAvatar
+								user={{
+									avatar_url: c.avatar,
+								}}
+								size={28}
+								className="mt-0.5 ring-1 ring-white/5"
 							/>
 
 							{/* Content */}
@@ -919,21 +907,6 @@ export default function ReviewPost({
 						onSubmit={handlePostComment}
 						className="flex items-center gap-3 pt-1"
 					>
-						{/* Current User Avatar */}
-						<img
-							src={
-								post.user.avatar ||
-								"https://ui-avatars.com/api/?name=" +
-									post.user.username
-							}
-							className="
-					w-7 h-7
-					rounded-full
-					object-cover
-					ring-1 ring-white/5
-				"
-						/>
-
 						{/* Input Wrapper */}
 						<div className="flex-1 relative">
 							<input

@@ -1,9 +1,9 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Clock3, Globe2, FileText } from "lucide-react";
 
 import { BookSearchItem } from "@/types/book";
 import BookRatingBadge from "./BookRatingBadge";
+import BookCover from "@/components/BookCover";
 
 type Props = {
 	book: BookSearchItem;
@@ -83,13 +83,10 @@ export default function SearchResultCard({ book }: Props) {
 						group-hover:scale-[1.02]
 					"
 				>
-					<Image
+					<BookCover
 						src={book.cover_img_url}
-						alt={book.title}
+						title={book.title}
 						fill
-						className="
-							object-cover
-						"
 					/>
 
 					{/* IMAGE OVERLAY */}

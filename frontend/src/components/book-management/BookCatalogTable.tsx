@@ -11,10 +11,10 @@ import {
 	Calendar,
 	Edit3,
 } from "lucide-react";
-import Image from "next/image";
 import { BookResponse, BookQueryParams } from "@/types/book-management";
 import BookDeleteModal from "@/components/book-management/BookDeleteModal";
 import ClientPortal from "../ClientPortal";
+import BookCover from "@/components/BookCover";
 
 interface BookCatalogTableProps {
 	data: BookResponse[];
@@ -90,15 +90,11 @@ export default function BookCatalogTable({
 							{/* COVER & CLUSTER INFO */}
 							<div className="col-span-5 pr-6 flex items-center gap-3">
 								<div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 bg-zinc-800">
-									<Image
-										src={
-											book.cover_img_url ||
-											"/book-placeholder.png"
-										}
-										alt={book.title}
+									<BookCover
+										src={book.cover_img_url}
+										title={book.title}
 										fill
 										sizes="36px"
-										className="object-cover"
 									/>
 								</div>
 								<div className="min-w-0">

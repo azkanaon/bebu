@@ -27,6 +27,8 @@ import { timeAgo } from "@/lib/utils";
 import ReportModal from "./ReportModal";
 import ClientPortal from "../ClientPortal";
 import Link from "next/link";
+import UserAvatar from "@/components/UserAvatar";
+import BookCover from "@/components/BookCover";
 
 type Props = {
 	post: AnalysisPostType;
@@ -272,24 +274,20 @@ export default function AnalysisPost({
 				<div className="flex gap-3 items-center">
 					{/* Cover + Avatar */}
 					<div className="relative">
-						<img
+						<BookCover
 							src={post.book.cover}
-							className="w-10 h-14 rounded-md object-cover shadow-md"
+							title={post.book.title}
+							width={40}
+							height={56}
+							className="rounded-md shadow-md border border-white/20"
 						/>
 
-						<img
-							src={
-								post.user.avatar ||
-								"https://ui-avatars.com/api/?name=" +
-									post.user.username
-							}
-							className="
-								w-7 h-7 rounded-full absolute 
-								-bottom-1 -right-1 
-								border-2 border-gray-900
-								object-cover
-								ring-1 ring-gray-700
-							"
+						<UserAvatar
+							user={{
+								avatar_url: post.user.avatar,
+							}}
+							size={28}
+							className="absolute -bottom-1 -right-1 border-2 border-gray-900"
 						/>
 					</div>
 
@@ -529,19 +527,12 @@ export default function AnalysisPost({
 	`}
 						>
 							{/* Avatar */}
-							<img
-								src={
-									c.avatar ||
-									"https://ui-avatars.com/api/?name=" +
-										c.username
-								}
-								className="
-							w-7 h-7
-							rounded-full
-							object-cover
-							mt-0.5
-							ring-1 ring-white/5
-						"
+							<UserAvatar
+								user={{
+									avatar_url: c.avatar,
+								}}
+								size={28} // w-7 dan h-7 di Tailwind setara dengan 28px
+								className="mt-0.5 ring-1 ring-white/5"
 							/>
 
 							{/* Content */}
@@ -848,21 +839,6 @@ export default function AnalysisPost({
 						onSubmit={handlePostComment}
 						className="flex items-center gap-3 pt-1"
 					>
-						{/* Current User Avatar */}
-						<img
-							src={
-								post.user.avatar ||
-								"https://ui-avatars.com/api/?name=" +
-									post.user.username
-							}
-							className="
-					w-7 h-7
-					rounded-full
-					object-cover
-					ring-1 ring-white/5
-				"
-						/>
-
 						{/* Input Wrapper */}
 						<div className="flex-1 relative">
 							<input

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { BookProfileData } from "@/types/book";
 import { CalendarDays, BookOpen, Languages } from "lucide-react";
+import BookCover from "@/components/BookCover";
 
 interface BookHeroProps {
 	book: BookProfileData;
@@ -44,18 +45,11 @@ export const BookHero: React.FC<BookHeroProps> = ({ book }) => {
 							shadow-[0_20px_60px_rgba(0,0,0,0.35)]
 						"
 					>
-						<img
-							src={cover_img_url || "/placeholder-cover.jpg"}
-							alt={`Cover buku ${title}`}
-							className="
-								h-full
-								w-full
-								object-cover
-								transition-transform
-								duration-700
-								group-hover:scale-[1.02]
-							"
-							loading="eager"
+						<BookCover
+							src={cover_img_url}
+							title={title}
+							fill // Menggantikan h-full w-full agar otomatis memenuhi parent div
+							className="transition-transform duration-700 group-hover:scale-[1.02]"
 						/>
 
 						<div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
@@ -90,9 +84,7 @@ export const BookHero: React.FC<BookHeroProps> = ({ book }) => {
 								key={a.slug || index}
 								className="inline-flex items-center"
 							>
-								<a
-									className="font-medium text-slate-200 transition-colors hover:text-indigo-300"
-								>
+								<a className="font-medium text-slate-200 transition-colors hover:text-indigo-300">
 									{a.author_name}
 								</a>
 								{/* Tambahkan koma jika bukan author terakhir */}

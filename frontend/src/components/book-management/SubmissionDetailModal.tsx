@@ -11,10 +11,10 @@ import {
 	Languages,
 	FileText,
 	MessageSquare,
-	AlertCircle,
 	Sparkles,
 } from "lucide-react";
 import { BookSubmissionResponse } from "@/types/book-management";
+import BookCover from "@/components/BookCover";
 
 interface SubmissionDetailModalProps {
 	isOpen: boolean;
@@ -102,23 +102,20 @@ export default function SubmissionDetailModal({
 					<div className="flex flex-col sm:flex-row gap-5 items-start bg-white/[0.01] border border-white/5 p-4 rounded-2xl">
 						{/* COVER CANVAS */}
 						<div className="w-full sm:w-auto flex justify-center shrink-0 mx-auto sm:mx-0">
-							{submission.cover_img_url ? (
-								<img
-									src={submission.cover_img_url}
-									alt={submission.title}
-									className="w-28 aspect-[3/4] rounded-xl object-cover border border-white/10 shadow-xl shadow-black/40"
-								/>
-							) : (
-								<div className="w-28 aspect-[3/4] rounded-xl bg-zinc-900/60 flex flex-col items-center justify-center text-zinc-600 border border-white/5 gap-1.5">
-									<AlertCircle
-										size={18}
-										className="text-zinc-700"
-									/>
-									<span className="text-[10px] uppercase tracking-wider font-semibold">
-										No Image
-									</span>
-								</div>
-							)}
+							<BookCover
+								src={submission.cover_img_url}
+								title={submission.title}
+								width={112} // setara w-28
+								height={149} // proporsi rasio 3:4 dari lebar 112px
+								className="
+    w-28 
+    aspect-[3/4] 
+    rounded-xl 
+    border border-white/10 
+    shadow-xl 
+    shadow-black/40
+  "
+							/>
 						</div>
 
 						{/* CORE META LABELS */}
