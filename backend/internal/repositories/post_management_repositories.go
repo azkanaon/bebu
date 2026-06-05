@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/models"
+	"github.com/google/uuid"
 
 	"gorm.io/gorm"
 )
@@ -24,95 +26,202 @@ type postManagementRepository struct {
 	db *gorm.DB
 }
 
+type postManagementRow struct {
+	PostID        uint
+	PublicID      uuid.UUID
+	Description   string
+	PostType      string
+	Rating        float64
+	ImgURL        string
+	PublishStatus string
+	CreatedAt     time.Time
+	DeletedAt     gorm.DeletedAt
+
+	Username     string
+	BookTitle    string
+	LikeCount    int
+	CommentCount int
+}
+
 func NewPostManagementRepository(db *gorm.DB) PostManagementRepository {
 	return &postManagementRepository{db: db}
 }
 
-func (r *postManagementRepository) GetPaginatedPosts(ctx context.Context, params dto.PostQueryParams) (dto.PaginatedPostAPIResponse, error) {
+func (r *postManagementRepository) GetPaginatedPosts(
+	ctx context.Context,
+	params dto.PostQueryParams,
+) (dto.PaginatedPostAPIResponse, error) {
+
 	var resp dto.PaginatedPostAPIResponse
-	var posts []models.Post
+	var rows []postManagementRow
 	var totalRows int64
 
 	if params.Page <= 0 {
 		params.Page = 1
 	}
+
 	if params.Limit <= 0 {
 		params.Limit = 10
 	}
+
 	offset := (params.Page - 1) * params.Limit
 
-	// Gunakan Unscoped() agar post yang berstatus 'soft_deleted' tetap bisa ditarik ke dalam list tabel admin
-	query := r.db.WithContext(ctx).Model(&models.Post{}).Unscoped().
-		Where("posts.publish_status != ?", "draft").
-		Preload("User").
-		Preload("Book").
-		Preload("Stats")
+	query := r.db.
+		WithContext(ctx).
+		Model(&models.Post{}).
+		Unscoped().
+		Select(`
+			posts.post_id,
+			posts.public_id,
+			posts.description,
+			posts.post_type,
+			posts.rating,
+			posts.img_url,
+			posts.publish_status,
+			posts.created_at,
+			posts.deleted_at,
 
-	// Filter berdasarkan Status Keadaan Data
+			users.username,
+
+			books.title AS book_title,
+
+			COALESCE(post_stats.like_count, 0) AS like_count,
+			COALESCE(post_stats.comment_count, 0) AS comment_count
+		`).
+		Joins(`
+			LEFT JOIN users
+			ON users.user_id = posts.user_id
+		`).
+		Joins(`
+			LEFT JOIN books
+			ON books.book_id = posts.book_id
+		`).
+		Joins(`
+			LEFT JOIN post_stats
+			ON post_stats.post_id = posts.post_id
+		`).
+		Where("posts.publish_status != ?", "draft")
+
+	// Filter status
 	if params.PublishStatus != "" {
+
 		if params.PublishStatus == "soft_deleted" {
+
 			query = query.Where("posts.deleted_at IS NOT NULL")
+
 		} else {
-			query = query.Where("posts.publish_status = ? AND posts.deleted_at IS NULL", params.PublishStatus)
+
+			query = query.Where(
+				"posts.publish_status = ? AND posts.deleted_at IS NULL",
+				params.PublishStatus,
+			)
 		}
 	}
 
-	// Filter Global Search (Deskripsi post, username pembuat, atau judul buku)
+	// Search
 	if params.Search != "" {
+
 		searchPattern := fmt.Sprintf("%%%s%%", params.Search)
-		query = query.Joins("LEFT JOIN users ON users.user_id = posts.user_id").
-			Joins("LEFT JOIN books ON books.book_id = posts.book_id").
-			Where("(posts.description ILIKE ? OR users.username ILIKE ? OR books.title ILIKE ?)", 
-				searchPattern, searchPattern, searchPattern)
+
+		query = query.Where(`
+			(
+				posts.description ILIKE ?
+				OR users.username ILIKE ?
+				OR books.title ILIKE ?
+			)
+		`,
+			searchPattern,
+			searchPattern,
+			searchPattern,
+		)
 	}
 
-	// Hitung Total Records
-	if err := query.Count(&totalRows).Error; err != nil {
+	// Count
+	countQuery := r.db.
+		WithContext(ctx).
+		Model(&models.Post{}).
+		Unscoped().
+		Joins(`
+			LEFT JOIN users
+			ON users.user_id = posts.user_id
+		`).
+		Joins(`
+			LEFT JOIN books
+			ON books.book_id = posts.book_id
+		`).
+		Where("posts.publish_status != ?", "draft")
+
+	if params.PublishStatus != "" {
+
+		if params.PublishStatus == "soft_deleted" {
+
+			countQuery = countQuery.Where(
+				"posts.deleted_at IS NOT NULL",
+			)
+
+		} else {
+
+			countQuery = countQuery.Where(
+				"posts.publish_status = ? AND posts.deleted_at IS NULL",
+				params.PublishStatus,
+			)
+		}
+	}
+
+	if params.Search != "" {
+
+		searchPattern := fmt.Sprintf("%%%s%%", params.Search)
+
+		countQuery = countQuery.Where(`
+			(
+				posts.description ILIKE ?
+				OR users.username ILIKE ?
+				OR books.title ILIKE ?
+			)
+		`,
+			searchPattern,
+			searchPattern,
+			searchPattern,
+		)
+	}
+
+	if err := countQuery.Count(&totalRows).Error; err != nil {
 		return resp, err
 	}
 
-	// Ambil Data Berpaginasi
-	if err := query.Offset(offset).Limit(params.Limit).Order("posts.created_at DESC").Find(&posts).Error; err != nil {
+	// Data
+	if err := query.
+		Order("posts.created_at DESC").
+		Offset(offset).
+		Limit(params.Limit).
+		Scan(&rows).Error; err != nil {
+
 		return resp, err
 	}
 
-	// Mapping dari Model ke DTO Response
-	listData := make([]dto.PostManageableResponse, 0)
-	for _, p := range posts {
-		statusStr := p.PublishStatus
-		if p.DeletedAt.Valid {
-			statusStr = "soft_deleted" // Override string penanda jika record sudah di-softdelete
-		}
+	listData := make([]dto.PostManageableResponse, 0, len(rows))
 
-		username := "Unknown"
-		if p.User != nil {
-			username = p.User.Username
-		}
+	for _, row := range rows {
 
-		bookTitle := "Unknown Book"
-		if p.Book != nil {
-			bookTitle = p.Book.Title
-		}
+		statusStr := row.PublishStatus
 
-		likes, comments := 0, 0
-		if p.Stats != nil {
-			likes = p.Stats.LikeCount
-			comments = p.Stats.CommentCount
+		if row.DeletedAt.Valid {
+			statusStr = "soft_deleted"
 		}
 
 		listData = append(listData, dto.PostManageableResponse{
-			PostID:        p.PostID,
-			PublicID:      p.PublicID.String(),
-			Description:   p.Description,
-			PostType:      p.PostType,
-			Rating:        p.Rating,
-			ImgURL:        p.ImgURL,
+			PostID:        row.PostID,
+			PublicID:      row.PublicID.String(),
+			Description:   row.Description,
+			PostType:      row.PostType,
+			Rating:        row.Rating,
+			ImgURL:        row.ImgURL,
 			PublishStatus: statusStr,
-			CreatedAt:     p.CreatedAt,
-			Username:      username,
-			BookTitle:     bookTitle,
-			LikeCount:     likes,
-			CommentCount:  comments,
+			CreatedAt:     row.CreatedAt,
+			Username:      row.Username,
+			BookTitle:     row.BookTitle,
+			LikeCount:     row.LikeCount,
+			CommentCount:  row.CommentCount,
 		})
 	}
 
@@ -120,7 +229,9 @@ func (r *postManagementRepository) GetPaginatedPosts(ctx context.Context, params
 	resp.TotalRows = totalRows
 	resp.Page = params.Page
 	resp.Limit = params.Limit
-	resp.TotalPages = int(math.Ceil(float64(totalRows) / float64(params.Limit)))
+	resp.TotalPages = int(
+		math.Ceil(float64(totalRows) / float64(params.Limit)),
+	)
 
 	return resp, nil
 }

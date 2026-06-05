@@ -10,11 +10,11 @@ import {
 	XCircle,
 	Eye,
 } from "lucide-react";
-import Image from "next/image";
 import {
 	BookSubmissionResponse,
 	SubmissionQueryParams,
 } from "@/types/book-management";
+import BookCover from "@/components/BookCover";
 
 interface SubmissionTableProps {
 	data: BookSubmissionResponse[];
@@ -89,15 +89,11 @@ export default function SubmissionTable({
 							<div className="col-span-5 pr-6">
 								<div className="flex items-center gap-3">
 									<div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 bg-zinc-800">
-										<Image
-											src={
-												sub.cover_img_url ||
-												"/book-placeholder.png"
-											}
-											alt={sub.title}
+										<BookCover
+											src={sub.cover_img_url}
+											title={sub.title}
 											fill
 											sizes="36px"
-											className="object-cover"
 										/>
 									</div>
 									<div className="min-w-0">

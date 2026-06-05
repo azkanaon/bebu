@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { getPopularBooksAPI } from "@/lib/api"; 
+import { getPopularBooksAPI } from "@/lib/api";
 import { PopularBookItem } from "@/types/book";
+import BookCover from "@/components/BookCover";
 
 export function TrendingBooks() {
 	const [books, setBooks] = useState<PopularBookItem[]>([]);
@@ -122,11 +123,11 @@ export function TrendingBooks() {
 									href={`/books/${b.slug}`}
 									className="relative block w-[180px] h-[240px] rounded-xl overflow-hidden border border-white/10 cursor-pointer group"
 								>
-									<Image
+									<BookCover
 										src={b.cover_img_url}
-										alt={b.title}
+										title={b.title}
 										fill
-										className="object-cover transition-transform duration-300 group-hover:scale-105" // 💡 Efek zoom sedikit pas di-hover (opsional)
+										className="transition-transform duration-300 group-hover:scale-105"
 									/>
 
 									<div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />

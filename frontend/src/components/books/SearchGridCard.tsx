@@ -1,9 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { BookOpen, Clock3 } from "lucide-react";
-
 import { BookSearchItem } from "@/types/book";
 import BookRatingBadge from "./BookRatingBadge";
+import BookCover from "@/components/BookCover";
 
 type Props = {
 	book: BookSearchItem;
@@ -40,19 +39,12 @@ export default function SearchGridCard({ book }: Props) {
 
 					overflow-hidden
 				"
-			>
-				<Image
+			>\
+				<BookCover
 					src={book.cover_img_url}
-					alt={book.title}
+					title={book.title}
 					fill
-					className="
-						object-cover
-
-						transition-transform
-						duration-700
-
-						group-hover:scale-[1.02]
-					"
+					className="transition-transform duration-700 group-hover:scale-[1.02]"
 				/>
 
 				{/* RATING */}

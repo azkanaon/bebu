@@ -58,6 +58,7 @@ export default function ProfilePage({ params }: Props) {
     >
       <motion.div variants={item}>
         <ProfileHeader
+          userId={data.userId}
           publicId={data.publicId}
           username={data.username}
           profile={data.profile}

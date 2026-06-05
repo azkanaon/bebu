@@ -132,17 +132,6 @@ export default function PostMenu({ postId, postPublicID, userPublicID }: PostMen
 									/* VISITOR OPTIONS */
 									<>
 										<MenuItem
-											icon={<EyeOff size={16} />}
-											label="Not interested"
-											color="hover:text-yellow-400"
-										/>
-										<MenuItem
-											icon={<UserX size={16} />}
-											label="Mute user"
-											color="hover:text-orange-400"
-										/>
-										<div className="h-px bg-gray-800/50 my-1" />
-										<MenuItem
 											icon={<Flag size={16} />}
 											label="Report"
 											color="hover:text-red-400"

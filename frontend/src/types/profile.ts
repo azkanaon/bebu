@@ -1,4 +1,5 @@
 export interface UserProfileResponse {
+  userId: number;
   publicId: string
   username: string
   profile: ProfileInfo

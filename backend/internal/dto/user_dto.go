@@ -7,6 +7,7 @@ import (
 // ProfileResponseDTO adalah struktur data utama dan lengkap yang akan dikirim sebagai response JSON.
 // Ini adalah "paket" data yang merangkum semua informasi yang dibutuhkan oleh halaman profil frontend.
 type ProfileResponseDTO struct {
+	UserID   	  uint `json:"userId"`
 	PublicID      string           `json:"publicId"`
 	Username      string           `json:"username"`
 	Profile       ProfileInfoDTO   `json:"profile"`
@@ -107,7 +108,7 @@ type FriendRecommendationResponse struct {
 	ID             uint   `json:"id"`
 	Name           string `json:"name"`
 	Username       string `json:"username"`
-	Avatar         string `json:"avatar"`
+	Avatar         *string `json:"avatar"`
 	Bio            string `json:"bio"`
 	TotalFollowers int    `json:"total_followers"`
 	TotalFollowing int    `json:"total_following"`

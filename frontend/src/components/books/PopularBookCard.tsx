@@ -2,10 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { BookOpen, Clock3, MessageSquareText } from "lucide-react";
-
 import { PopularBookItem } from "@/types/book";
-
 import BookRatingBadge from "./BookRatingBadge";
+import BookCover from "@/components/BookCover";
 
 type Props = {
 	book: PopularBookItem;
@@ -14,15 +13,15 @@ type Props = {
 export default function PopularBookCard({ book }: Props) {
 	return (
 		<Link
-    href={`/books/${book.slug}`} // Mengarah ke ./books/[slug] (sesuaikan dengan properti slug buku kamu)
-    className="
+			href={`/books/${book.slug}`} // Mengarah ke ./books/[slug] (sesuaikan dengan properti slug buku kamu)
+			className="
         group
         w-[190px]
         shrink-0
         block       {/* Ditambahkan agar perilaku layouting Link sama seperti div asli */}
         cursor-pointer
     "
->
+		>
 			<div
 				className="
 					overflow-hidden
@@ -48,18 +47,11 @@ export default function PopularBookCard({ book }: Props) {
 						overflow-hidden
 					"
 				>
-					<Image
+					<BookCover
 						src={book.cover_img_url}
-						alt={book.title}
+						title={book.title}
 						fill
-						className="
-							object-cover
-
-							transition-transform
-							duration-700
-
-							group-hover:scale-[1.03]
-						"
+						className="transition-transform duration-700 group-hover:scale-[1.02]"
 					/>
 
 					{/* OVERLAY */}

@@ -11,6 +11,7 @@ import { useUnfollowUser } from "@/api/profile/useUnfollowUser";
 import { formatCompactNumber } from "@/lib/utils";
 import { FriendRecommendationItem } from "@/types/user";
 import { UserProfileResponse } from "@/types/profile";
+import UserAvatar from "@/components/UserAvatar";
 import { FaCheck } from "react-icons/fa";
 
 export function FriendRecommendation() {
@@ -198,15 +199,12 @@ export function FriendRecommendation() {
 									href={`/${u.username}`}
 									className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
 								>
-									<Image
-										src={
-											u.avatar ||
-											`https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`
-										}
-										alt={u.name}
-										width={40}
-										height={40}
-										className="rounded-full border border-white/20 object-cover flex-shrink-0"
+									<UserAvatar
+										user={{
+											avatar_url: u.avatar,
+										}}
+										size={40}
+										className="border border-white/20 flex-shrink-0"
 									/>
 
 									<div className="min-w-0 flex-1">
@@ -274,15 +272,12 @@ export function FriendRecommendation() {
 										className="absolute left-0 top-full mt-2 w-64 p-4 rounded-xl bg-[#020617] border border-white/10 shadow-xl z-50 pointer-events-none"
 									>
 										<div className="flex items-center gap-3">
-											<Image
-												src={
-													u.avatar ||
-													`https://api.dicebear.com/7.x/initials/svg?seed=${u.name}`
-												}
-												alt={u.name}
-												width={46}
-												height={46}
-												className="rounded-full object-cover"
+											<UserAvatar
+												user={{
+													avatar_url: u.avatar,
+												}}
+												size={46}
+												className="border border-white/20 flex-shrink-0"
 											/>
 
 											<div className="min-w-0 flex-1">

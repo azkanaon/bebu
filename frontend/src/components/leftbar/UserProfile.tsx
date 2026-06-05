@@ -1,10 +1,10 @@
 'use client'
 
 import { MoreVertical, LogOut, Settings, User } from 'lucide-react'
-import Image from 'next/image'
 import { useState, useRef, useEffect } from 'react'
 import { useLogout } from '@/api/auth/useLogout'
 import { User as TypeUser } from '@/types/auth'
+import UserAvatar from "@/components/UserAvatar";
 
 type Props = {
   user: TypeUser | null
@@ -48,17 +48,7 @@ export function UserProfile({ user }: Props) {
           {/* LEFT */}
           <div className="flex items-center gap-3">
             <div className="relative">
-              <Image
-                src={
-                  user?.avatar_url ||
-                  `https://api.dicebear.com/7.x/initials/svg?seed=${user?.display_name}`
-                }
-                alt={user?.display_name ? user?.display_name : ''}
-                width={40}
-                height={40}
-                className="rounded-full object-cover border-2 border-white/30"
-                unoptimized
-              />
+              <UserAvatar user={user} size={40} />
 
               {/* Presence */}
               <span

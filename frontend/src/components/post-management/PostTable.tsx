@@ -11,8 +11,7 @@ import {
 	Globe,
 	Trash2,
 } from "lucide-react";
-import Image from "next/image";
-
+import BookCover from "@/components/BookCover";
 import { PostManageableResponse } from "@/types/post-management";
 
 interface PostTableProps {
@@ -93,17 +92,13 @@ export default function PostTable({
 							<div className="col-span-4 pr-6">
 								<div className="flex items-center gap-3">
 									<div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 bg-zinc-800">
-										<Image
-											src={
-												post.img_url ||
-												"/book-placeholder.png"
-											}
-											alt={
+										<BookCover
+											src={post.img_url}
+											title={
 												post.book_title || "Post Image"
 											}
 											fill
 											sizes="36px"
-											className="object-cover"
 										/>
 									</div>
 
