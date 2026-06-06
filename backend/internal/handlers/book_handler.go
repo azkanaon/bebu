@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"net/http"
 	"backend-bebu/internal/services"
-	"github.com/gin-gonic/gin"
+	"net/http"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 type BookHandler struct {
@@ -184,6 +185,25 @@ func (h *BookHandler) GetBookProfile(c *gin.Context) {
 		"status":  "success",
 		"message": "book profile retrieved successfully",
 		"data":    book,
+	})
+}
+
+func (h *BookHandler) GetBookTitle(c *gin.Context) {
+	slug := c.Param("slug")
+
+	title, err := h.service.GetBookTitle(c.Request.Context(), slug)
+	if err != nil {
+		if err.Error() == "book not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	// Output sesuai permintaan Anda: hanya title
+	c.JSON(http.StatusOK, gin.H{
+		"title": title,
 	})
 }
 

@@ -14,7 +14,7 @@ export function SubmissionCard({
   const initialLetter = item.title.charAt(0).toUpperCase()
 
   return (
-    <div className="group relative bg-[#0B1220]/60 border border-white/5 p-5 rounded-[2rem] hover:border-white/10 transition-all flex gap-5 items-start overflow-hidden">
+    <div className="group relative bg-[#0B1220]/60 border border-white/5 p-5 rounded-4xl hover:border-white/10 transition-all flex gap-5 items-start overflow-hidden">
       {/* PLACEHOLDER / IMAGE */}
       <div className="relative w-20 h-28 shrink-0 rounded-2xl overflow-hidden border border-white/10 bg-linear-to-br from-slate-800 to-slate-900 flex items-center justify-center">
         {item.coverImgUrl ? (

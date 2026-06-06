@@ -80,9 +80,7 @@ export default function PostTabs({ username }: { username: string }) {
                       damping: 30,
                     }}
                     className={`absolute top-1 bottom-1 rounded-lg bg-blue-600 ${
-                      postType === 'review'
-                        ? 'left-1 w-[120px]'
-                        : 'left-[121px] w-[120px]'
+                      postType === 'review' ? 'left-1 w-30' : 'left-30.25 w-30'
                     }`}
                   />
 
@@ -153,35 +151,6 @@ export default function PostTabs({ username }: { username: string }) {
         </motion.div>
       </AnimatePresence>
     </div>
-  )
-}
-
-// --- SUB-COMPONENT: VIEW OPTION (DENGAN TEKS & IKON) ---
-function ViewOption({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  label: string
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer ${
-        active
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-          : 'text-slate-500 hover:text-slate-300'
-      }`}
-    >
-      {icon}
-      <span className="text-[11px] font-bold uppercase tracking-widest">
-        {label}
-      </span>
-    </button>
   )
 }
 

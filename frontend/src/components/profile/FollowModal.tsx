@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { X, Search, Loader2 } from 'lucide-react'
+import { X, Search, Loader2, UserCircleIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useInView } from 'react-intersection-observer'
 import ClientPortal from '../ClientPortal'
@@ -115,16 +115,21 @@ export default function FollowModal({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100dvh', opacity: 0 }}
               transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-              className="pointer-events-auto relative w-full h-[85dvh] md:h-auto md:max-h-[75vh] md:w-105 bg-[#0B1220] rounded-t-3xl md:rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden"
+              className="pointer-events-auto relative w-full h-[85dvh] md:h-auto md:max-h-[75vh] md:max-w-xl bg-[#0B1220] rounded-t-3xl md:rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden"
             >
               {/* HEADER */}
               <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
-                <h2 className="text-sm font-bold text-white tracking-tight uppercase italic">
-                  Connections
-                </h2>
+                <div className="flex gap-2">
+                  <span className="text-white/80">
+                    <UserCircleIcon size={20} />
+                  </span>
+                  <h2 className="text-sm font-bold text-white/80 tracking-tight uppercase">
+                    Connections
+                  </h2>
+                </div>
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 outline-none"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-400 outline-none cursor-pointer"
                 >
                   <X size={18} />
                 </button>
@@ -146,10 +151,7 @@ export default function FollowModal({
                         {tab}
                       </span>
                       {isActive && (
-                        <motion.div
-                          layoutId="follow-tab"
-                          className="absolute bottom-0 left-6 right-6 h-[1.5px] bg-blue-500 rounded-full"
-                        />
+                        <motion.div className="absolute bottom-0 left-6 right-6 h-[1.5px] bg-blue-500 rounded-full" />
                       )}
                     </button>
                   )
@@ -295,28 +297,22 @@ function UserRow({
   return (
     <div
       onClick={handleNavigate}
-      className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/2 transition-all group cursor-pointer active:scale-[0.98]"
+      className="flex items-center justify-between px-4 py-4 rounded-xl hover:bg-white/2 transition-all group cursor-pointer active:scale-[0.98]"
     >
       <div className="flex items-center gap-3">
-        <div className="relative h-9 w-9 border border-white/10 rounded-full overflow-hidden bg-white/5">
-          {user.avatarUrl ? (
-            <Image
-              src={user.avatarUrl}
-              alt={user.username}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500 font-bold">
-              {user.username.substring(0, 2).toUpperCase()}
-            </div>
-          )}
+        <div className="relative h-12 w-12 border border-white/10 rounded-full overflow-hidden bg-white/5">
+          <Image
+            src={user.avatarUrl ? user.avatarUrl : '/default-avatar.png'}
+            alt={user.username}
+            fill
+            className="object-cover"
+          />
         </div>
         <div>
-          <p className="text-xs md:text-sm font-semibold text-white group-hover:text-blue-400 transition-colors">
+          <p className="text-xs md:text-base font-semibold text-white group-hover:text-blue-400 transition-colors">
             {user.displayName}
           </p>
-          <p className="text-[10px] md:text-xs text-gray-500">
+          <p className="text-[10px] md:text-sm text-gray-500">
             @{user.username}
           </p>
         </div>
@@ -326,12 +322,12 @@ function UserRow({
         <button
           disabled={fLoading || uLoading}
           onClick={handleAction}
-          className={`px-3.5 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all min-w-21.25 flex justify-center cursor-pointer ${
+          className={`px-3.5 py-2 rounded-xl border border-blue-900 text-[10px] md:text-xs tracking-tighter font-bold transition-all min-w-21.25 flex justify-center cursor-pointer ${
             isFollowing
               ? 'bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10'
               : isPending
                 ? 'bg-white/5 text-gray-500 italic'
-                : 'bg-blue-600 text-white hover:bg-blue-500'
+                : 'bg-transparent text-white/70 hover:bg-blue-800'
           }`}
         >
           {fLoading || uLoading ? (

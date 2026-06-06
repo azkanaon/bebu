@@ -7,6 +7,7 @@ import Image from 'next/image'
 import { Star, Loader2 } from 'lucide-react'
 import { LoadingSpinner } from './Loading'
 import NoResults from './NoResults'
+import Link from 'next/link'
 
 export default function BooksResults({ query }: { query: string }) {
   const { ref, inView } = useInView()
@@ -31,8 +32,9 @@ export default function BooksResults({ query }: { query: string }) {
   return (
     <div className="grid grid-cols-2 gap-4 px-2">
       {allBooks.map((book) => (
-        <div
+        <Link
           key={book.public_id}
+          href={`/books/${book.slug}`}
           className="bg-white/2 border border-white/5 p-3 rounded-2xl flex flex-col gap-3 group cursor-pointer hover:border-amber-500/20 transition-all"
         >
           <div className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-lg bg-slate-800">
@@ -68,7 +70,7 @@ export default function BooksResults({ query }: { query: string }) {
               </span>
             </div>
           </div>
-        </div>
+        </Link>
       ))}
       <div ref={ref} className="col-span-2 py-10 flex justify-center">
         {isFetchingNextPage && (

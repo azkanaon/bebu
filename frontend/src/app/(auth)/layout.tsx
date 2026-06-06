@@ -1,10 +1,9 @@
 'use client'
 
-import React, { useContext, useRef } from 'react'
+import React from 'react'
 import Image from 'next/image'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { usePathname } from 'next/navigation'
-import { LayoutRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 
 export default function AuthLayout({
   children,

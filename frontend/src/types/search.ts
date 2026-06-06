@@ -19,6 +19,7 @@ export interface SearchBook {
   genres: string[] | null
   total_pages: number
   rating: number
+  slug: string
 }
 
 export interface SearchPost {

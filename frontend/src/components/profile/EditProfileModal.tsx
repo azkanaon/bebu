@@ -10,6 +10,7 @@ import {
   GripVertical,
   Globe,
   MessageSquare,
+  UserPen,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import ClientPortal from '../ClientPortal'
@@ -187,12 +188,15 @@ export default function EditProfileModal({
             >
               {/* HEADER */}
               <div className="flex items-center justify-between p-5 border-b border-white/10 shrink-0">
-                <h2 className="text-lg font-bold tracking-tight uppercase italic text-gray-400">
-                  Edit Profile
-                </h2>
+                <div className="flex gap-2">
+                  <UserPen size={20} className="text-gray-400" />
+                  <h2 className="text-base font-bold tracking-tight uppercase text-gray-400">
+                    Edit Profile
+                  </h2>
+                </div>
                 <button
                   onClick={onClose}
-                  className="p-2 rounded-full hover:bg-white/10 text-gray-400 outline-none"
+                  className="p-2 rounded-full hover:bg-white/10 text-gray-400 outline-none cursor-pointer"
                 >
                   <X size={20} />
                 </button>
@@ -219,10 +223,10 @@ export default function EditProfileModal({
                         // Jika sedang mode "Hapus", tampilkan gambar default
                         src={
                           isRemovingPhoto
-                            ? 'https://i.pravatar.cc/150'
+                            ? '/default-avatar.png'
                             : previewUrl ||
                               initialData?.profile?.avatarUrl ||
-                              'https://i.pravatar.cc/150'
+                              '/default-avatar.png'
                         }
                         alt="Profile"
                         fill
@@ -235,7 +239,7 @@ export default function EditProfileModal({
                         setIsRemovingPhoto(false)
                         fileInputRef.current?.click()
                       }}
-                      className="absolute bottom-1 right-1 p-2 bg-blue-600 rounded-full border-4 border-[#0B1220] hover:bg-blue-500 transition-colors shadow-lg outline-none"
+                      className="absolute bottom-1 right-1 p-2 bg-blue-700 rounded-full border-4 border-[#0B1220] hover:bg-blue-900 transition-colors shadow-lg outline-none cursor-pointer"
                     >
                       <Camera size={14} className="text-white" />
                     </button>
@@ -248,7 +252,7 @@ export default function EditProfileModal({
                         setIsRemovingPhoto(false)
                         fileInputRef.current?.click()
                       }}
-                      className="text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest outline-none"
+                      className="text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest outline-none cursor-pointer"
                     >
                       Change
                     </button>

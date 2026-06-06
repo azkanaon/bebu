@@ -28,7 +28,7 @@ export const useLogin = () => {
       })
 
       // Redirect ke halaman profile
-      router.push('/profile')
+      router.push('/')
     },
 
     onError: (error) => {
