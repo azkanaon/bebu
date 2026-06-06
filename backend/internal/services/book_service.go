@@ -2,9 +2,9 @@ package services
 
 import (
 	"backend-bebu/internal/dto"
-	"backend-bebu/internal/repositories"
-	"backend-bebu/internal/models"
 	"backend-bebu/internal/mapper"
+	"backend-bebu/internal/models"
+	"backend-bebu/internal/repositories"
 
 	"context"
 	"errors"
@@ -20,6 +20,7 @@ type BookService interface {
 	GetBookProfile(ctx context.Context, slug string) (*dto.BookProfileResponse, error)
 	GetBookRecommendations(ctx context.Context, slug string) (*dto.BookRecommendationsResponse, error)
 	GetBookPosts(ctx context.Context, slug string, postType string, cursor uint, limit int, userID uint) ([]interface{}, error)
+	GetBookTitle(ctx context.Context, slug string) (string, error)
 }
 
 type bookService struct {
@@ -203,6 +204,10 @@ func (s *bookService) GetBookProfile(ctx context.Context, slug string) (*dto.Boo
 	}
 
 	return response, nil
+}
+
+func (s *bookService) GetBookTitle(ctx context.Context, slug string) (string, error) {
+	return s.bookRepo.GetTitleBySlug(ctx, slug)
 }
 
 func (s *bookService) GetBookRecommendations(ctx context.Context, slug string) (*dto.BookRecommendationsResponse, error) {

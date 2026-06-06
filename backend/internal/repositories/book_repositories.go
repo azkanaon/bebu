@@ -6,11 +6,11 @@ import (
 
 	"gorm.io/gorm"
 
+	"context"
+	"errors"
 	"math"
 	"strings"
 	"time"
-	"context"
-	"errors"
 )
 
 type BookRepository interface {
@@ -24,6 +24,7 @@ type BookRepository interface {
 	GetRecommendationsByGenres(ctx context.Context, currentBookID uint, genreIDs []uint, limit int) ([]models.Book, error)
 	GetRecommendationsByAuthors(ctx context.Context, currentBookID uint, authorIDs []uint, limit int) ([]models.Book, error)
 	GetBookPosts(ctx context.Context, bookID uint, postType string, cursor uint, limit int, userID uint) ([]models.Post, error)
+	GetTitleBySlug(ctx context.Context, slug string) (string, error)
 }
 
 type bookRepository struct {
@@ -845,6 +846,25 @@ func (r *bookRepository) GetBySlug(ctx context.Context, slug string) (*models.Bo
 	}
 
 	return &book, nil
+}
+
+func (r *bookRepository) GetTitleBySlug(ctx context.Context, slug string) (string, error) {
+	var book models.Book
+	
+	// Kita hanya SELECT kolom title. Tanpa Preload apa pun.
+	err := r.db.WithContext(ctx).
+		Select("title").
+		Where("slug = ?", slug).
+		First(&book).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", errors.New("book not found")
+		}
+		return "", err
+	}
+
+	return book.Title, nil
 }
 
 func (r *bookRepository) GetRecommendationsByGenres(ctx context.Context, currentBookID uint, genreIDs []uint, limit int) ([]models.Book, error) {

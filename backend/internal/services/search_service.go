@@ -154,6 +154,7 @@ func (s *searchService) mapBooksToDTO(books []models.Book) []dto.BookSearchItem 
 			Language:        b.Language,
 			Authors:         authorNames,
 			TotalPages:      b.TotalPages,
+			Slug:            b.Slug,
 		})
 	}
 	return dtos

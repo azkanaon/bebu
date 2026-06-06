@@ -56,19 +56,19 @@ html {
 }
 
 @keyframes float {
-	0% {
-		transform: translateY(0px);
-	}
-	50% {
-		transform: translateY(-6px);
-	}
-	100% {
-		transform: translateY(0px);
-	}
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
 }
 
 .animate-float {
-	animation: float 4s ease-in-out infinite;
+  animation: float 4s ease-in-out infinite;
 }
 
 body {
@@ -76,17 +76,6 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
-
-/* .custom-scrollbar::-webkit-scrollbar {
-  width: 2px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #161922;
-  border-radius: 10px;
-} */
 
 /* 🔥 MODERN SCROLLBAR */
 .custom-scrollbar::-webkit-scrollbar {

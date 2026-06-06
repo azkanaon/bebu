@@ -43,7 +43,10 @@ export function UserProfile({ user }: Props) {
           hover:scale-[1.03]   /* ✅ hover scale */
           active:scale-[0.98]
           cursor-pointer"
-          onClick={() => setExpand(!expand)}
+          onClick={(e) => {
+            e.stopPropagation()
+            setOpen(!open)
+          }}
         >
           {/* LEFT */}
           <div className="flex items-center gap-3">
@@ -65,19 +68,6 @@ export function UserProfile({ user }: Props) {
               <div className="text-xs text-gray-400">@{user?.username}</div>
             </div>
           </div>
-
-          {/* RIGHT ACTION */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setOpen(!open)
-              }}
-              className="text-gray-400 hover:text-white transition"
-            >
-              <MoreVertical size={18} />
-            </button>
-          </div>
         </div>
 
         {/* DROPDOWN */}
@@ -90,12 +80,7 @@ export function UserProfile({ user }: Props) {
             overflow-hidden
             animate-in fade-in zoom-in-95"
           >
-            <button className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10">
-              <User size={16} />
-              Profile
-            </button>
-
-            <button className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10">
+            <button className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10  cursor-pointer">
               <Settings size={16} />
               Settings
             </button>
@@ -105,7 +90,7 @@ export function UserProfile({ user }: Props) {
             <button
               onClick={() => logout()}
               disabled={isPending}
-              className={`flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`flex items-center gap-2 w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 cursor-pointer ${isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <LogOut size={16} />
               {isPending ? 'Logging out...' : 'Logout'}

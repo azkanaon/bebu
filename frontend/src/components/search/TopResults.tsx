@@ -13,6 +13,7 @@ import {
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import NoResults from './NoResults'
+import Link from 'next/link'
 
 interface Props {
   data?: TopSearchResponse
@@ -108,7 +109,8 @@ export default function TopResults({ data, onSeeAll, query }: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             {books.map((book) => (
-              <div
+              <Link
+                href={`/books/${book.slug}`}
                 key={book.public_id}
                 className="bg-white/5 border border-white/10 p-3 rounded-2xl flex gap-3 group cursor-pointer hover:border-amber-500/20 transition-all"
               >
@@ -140,7 +142,7 @@ export default function TopResults({ data, onSeeAll, query }: Props) {
                     </span>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
