@@ -674,6 +674,7 @@ func (s *bookshelfService) GetBookshelfNotes(viewerID *uint, bookshelfID uint, n
 			Progress:    progressVal,
 			CurrentPage: entry.CurrentPage,
 			TotalPages: entry.Book.TotalPages,
+			ShelfStatus: entry.ShelfStatus,
 		},
 		Data: notesDTO,
 		Meta: dto.NewPaginationDTO(total, page, limit),
