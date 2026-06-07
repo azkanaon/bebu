@@ -71,6 +71,7 @@ export interface NotesResponse {
     progress: number
     currentPage: number
     totalPages: number
+    shelfStatus: ShelfStatus
   }
   data: Note[]
   meta: PaginationMeta

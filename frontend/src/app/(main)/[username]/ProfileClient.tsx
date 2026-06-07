@@ -7,6 +7,7 @@ import Badges from '@/components/profile/Badges'
 import PostTabs from '@/components/profile/PostTabs'
 import { useProfile } from '@/api/profile/useProfile'
 import { use } from 'react'
+import { PrivateProfileWall } from '@/components/profile/PrivateProfileWall'
 
 const container: Variants = {
   hidden: { opacity: 0 },
@@ -66,20 +67,46 @@ export default function ProfileClient({ params }: Props) {
           viewerContext={data.viewerContext}
           settings={data.settings}
           isPrivateAccount={data.isPrivateAccount}
+          userId={data.userId}
         />
       </motion.div>
 
-      <motion.div variants={item}>
-        <Achievements items={data.favoriteAchievements} username={username} />
-      </motion.div>
+      {data.isPrivate ? (
+        <motion.div variants={item}>
+          <PrivateProfileWall />
+        </motion.div>
+      ) : (
+        <>
+          <motion.div variants={item}>
+            <Achievements
+              items={data.favoriteAchievements}
+              username={username}
+            />
+          </motion.div>
 
-      <motion.div variants={item}>
-        <Badges items={data.favoriteBadges} username={username} />
-      </motion.div>
+          <motion.div variants={item}>
+            <Badges items={data.favoriteBadges} username={username} />
+          </motion.div>
 
-      <motion.div variants={item}>
-        <PostTabs username={username} />
-      </motion.div>
+          <motion.div variants={item}>
+            <PostTabs username={username} />
+          </motion.div>
+        </>
+      )}
     </motion.div>
+  )
+}
+
+function LoadingPlaceholder() {
+  return (
+    <div className="py-20 text-center text-slate-500">Loading profile...</div>
+  )
+}
+
+function ErrorPlaceholder() {
+  return (
+    <div className="py-20 text-center text-red-400">
+      Failed to load profile.
+    </div>
   )
 }

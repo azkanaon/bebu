@@ -22,6 +22,7 @@ import { BookshelfItem, ShelfStatus } from '@/types/bookshelf'
 import BookCard from '@/components/bookshelf/BookCard'
 import BookModal from '@/components/bookshelf/BookModal'
 import AddBookModal from '@/components/bookshelf/AddBookModal'
+import { useRouter } from 'next/navigation'
 
 type Props = {
   params: Promise<{
@@ -40,6 +41,8 @@ export default function BookshelfPage({ params }: Props) {
   const [debouncedSearch, setDebouncedSearch] = useState('') // Nilai yang dikirim ke API
   const { ref, inView } = useInView()
   const [isAddBookOpen, setIsAddBookOpen] = useState(false)
+
+  const router = useRouter()
 
   const [selectedItem, setSelectedItem] = useState<BookshelfItem | null>(null)
 
@@ -195,9 +198,11 @@ export default function BookshelfPage({ params }: Props) {
                 >
                   {filteredBooks.map((item) => (
                     <BookCard
-                      key={item.publicId}
+                      key={item.id}
                       item={item}
-                      onClick={setSelectedItem}
+                      onClick={() =>
+                        router.push(`/bookshelf/${profileUsername}/${item.id}`)
+                      }
                     />
                   ))}
                 </motion.div>

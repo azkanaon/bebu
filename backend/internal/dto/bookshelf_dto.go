@@ -11,6 +11,7 @@ type BookshelfContextDTO struct {
 	Progress    int      `json:"progress"`
 	CurrentPage int      `json:"currentPage"`
 	TotalPages  int      `json:"totalPages"`
+	ShelfStatus string   `json:"shelfStatus"`
 }
 
 // Response utama untuk endpoint notes
