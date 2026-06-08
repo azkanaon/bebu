@@ -315,6 +315,7 @@ ${glow}
 									});
 
 									handleCloseModal(); // tutup modal setelah sukses
+									window.location.reload();
 
 									// optional: reset state
 									setText("");

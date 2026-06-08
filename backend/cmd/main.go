@@ -19,7 +19,11 @@ import (
 func main() {
 	config.LoadAndConnectDB()
 	db := config.GetDB()
+	
 	config.InitCloudinary()
+
+	config.ConnectRedis()
+	rdb := config.GetRedisClient()
 
 	loginLimiter := utils.NewLoginRateLimiter(5, 5*time.Minute, 15*time.Minute)
 
@@ -41,9 +45,16 @@ func main() {
 	notifHandler := handlers.NewNotificationHandler(notifService)
 	wsHandler := handlers.NewWSHandler(hub)
 
+	pgRepo := repositories.NewPostgresRepository(db)
+	redisRepo := repositories.NewRedisRepository(rdb)
+
+	leaderboardService := services.NewLeaderboardService(pgRepo, redisRepo)
+	workerService := services.NewWorkerService(pgRepo, redisRepo)
+	expService := services.NewExpService(pgRepo, redisRepo)
+
 	postRepo := repositories.NewPostRepository(db)
 	postService := services.NewPostService(postRepo, userRepo, categoryRepo, bookshelfRepo,notifService, db) 
-	postHandler := handlers.NewPostHandler(postService) 
+	postHandler := handlers.NewPostHandler(postService, expService) 
 
 	bookRepo := repositories.NewBookRepository(db)
 	bookService := services.NewBookService(bookRepo)
@@ -96,9 +107,14 @@ func main() {
 	submissionService := services.NewBookSubmissionService(submissionRepo, db)
 	submissionHandler := handlers.NewBookSubmissionHandler(submissionService)
 
+	leaderboardHandler := handlers.NewLeaderboardHandler(leaderboardService)
+
 	authMiddleware := middlewares.NewAuthMiddleware(userRepo)
 
 	worker.InitStreakWorker(bookshelfRepo)
+	
+	leaderboardCron := worker.NewLeaderboardCron(workerService)
+    leaderboardCron.Start()
 
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
@@ -109,13 +125,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, recommendationHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, submissionHandler, bookManagementHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, recommendationHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, submissionHandler, bookManagementHandler, leaderboardHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, recommendationHandler *handlers.RecommendationHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, submissionHandler *handlers.BookSubmissionHandler, bookManagementHandler *handlers.BookManagementHandler) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, recommendationHandler *handlers.RecommendationHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, submissionHandler *handlers.BookSubmissionHandler, bookManagementHandler *handlers.BookManagementHandler, leaderboardHandler *handlers.LeaderboardHandler,) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -301,7 +317,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 
 		v1.GET("/ws", authMiddleware.RequiredAuth(), wsHandler.HandleWS)
 
-		v1.GET("/leaderboard", handlers.GetLeaderboard)
+		v1.GET("/leaderboard", authMiddleware.OptionalAuth(), leaderboardHandler.GetLeaderboard)
 		v1.GET("/platforms", platformHandler.GetAllPlatforms)
 
 		v1.POST("/report", authMiddleware.RequiredAuth(), reportHandler.CreateReport)

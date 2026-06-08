@@ -2,52 +2,46 @@ package handlers
 
 import (
 	"net/http"
-
+	"strconv"
+	"backend-bebu/internal/domain"
 	"github.com/gin-gonic/gin"
-	"backend-bebu/config"
-	"backend-bebu/internal/models"
 )
 
-type LeaderboardResponse struct {
-	ID        uint   `json:"id"`
-	Name      string `json:"name"`
-	Username  string `json:"username"`
-	Avatar    string `json:"avatar"`
-	Rank      int    `json:"rank"`
+type LeaderboardHandler struct {
+	service domain.LeaderboardService
 }
 
-func GetLeaderboard(c *gin.Context) {
-	var rankings []models.UserRanking
+func NewLeaderboardHandler(service domain.LeaderboardService) *LeaderboardHandler {
+	return &LeaderboardHandler{service: service}
+}
 
-	err := config.DB.
-		Preload("User.Profile").
-		Order("global_rank ASC").
-		Limit(5).
-		Find(&rankings).Error
+func (h *LeaderboardHandler) GetLeaderboard(c *gin.Context) {
+	// Ambil query params dengan nilai default
+	periodType := c.DefaultQuery("type", "all_time") // atau "monthly"
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "5")
 
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+
+	if page < 1 { page = 1 }
+	if limit < 1 || limit > 100 { limit = 5 } // Batasi maksimal limit demi keamanan server
+
+	// EKSTRAKSI USER ID: Asumsi kamu memiliki JWT Middleware yang menyimpan userID di konteks gin
+	// Misal: c.Set("userID", claims.UserID)
+	var currentUserID uint
+	if val, exists := c.Get("userID"); exists {
+		if id, ok := val.(uint); ok {
+			currentUserID = id
+		}
+	}
+
+	// Jalankan service pipeline
+	resp, err := h.service.GetLeaderboard(c.Request.Context(), periodType, page, limit, currentUserID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch leaderboard data"})
 		return
 	}
 
-	response := make([]LeaderboardResponse, 0)
-
-	for _, r := range rankings {
-		avatar := r.User.Profile.AvatarUrl
-		if avatar == "" {
-			avatar = "https://i.pravatar.cc/150"
-		}
-
-		response = append(response, LeaderboardResponse{
-			ID:       r.User.UserID,
-			Name:     r.User.Profile.DisplayName,
-			Username: r.User.Username,
-			Avatar:   avatar,
-			Rank:     r.GlobalRank,
-		})
-	}
-
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, resp)
 }
