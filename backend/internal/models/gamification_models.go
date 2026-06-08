@@ -92,9 +92,12 @@ type UserAchievement struct {
 }
 
 type UserRanking struct {
-	UserID     uint      `gorm:"column:user_id;primaryKey"`
-	GlobalRank int      `gorm:"column:global_rank"`
-	UpdatedAt  time.Time `gorm:"column:updated_at;autoUpdateTime"`
+    UserID     uint      `gorm:"column:user_id;primaryKey"`
+    PeriodType string    `gorm:"column:period_type;primaryKey;type:varchar(20)"` // "all_time" atau "monthly"
+    PeriodKey  string    `gorm:"column:period_key;primaryKey;type:varchar(20)"`  // "all" atau "2026-06"
+    TotalExp   int       `gorm:"column:total_exp;not null;default:0"`
+    GlobalRank int       `gorm:"column:global_rank;not null;default:0"`
+    UpdatedAt  time.Time `gorm:"column:updated_at;autoUpdateTime"`
 
-	User User `gorm:"foreignKey:UserID;references:UserID"`
+    User User `gorm:"foreignKey:UserID;references:UserID"`
 }

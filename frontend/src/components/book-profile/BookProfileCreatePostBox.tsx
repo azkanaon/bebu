@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { usePostModal } from "@/stores/postModal";
 
-import { PenTool, MessageSquareText, BarChart3 } from "lucide-react";
+import { MessageSquareText, BarChart3 } from "lucide-react";
 
 type BookProfileCreatePostBoxProps = {
 	activeTab: "review" | "analysis";

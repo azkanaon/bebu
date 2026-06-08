@@ -39,8 +39,21 @@ import {
 	GenreResponse,
 } from "@/types/book-management";
 import { FriendRecommendationItem } from "@/types/user";
+import { LeaderboardResponse, TabType } from "@/types/leaderboard";
 import api from "@/lib/axios";
 
+// Get Data Leaderboard Right Sidebar
+export async function getLeaderboardAPI(
+	timeFrame: TabType,
+	limit: number = 5,
+): Promise<LeaderboardResponse> {
+	const res = await api.get(
+		`/v1/leaderboard?type=${timeFrame}&limit=${limit}`,
+	);
+	return res.data;
+}
+
+/* --- POSTS --- */
 export async function getPostsAPI(
 	tab: string,
 	cursor: number = 0,

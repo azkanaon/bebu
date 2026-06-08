@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"errors"
+	"context"
+	"time"
 
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/services"
@@ -18,6 +20,7 @@ import (
 
 type PostHandler struct {
 	service services.PostService
+	expService services.ExpService
 }
 
 // prettyPrint tetap bisa Anda gunakan untuk debugging
@@ -26,8 +29,11 @@ func prettyPrint(data interface{}) {
 	fmt.Println(string(b))
 }
 
-func NewPostHandler(service services.PostService) *PostHandler {
-	return &PostHandler{service: service}
+func NewPostHandler(service services.PostService, expService services.ExpService) *PostHandler {
+	return &PostHandler{
+		service:    service,
+		expService: expService,
+	}
 }
 
 func (h *PostHandler) GetPosts(c *gin.Context) {
@@ -114,9 +120,8 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	bookID, _ := strconv.Atoi(c.PostForm("book_id"))
 	req.BookID = uint(bookID)
 	req.Description = c.PostForm("description")
-	req.PostType = c.PostForm("post_type")
+	req.PostType = c.PostForm("post_type") // nilainya: "review" atau "analysis"
 	
-	// Parsing rating (opsional)
 	if ratingStr := c.PostForm("rating"); ratingStr != "" {
 		rating, err := strconv.ParseFloat(ratingStr, 64)
 		if err == nil {
@@ -124,16 +129,13 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		}
 	}
 
-	// ✅ categories (string JSON → []string)
 	if categoriesJSON := c.PostForm("categories"); categoriesJSON != "" {
 		json.Unmarshal([]byte(categoriesJSON), &req.Categories)
 	}
 
-	// ✅ upload image (sedikit disederhanakan)
 	file, err := c.FormFile("image")
 	if err == nil {
-		// Asumsi UploadToCloudinary Anda sekarang menerima *multipart.FileHeader
-		url, err := utils.UploadToCloudinary(file, "bebu/posts") // Tambahkan folder
+		url, err := utils.UploadToCloudinary(file, "bebu/posts")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "upload failed"})
 			return
@@ -144,10 +146,34 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
+	// Eksekusi penyimpanan Post utama ke Database SQL
 	if err := h.service.CreatePost(req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Jalankan di background agar user tidak merasakan delay/lag saat memposting.
+	go func(uID uint, pType string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // Naikkan ke 10 detik untuk antisipasi koneksi lambat
+		defer cancel()
+
+		sourceType := "POST_REVIEW"
+		if pType == "analysis" {
+			sourceType = "POST_BEDAH"
+		}
+
+		var sourceID *uint = nil 
+
+		fmt.Printf("[DEBUG-EXP] Memulai proses RewardExp untuk UserID: %d, Type: %s\n", uID, sourceType)
+
+		// Panggil ExpService dan tangkap error-nya langsung di sini untuk di-print
+		err := h.expService.RewardExp(ctx, uID, sourceID, sourceType)
+		if err != nil {
+			fmt.Printf("[ERROR-EXP] Gagal memberikan EXP di background: %v\n", err)
+		} else {
+			fmt.Printf("[SUCCESS-EXP] Berhasil menambahkan EXP dan mengupdate Redis untuk UserID: %d\n", uID)
+		}
+	}(req.UserID, req.PostType)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Post created successfully",
