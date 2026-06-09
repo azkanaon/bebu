@@ -191,6 +191,7 @@ func (s *userService) mapToPublicProfileDTO(
 		Settings: &dto.UserSettingsDTO{
 			IsProfilePublic: user.Settings != nil && user.Settings.IsProfilePublic,
 			AllowDmFromPublic: user.Settings != nil && user.Settings.AllowDmFromPublic,
+			IsBookshelfPublic: user.Settings != nil && user.Settings.IsBookshelfPublic,
 		},
 		Profile: dto.ProfileInfoDTO{
 			DisplayName: user.Profile.DisplayName,
@@ -255,6 +256,7 @@ func (s *userService) mapToPrivateProfileDTO(user *models.User, stats *models.Us
 		Settings: &dto.UserSettingsDTO{
 			IsProfilePublic: user.Settings != nil && user.Settings.IsProfilePublic,
 			AllowDmFromPublic: user.Settings != nil && user.Settings.AllowDmFromPublic,
+			IsBookshelfPublic: user.Settings != nil && user.Settings.IsBookshelfPublic,
 		},
 		SocialLinks:   socialLinks,
 		FavoriteBadges:        []dto.BadgeDTO{},
@@ -469,6 +471,9 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 		}
 	}
 
+	if req.IsBookshelfPublic != nil {
+		settingsUpdates["is_bookshelf_public"] = *req.IsBookshelfPublic
+	}
 
 	if req.AllowDmFromPublic != nil {
 		settingsUpdates["allow_dm_from_public"] = *req.AllowDmFromPublic

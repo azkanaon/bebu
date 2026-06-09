@@ -71,3 +71,21 @@ export const useSubmitBook = () => {
     onError: () => toast.error('Failed to submit book request'),
   })
 }
+
+export const useUpdateSubmission = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number
+      payload: BookSubmissionRequest
+    }) => submissionService.updateSubmission(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-submissions'] })
+      toast.success('Submission updated successfully!')
+    },
+    onError: () => toast.error('Failed to update submission'),
+  })
+}

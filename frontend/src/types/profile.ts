@@ -1,5 +1,5 @@
 export interface UserProfileResponse {
-  userId: number;
+  userId: number
   publicId: string
   username: string
   profile: ProfileInfo
@@ -60,6 +60,7 @@ export interface ViewerContext {
 export interface UserSetting {
   isProfilePublic: boolean
   allowDmFromPublic: boolean
+  isBookshelfPublic: boolean
 }
 
 export interface SocialLinkInput {

@@ -3,6 +3,7 @@ import {
   BookSubmissionRequest,
   MySubmissionsResponse,
   SearchResultItem,
+  SubmissionResponse,
 } from '@/types/submission'
 
 export const submissionService = {
@@ -45,6 +46,40 @@ export const submissionService = {
         limit: 10,
       },
     })
+    return res.data
+  },
+
+  updateSubmission: async (
+    id: number,
+    data: BookSubmissionRequest,
+  ): Promise<SubmissionResponse> => {
+    const formData = new FormData()
+    formData.append('title', data.title)
+    formData.append('authors', JSON.stringify(data.authors))
+    formData.append('genres', JSON.stringify(data.genres))
+
+    if (data.synopsis) formData.append('synopsis', data.synopsis)
+    if (data.language) formData.append('language', data.language)
+    if (data.isbn) formData.append('isbn', data.isbn)
+    if (data.total_pages)
+      formData.append('total_pages', String(data.total_pages))
+    if (data.publication_year)
+      formData.append('publication_year', String(data.publication_year))
+    if (data.user_note) formData.append('user_note', data.user_note)
+
+    // Logika File & Removal
+    if (data.cover) {
+      formData.append('cover', data.cover)
+    }
+    if (data.remove_cover !== undefined) {
+      formData.append('remove_cover', String(data.remove_cover))
+    }
+
+    // Gunakan method PATCH untuk update sesuai endpoint kamu
+    const res = await api.patch<SubmissionResponse>(
+      `/v1/submissions/${id}`,
+      formData,
+    )
     return res.data
   },
 

@@ -56,6 +56,7 @@ type UserSetting struct {
 	PublicID           uuid.UUID `gorm:"type:uuid;unique;not null;default:gen_random_uuid()"`
 	UserID             uint      `gorm:"not null;unique"` // UserID harus unik, 1 user 1 setting
 	IsProfilePublic    bool      `gorm:"not null;default:true"`
+    IsBookshelfPublic bool `gorm:"not null;default:true"`
 	ShowActivityHeatmap bool      `gorm:"not null;default:true"`
 	AllowDmFromPublic  bool      `gorm:"not null;default:true"`
 	CreatedAt          time.Time `gorm:"not null;default:now()"`

@@ -25,6 +25,7 @@ type ProfileResponseDTO struct {
 type UserSettingsDTO struct {
 	IsProfilePublic   bool `json:"isProfilePublic"`
 	AllowDmFromPublic bool `json:"allowDmFromPublic"`
+	IsBookshelfPublic bool `json:"isBookshelfPublic"`
 }
 
 // ProfileInfoDTO berisi data spesifik dari tabel user_profiles.
@@ -73,6 +74,7 @@ type UpdateProfileRequestDTO struct {
 	Gender            *string
 	SocialLinks       []SocialLinkInputDTO // Menerima array social links
 	IsProfilePublic   *bool // Pointer agar bisa diabaikan jika tidak di-supply
+	IsBookshelfPublic *bool `json:"is_bookshelf_public"`
 	AllowDmFromPublic *bool
 	RemoveAvatar *bool `json:"remove_avatar"`
 }

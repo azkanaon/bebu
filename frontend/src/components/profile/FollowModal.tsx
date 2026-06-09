@@ -24,6 +24,7 @@ type Props = {
   onClose: () => void
   initialTab?: 'followers' | 'following'
   username: string
+  isLocked: boolean
 }
 
 export default function FollowModal({
@@ -31,19 +32,21 @@ export default function FollowModal({
   onClose,
   initialTab = 'followers',
   username,
+  isLocked,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'followers' | 'following'>(
     initialTab,
   )
   const [search, setSearch] = useState('')
 
+  const isEnabled = open && !isLocked
   const {
     data: followersData,
     fetchNextPage: fetchFollowers,
     hasNextPage: hasMoreFollowers,
     isFetchingNextPage: isFetchingFollowers,
     isLoading: loadingFollowers,
-  } = useInfiniteFollowers(username)
+  } = useInfiniteFollowers(username, isEnabled)
 
   const {
     data: followingData,
@@ -51,7 +54,7 @@ export default function FollowModal({
     hasNextPage: hasMoreFollowing,
     isFetchingNextPage: isFetchingFollowing,
     isLoading: loadingFollowing,
-  } = useInfiniteFollowing(username)
+  } = useInfiniteFollowing(username, isEnabled)
 
   const { ref, inView } = useInView()
 

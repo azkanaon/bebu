@@ -23,6 +23,7 @@ import BookCard from '@/components/bookshelf/BookCard'
 import BookModal from '@/components/bookshelf/BookModal'
 import AddBookModal from '@/components/bookshelf/AddBookModal'
 import { useRouter } from 'next/navigation'
+import PrivateBookshelfWall from '@/components/bookshelf/PrivateBookshelfWall'
 
 type Props = {
   params: Promise<{
@@ -63,7 +64,7 @@ export default function BookshelfPage({ params }: Props) {
     isLoading,
     isFetching, // Tambahkan isFetching untuk indikator search
   } = useInfiniteBookshelf(profileUsername, activeStatus, debouncedSearch)
-
+  const isBookshelfPrivate = data?.pages[0]?.isPrivate || false
   const { data: stats } = useReadingStats(profileUsername)
 
   // 2. Infinite Scroll Trigger
@@ -80,184 +81,196 @@ export default function BookshelfPage({ params }: Props) {
 
   return (
     <div className="flex flex-col gap-8 pb-20 text-slate-200 mt-4">
-      {/* HEADER: Reading Stats */}
-      <header className="grid grid-cols-2 gap-3 sm:gap-4">
-        <div className="bg-[#0B1220]/60 border border-white/5 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-10 h-10 bg-orange-500/10 rounded-full flex items-center justify-center text-orange-400">
-            <Flame size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Reading streak</p>
-            <p className="text-lg font-semibold text-slate-100">
-              {stats?.currentStreak || 0} days
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-[#0B1220]/60 border border-white/5 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400">
-            <Library size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Longest streak</p>
-            <p className="text-lg font-semibold text-slate-100">
-              {stats?.longestStreak || 0} days
-            </p>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex sm:hidden overflow-x-auto no-scrollbar gap-2 pb-1">
-        <FilterPill
-          active={activeStatus === 'reading'}
-          onClick={() => setActiveStatus('reading')}
-          label="Reading"
-        />
-        <FilterPill
-          active={activeStatus === 'want_to_read'}
-          onClick={() => setActiveStatus('want_to_read')}
-          label="Wishlist"
-        />
-        <FilterPill
-          active={activeStatus === 'done'}
-          onClick={() => setActiveStatus('done')}
-          label="Finished"
-        />
-      </div>
-
-      <div className="flex gap-6 items-start">
-        {/* SIDEBAR MINI INTERNAL */}
-        <aside className="hidden sm:flex w-36 flex-col gap-1 sticky top-4">
-          <NavButton
-            active={activeStatus === 'reading'}
-            onClick={() => setActiveStatus('reading')}
-            icon={<BookOpen size={18} />}
-            label="Reading"
-          />
-          <NavButton
-            active={activeStatus === 'want_to_read'}
-            onClick={() => setActiveStatus('want_to_read')}
-            icon={<Bookmark size={18} />}
-            label="Wishlist"
-          />
-          <NavButton
-            active={activeStatus === 'done'}
-            onClick={() => setActiveStatus('done')}
-            icon={<CheckCircle size={18} />}
-            label="Finished"
-          />
-          {isMe && (
-            <button
-              onClick={() => setIsAddBookOpen(true)}
-              className="mt-4 w-full h-11 sm:h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center gap-2 hover:bg-blue-500 transition-all shadow-md active:scale-95 text-sm font-medium cursor-pointer"
-            >
-              <Plus size={18} />
-              <span className="hidden sm:block">Add Book</span>
-            </button>
-          )}
-        </aside>
-
-        {/* MAIN CONTENT AREA */}
-        <main className="flex-1 min-w-0">
-          {/* SEARCH BAR */}
-          <div className="mb-6 relative">
-            <Search
-              className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isFetching && searchTerm ? 'text-blue-500' : 'text-slate-600'}`}
-              size={16}
-            />
-            <input
-              type="text"
-              value={searchTerm} // Gunakan searchTerm (bukan debouncedSearch)
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search books by title..."
-              className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-sm text-slate-200 outline-none focus:border-blue-500/30 transition-all"
-            />
-            {/* Indikator Loading Kecil saat sedang searching */}
-            {isFetching && searchTerm && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Loader2 size={14} className="animate-spin text-blue-500" />
+      {isBookshelfPrivate ? (
+        <PrivateBookshelfWall />
+      ) : (
+        <div>
+          <header className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="bg-[#0B1220]/60 border border-white/5 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-orange-500/10 rounded-full flex items-center justify-center text-orange-400">
+                <Flame size={20} />
               </div>
-            )}
+              <div>
+                <p className="text-xs text-slate-500 font-medium">
+                  Reading streak
+                </p>
+                <p className="text-lg font-semibold text-slate-100">
+                  {stats?.currentStreak || 0} days
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-[#0B1220]/60 border border-white/5 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400">
+                <Library size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 font-medium">
+                  Longest streak
+                </p>
+                <p className="text-lg font-semibold text-slate-100">
+                  {stats?.longestStreak || 0} days
+                </p>
+              </div>
+            </div>
+          </header>
+
+          <div className="flex sm:hidden overflow-x-auto no-scrollbar gap-2 pb-1">
+            <FilterPill
+              active={activeStatus === 'reading'}
+              onClick={() => setActiveStatus('reading')}
+              label="Reading"
+            />
+            <FilterPill
+              active={activeStatus === 'want_to_read'}
+              onClick={() => setActiveStatus('want_to_read')}
+              label="Wishlist"
+            />
+            <FilterPill
+              active={activeStatus === 'done'}
+              onClick={() => setActiveStatus('done')}
+              label="Finished"
+            />
           </div>
 
-          {/* GRID BUKU */}
-          {isLoading ? (
-            <div className="flex justify-center py-20">
-              <Loader2 className="animate-spin text-blue-500" size={32} />
-            </div>
-          ) : (
-            <div>
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeStatus + debouncedSearch} // Key di sini sangat penting untuk AnimatePresence
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
+          <div className="flex gap-6 items-start">
+            {/* SIDEBAR MINI INTERNAL */}
+            <aside className="hidden sm:flex w-36 flex-col gap-1 sticky top-4">
+              <NavButton
+                active={activeStatus === 'reading'}
+                onClick={() => setActiveStatus('reading')}
+                icon={<BookOpen size={18} />}
+                label="Reading"
+              />
+              <NavButton
+                active={activeStatus === 'want_to_read'}
+                onClick={() => setActiveStatus('want_to_read')}
+                icon={<Bookmark size={18} />}
+                label="Wishlist"
+              />
+              <NavButton
+                active={activeStatus === 'done'}
+                onClick={() => setActiveStatus('done')}
+                icon={<CheckCircle size={18} />}
+                label="Finished"
+              />
+              {isMe && (
+                <button
+                  onClick={() => setIsAddBookOpen(true)}
+                  className="mt-4 w-full h-11 sm:h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center gap-2 hover:bg-blue-500 transition-all shadow-md active:scale-95 text-sm font-medium cursor-pointer"
                 >
-                  {filteredBooks.map((item) => (
-                    <BookCard
-                      key={item.id}
-                      item={item}
-                      onClick={() =>
-                        router.push(`/bookshelf/${profileUsername}/${item.id}`)
-                      }
-                    />
-                  ))}
-                </motion.div>
-              </AnimatePresence>
+                  <Plus size={18} />
+                  <span className="hidden sm:block">Add Book</span>
+                </button>
+              )}
+            </aside>
 
-              {/* Empty State jika tidak ketemu */}
-              {!isLoading && !isFetching && filteredBooks.length === 0 && (
-                <div className="text-center py-20 text-slate-500">
-                  <p className="text-sm italic">
-                    No books found for &quot;{debouncedSearch}&quot;
-                  </p>
+            {/* MAIN CONTENT AREA */}
+            <main className="flex-1 min-w-0">
+              {/* SEARCH BAR */}
+              <div className="mb-6 relative">
+                <Search
+                  className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isFetching && searchTerm ? 'text-blue-500' : 'text-slate-600'}`}
+                  size={16}
+                />
+                <input
+                  type="text"
+                  value={searchTerm} // Gunakan searchTerm (bukan debouncedSearch)
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search books by title..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-10 text-sm text-slate-200 outline-none focus:border-blue-500/30 transition-all"
+                />
+                {/* Indikator Loading Kecil saat sedang searching */}
+                {isFetching && searchTerm && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 size={14} className="animate-spin text-blue-500" />
+                  </div>
+                )}
+              </div>
+
+              {/* GRID BUKU */}
+              {isLoading ? (
+                <div className="flex justify-center py-20">
+                  <Loader2 className="animate-spin text-blue-500" size={32} />
+                </div>
+              ) : (
+                <div>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeStatus + debouncedSearch} // Key di sini sangat penting untuk AnimatePresence
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"
+                    >
+                      {filteredBooks.map((item) => (
+                        <BookCard
+                          key={item.id}
+                          item={item}
+                          onClick={() =>
+                            router.push(
+                              `/bookshelf/${profileUsername}/${item.id}`,
+                            )
+                          }
+                        />
+                      ))}
+                    </motion.div>
+                  </AnimatePresence>
+
+                  {/* Empty State jika tidak ketemu */}
+                  {!isLoading && !isFetching && filteredBooks.length === 0 && (
+                    <div className="text-center py-20 text-slate-500">
+                      <p className="text-sm italic">
+                        No books found for &quot;{debouncedSearch}&quot;
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* SENTINEL (Trigger Infinite Scroll) */}
-          <div ref={ref} className="py-10 flex justify-center">
-            {isFetchingNextPage && (
-              <Loader2 className="animate-spin text-blue-500" size={20} />
-            )}
-            {!hasNextPage && !isLoading && filteredBooks.length > 0 && (
-              <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                End of library
-              </p>
-            )}
-            {!isLoading && filteredBooks.length === 0 && (
-              <div className="text-center py-20 text-slate-500">
-                <p className="text-sm">No books found in this category.</p>
+              {/* SENTINEL (Trigger Infinite Scroll) */}
+              <div ref={ref} className="py-10 flex justify-center">
+                {isFetchingNextPage && (
+                  <Loader2 className="animate-spin text-blue-500" size={20} />
+                )}
+                {!hasNextPage && !isLoading && filteredBooks.length > 0 && (
+                  <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                    End of library
+                  </p>
+                )}
+                {!isLoading && filteredBooks.length === 0 && (
+                  <div className="text-center py-20 text-slate-500">
+                    <p className="text-sm">No books found in this category.</p>
+                  </div>
+                )}
               </div>
-            )}
+            </main>
           </div>
-        </main>
-      </div>
-      <button
-        onClick={() => setIsAddBookOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center sm:hidden z-50 active:scale-90 transition-transform"
-      >
-        <Plus size={28} />
-      </button>
-      <BookModal
-        open={selectedItem !== null}
-        onClose={() => setSelectedItem(null)}
-        // Kirim ID dan InitialData dari state yang sama
-        bookshelfId={selectedItem ? selectedItem.id : null}
-        initialData={selectedItem}
-        key={selectedItem?.id || 'none'}
-        isOwner={isMe}
-      />
+          <button
+            onClick={() => setIsAddBookOpen(true)}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center sm:hidden z-50 active:scale-90 transition-transform"
+          >
+            <Plus size={28} />
+          </button>
 
-      <AddBookModal
-        open={isAddBookOpen}
-        onClose={() => setIsAddBookOpen(false)}
-        username={profileUsername}
-      />
+          <BookModal
+            open={selectedItem !== null}
+            onClose={() => setSelectedItem(null)}
+            // Kirim ID dan InitialData dari state yang sama
+            bookshelfId={selectedItem ? selectedItem.id : null}
+            initialData={selectedItem}
+            key={selectedItem?.id || 'none'}
+            isOwner={isMe}
+          />
+
+          <AddBookModal
+            open={isAddBookOpen}
+            onClose={() => setIsAddBookOpen(false)}
+            username={profileUsername}
+          />
+        </div>
+      )}
     </div>
   )
 }

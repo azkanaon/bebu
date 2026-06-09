@@ -25,6 +25,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import ExpandableNotes from './ExpandableNotes'
 import AddNoteModal from './AddNoteModal'
 import ConfirmModal from './ConfirmModal'
+import PrivateBookshelfWall from './PrivateBookshelfWall'
 
 const statusOptions: {
   value: ShelfStatus
@@ -83,6 +84,7 @@ export default function BookReaderContent({
     isFetchingNextPage,
     isLoading,
   } = useInfiniteNotes(bookshelfId, activeFilter)
+  const isDetailPrivate = notesData?.pages[0]?.isPrivate || false
 
   const { mutate: updateProgress, isPending: isUpdating } =
     useUpdateBookProgress(user?.username || '')
@@ -169,6 +171,18 @@ export default function BookReaderContent({
       ? 'flex-1 flex flex-col min-h-0 bg-[#070D18]/40'
       : 'w-full flex flex-col bg-[#070D18]/20'
 
+  if (isLoading) {
+    return (
+      <div className="py-20 flex justify-center">
+        <Loader2 className="animate-spin" />
+      </div>
+    )
+  }
+
+  if (isDetailPrivate && !isOwner) {
+    return <PrivateBookshelfWall />
+  }
+
   return (
     <div className={containerClass}>
       {/* --- KOLOM KIRI: INFO & PROGRESS --- */}
@@ -179,11 +193,6 @@ export default function BookReaderContent({
           </div>
         ) : (
           bookshelfInfo && (
-            /* 
-         MENGGUNAKAN GRID: 
-         Baris 1: Info Buku & Cover
-         Baris 2: Controls (Progress & Status)
-      */
             <div
               className={
                 variant === 'page' ? 'flex flex-col gap-6' : 'space-y-6'

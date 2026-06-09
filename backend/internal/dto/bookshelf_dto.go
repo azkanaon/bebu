@@ -19,6 +19,7 @@ type BookshelfNotesResponseDTO struct {
 	Bookshelf BookshelfContextDTO `json:"bookshelf"`
 	Data      []NoteDTO           `json:"data"`
 	Meta      *PaginationDTO      `json:"meta"`
+	IsPrivate bool 			  `json:"isPrivate"`
 }
 // BookshelfItemDTO merepresentasikan satu item buku di rak pengguna.
 type BookshelfItemDTO struct {
@@ -89,3 +90,8 @@ type ReadingStatsDTO struct {
 	LastActivityDate *time.Time `json:"lastActivityDate"`
 }
 
+type BookshelfListResponseDTO struct {
+	Data      []BookshelfItemDTO `json:"data"`
+	Meta      *PaginationDTO     `json:"meta"`
+	IsPrivate bool               `json:"isPrivate"` // <--- TAMBAHKAN INI
+}

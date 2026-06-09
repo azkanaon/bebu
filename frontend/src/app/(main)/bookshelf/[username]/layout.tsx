@@ -7,8 +7,8 @@ export default function BookshelfLayout({
 }) {
   return (
     <>
-      {children} {/* Ini adalah isi BookshelfClient kamu */}
-      {modal} {/* Ini adalah tempat Modal akan 'menempel' */}
+      {children}
+      {modal}
     </>
   )
 }

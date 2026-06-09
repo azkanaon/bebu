@@ -12,6 +12,7 @@ import {
   Users,
   FileText,
   Library,
+  BookDown,
 } from 'lucide-react'
 import { SidebarItem } from './SidebarItem'
 import { UserProfile } from './UserProfile'
@@ -113,6 +114,12 @@ export default function Sidebar({ user }: SidebarProps) {
             label="Chat"
             href="/chat"
           />
+          <SidebarItem
+            icon={<BookDown size={20} />}
+            label="Submission"
+            href="/submission"
+          />
+
           <SidebarItem
             icon={
               <div className="relative">
