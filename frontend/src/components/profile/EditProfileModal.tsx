@@ -11,6 +11,7 @@ import {
   Globe,
   MessageSquare,
   UserPen,
+  Library,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import ClientPortal from '../ClientPortal'
@@ -51,6 +52,7 @@ export default function EditProfileModal({
   const [socialLinks, setSocialLinks] = useState<SocialLinkItem[]>([])
   const [isPublic, setIsPublic] = useState(true)
   const [allowDm, setAllowDm] = useState(false)
+  const [isBookshelfPublic, setIsBookshelfPublic] = useState(true) // State baru
   const [isRemovingPhoto, setIsRemovingPhoto] = useState(false)
   useEffect(() => {
     // Hanya jalankan pengisian data jika modal dalam keadaan OPEN
@@ -65,6 +67,7 @@ export default function EditProfileModal({
 
       // Jika di backend ada field ini, masukkan juga
       setAllowDm(initialData.settings?.allowDmFromPublic ?? true)
+      setIsBookshelfPublic(initialData.settings?.isBookshelfPublic ?? false)
 
       const mappedLinks =
         initialData.socialLinks?.map((link: any) => {
@@ -152,6 +155,7 @@ export default function EditProfileModal({
     formData.append('gender', gender)
     formData.append('is_profile_public', String(isPublic))
     formData.append('allow_dm_from_public', String(allowDm))
+    formData.append('is_bookshelf_public', String(isBookshelfPublic))
 
     // Append Social Links sebagai JSON String
     const linksForBackend = socialLinks.map(({ platformId, url }) => ({
@@ -457,6 +461,12 @@ export default function EditProfileModal({
                       label="Allow DM From Public"
                       active={allowDm}
                       onToggle={() => setAllowDm(!allowDm)}
+                    />
+                    <ToggleRow
+                      icon={<Library size={18} />}
+                      label="Public Bookshelf"
+                      active={isBookshelfPublic}
+                      onToggle={() => setIsBookshelfPublic(!isBookshelfPublic)}
                     />
                   </div>
                 </div>

@@ -1,0 +1,1 @@
+ALTER TABLE user_settings ADD COLUMN is_bookshelf_public BOOLEAN NOT NULL DEFAULT TRUE;

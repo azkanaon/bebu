@@ -48,17 +48,23 @@ func (h *BookshelfHandler) GetUserBookshelves(c *gin.Context) {
 	}
 
 	// 4. Panggil service
-	bookshelves, pagination, err := h.bookshelfService.GetUserBookshelves(viewerID, username, status, search, page, limit)
+	result, err := h.bookshelfService.GetUserBookshelves(viewerID, username, status, search, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bookshelves"})
 		return
 	}
 
-	// 5. Kirim response JSON dengan format data dan meta
-	c.JSON(http.StatusOK, gin.H{
-		"data": bookshelves,
-		"meta": pagination,
-	})
+	if err != nil {
+		if err.Error() == "user not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch bookshelves"})
+		return
+	}
+
+	// Langsung kirim result karena formatnya sudah data, meta, isPrivate di dalam satu objek
+	c.JSON(http.StatusOK, result)
 }
 
 // AddToBookshelf adalah handler untuk POST /bookshelves

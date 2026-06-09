@@ -14,7 +14,7 @@ import (
 )
 
 type BookshelfService interface {
-	GetUserBookshelves(viewerID *uint, targetUsername string, status string, search string, page, limit int) ([]dto.BookshelfItemDTO, *dto.PaginationDTO, error)
+	GetUserBookshelves(viewerID *uint, targetUsername string, status string, search string, page, limit int) (*dto.BookshelfListResponseDTO, error)
 	AddBookToShelf(userID uint, req *dto.AddToBookshelfRequestDTO) (*dto.BookshelfItemDTO, error)
 	UpdateShelfEntry(userID, bookshelfID uint, req *dto.UpdateBookshelfRequestDTO) (*dto.BookshelfItemDTO, error)
 	DeleteShelfEntry(userID, bookshelfID uint) error
@@ -41,79 +41,94 @@ func NewBookshelfService(db *gorm.DB,bookshelfRepo repositories.BookshelfReposit
 }
 
 
-func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername string, status string, search string, page, limit int) ([]dto.BookshelfItemDTO, *dto.PaginationDTO, error) {
+func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername string, status string, search string, page, limit int) (*dto.BookshelfListResponseDTO, error) {
 	// 1. Dapatkan data user target
 	targetUser, err := s.userRepo.FindByUsername(targetUsername)
 	if err != nil {
-		// Jika user tidak ditemukan, kembalikan data kosong
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return make([]dto.BookshelfItemDTO, 0), dto.NewPaginationDTO(0, page, limit), nil
+			return &dto.BookshelfListResponseDTO{
+				Data:      []dto.BookshelfItemDTO{},
+				Meta:      dto.NewPaginationDTO(0, page, limit),
+				IsPrivate: true,
+			}, nil
 		}
-		return nil, nil, err // Untuk error database lainnya
+		return nil, err
 	}
 
-	// 2. Lakukan pengecekan akses (blokir, privasi, dll.)
-	// Cek status blokir & kepemilikan
-	var isBlockedByTarget, isOwnProfile bool
-	if viewerID != nil {
-		isOwnProfile = (*viewerID == targetUser.UserID)
-		if !isOwnProfile {
-			// Cek apakah target memblokir saya. Jika ya, akses ditolak.
-			isBlockedByTarget, err = s.userRepo.IsBlocked(targetUser.UserID, *viewerID)
-			if err != nil {
-				return nil, nil, err
-			}
-			if isBlockedByTarget {
-				// Perlakukan seolah-olah user tidak ada
-				return make([]dto.BookshelfItemDTO, 0), dto.NewPaginationDTO(0, page, limit), nil
-			}
-		}
-	}
+	// 2. Logika Pengecekan Akses
+	isOwnProfile := (viewerID != nil && *viewerID == targetUser.UserID)
+	hasFullAccess := false
 
-	// Tentukan apakah viewer punya akses ke konten LENGKAP
-	var hasFullAccess bool
-	isProfilePublic := (targetUser.Settings == nil || targetUser.Settings.IsProfilePublic)
-
-	if isProfilePublic || isOwnProfile {
+	if isOwnProfile {
 		hasFullAccess = true
-	} else if viewerID != nil {
-		// Jika profil privat, cek status follow
-		status, err := s.userRepo.GetFollowStatus(*viewerID, targetUser.UserID)
-		if err != nil {
-			return nil, nil, err
+	} else {
+		// --- JIKA BUKAN PEMILIK ---
+
+		// A. Cek Blokir (Jika diblokir oleh target, sembunyikan keberadaan user)
+		if viewerID != nil {
+			isViewerBlockedByTarget, err := s.userRepo.IsBlocked(targetUser.UserID, *viewerID)
+			if err != nil { return nil, err }
+			
+			if isViewerBlockedByTarget {
+				return nil, errors.New("user not found") // Return error 404 via handler
+			}
 		}
-		hasFullAccess = (status == "accepted")
+
+		// B. Ambil Status Privasi dari Setting
+		isProfilePublic := true
+		isBookshelfPublic := true
+		if targetUser.Settings != nil {
+			isProfilePublic = targetUser.Settings.IsProfilePublic
+			isBookshelfPublic = targetUser.Settings.IsBookshelfPublic
+		}
+
+		// C. Cek Akses Profil (Follow Status)
+		profileAccessible := false
+		if isProfilePublic {
+			profileAccessible = true
+		} else if viewerID != nil {
+			followStatus, err := s.userRepo.GetFollowStatus(*viewerID, targetUser.UserID)
+			if err != nil { return nil, err }
+			profileAccessible = (followStatus == "accepted")
+		}
+
+		// D. KEPUTUSAN FINAL
+		hasFullAccess = profileAccessible && isBookshelfPublic
 	}
 
+	// 3. JIKA TIDAK PUNYA AKSES: Kembalikan IsPrivate: true
 	if !hasFullAccess {
-		// Jika tidak punya akses, kembalikan data kosong
-		return make([]dto.BookshelfItemDTO, 0), dto.NewPaginationDTO(0, page, limit), nil
+		return &dto.BookshelfListResponseDTO{
+			Data:      []dto.BookshelfItemDTO{},
+			Meta:      dto.NewPaginationDTO(0, page, limit),
+			IsPrivate: true,
+		}, nil
 	}
 
-
-	// 3. Jika punya akses, panggil repository untuk mengambil data
+	// 4. JIKA LOLOS: Ambil data dari repository
 	bookshelves, total, err := s.bookshelfRepo.GetBookshelvesByUserID(targetUser.UserID, status, search, page, limit)
-    if err != nil {
-        return nil, nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-	// 4. Mapping ke DTO
-	dtos := make([]dto.BookshelfItemDTO, 0, len(bookshelves)) // Inisialisasi slice dengan kapasitas
+	// 5. Mapping ke DTO
+	dtos := make([]dto.BookshelfItemDTO, 0, len(bookshelves))
 	for _, bs := range bookshelves {
 		var authorNames []string
 		for _, bookAuthor := range bs.Book.BookAuthors {
-			authorNames = append(authorNames, bookAuthor.Author.AuthorName)
+			if bookAuthor.Author.AuthorID > 0 {
+				authorNames = append(authorNames, bookAuthor.Author.AuthorName)
+			}
 		}
 		
 		itemDTO := dto.BookshelfItemDTO{
-			// --- PERBAIKAN PUBLIC ID ---
 			ID:          bs.UserBookshelfID,
-			PublicID:    bs.PublicID.String(), // Langsung gunakan, tanpa .String()
+			PublicID:    bs.PublicID.String(), // Hapus .String() karena PublicID sudah string di model Anda
 			Book: dto.BookSummaryDTO{
-				PublicID:    bs.Book.PublicID.String(), // Langsung gunakan, tanpa .String()
+				PublicID:    bs.Book.PublicID.String(),
 				Title:       bs.Book.Title,
 				CoverImgURL: bs.Book.CoverImgURL,
-				TotalPages: bs.Book.TotalPages,
+				TotalPages:  bs.Book.TotalPages,
 				Authors:     authorNames,
 			},
 			ShelfStatus: bs.ShelfStatus,
@@ -125,16 +140,17 @@ func (s *bookshelfService) GetUserBookshelves(viewerID *uint, targetUsername str
 		if bs.ProgressPercent != nil {
 			itemDTO.Progress = *bs.ProgressPercent
 		} else {
-			itemDTO.Progress = 0 // Nilai default jika NULL
+			itemDTO.Progress = 0
 		}
-
 		dtos = append(dtos, itemDTO)
 	}
 
-	// 5. Siapkan metadata paginasi menggunakan helper
-	pagination := dto.NewPaginationDTO(total, page, limit)
-
-	return dtos, pagination, nil
+	// 6. Kembalikan Response Wrapper Lengkap
+	return &dto.BookshelfListResponseDTO{
+		Data:      dtos,
+		Meta:      dto.NewPaginationDTO(total, page, limit),
+		IsPrivate: false,
+	}, nil
 }
 
 func (s *bookshelfService) AddBookToShelf(userID uint, req *dto.AddToBookshelfRequestDTO) (*dto.BookshelfItemDTO, error) {
@@ -365,15 +381,6 @@ func (s *bookshelfService) GetShelfEntryDetail(viewerID *uint, bookshelfID uint)
             return nil, errors.New("bookshelf entry not found") // Sembunyikan dengan 404
         }
     }
-	
-	// 3. LOGIKA PRIVASI (Fleksibel untuk masa depan)
-    // Untuk saat ini, kita anggap semua bookshelf bisa dilihat publik.
-    // Di masa depan, Anda akan menambahkan pengecekan di sini:
-    // isBookshelfPrivate := entry.User.Setting != nil && !entry.User.Setting.IsBookshelfPublic
-    // isOwner := viewerID != nil && *viewerID == ownerID
-    // if isBookshelfPrivate && !isOwner {
-    //     return nil, errors.New("forbidden: this bookshelf is private")
-    // }
 
 	// 4. Jika akses diizinkan, mapping ke DTO
 	return mapBookshelfToDetailDTO(entry), nil
@@ -619,29 +626,55 @@ func (s *bookshelfService) syncProgress(tx *gorm.DB, entry *models.UserBookshelf
 }
 
 func (s *bookshelfService) GetBookshelfNotes(viewerID *uint, bookshelfID uint, noteType string, page, limit int) (*dto.BookshelfNotesResponseDTO, error) {
-	// 1. Ambil data bookshelf lengkap dengan buku & penulis (untuk header)
+	// 1. Ambil data bookshelf entry (Beserta info pemilik & setting-nya)
 	entry, err := s.bookshelfRepo.GetBookshelfEntryByID(bookshelfID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("bookshelf entry not found")
+		}
 		return nil, err
 	}
 
-	// 2. Cek akses privasi menggunakan utilitas global kita
-	// Kita butuh username untuk ini
-	_, hasAccess, err := utils.HasProfileAccess(s.userRepo, viewerID, entry.User.Username)
-	if err != nil {
-		return nil, err
-	}
-	if !hasAccess {
-		return nil, errors.New("forbidden: this bookshelf is private")
+	// 2. LOGIKA PENGECEKAN AKSES
+	ownerID := entry.UserID
+	isOwnEntry := (viewerID != nil && *viewerID == ownerID)
+	hasAccess := false
+
+	if isOwnEntry {
+		hasAccess = true
+	} else {
+		// A. Cek Blokir Satu Arah (Apakah PEMILIK memblokir VIEWER?)
+		if viewerID != nil {
+			isViewerBlockedByOwner, err := s.userRepo.IsBlocked(ownerID, *viewerID)
+			if err != nil { return nil, err }
+			if isViewerBlockedByOwner {
+				return nil, errors.New("bookshelf entry not found") 
+			}
+		}
+
+		// B. Ambil Status Privasi dari Setting Pemilik
+		isProfilePublic := true
+		isBookshelfPublic := true
+		if entry.User.Settings != nil {
+			isProfilePublic = entry.User.Settings.IsProfilePublic
+			isBookshelfPublic = entry.User.Settings.IsBookshelfPublic
+		}
+
+		// C. Cek Akses Profil (Follow Status)
+		profileAccessible := false
+		if isProfilePublic {
+			profileAccessible = true
+		} else if viewerID != nil {
+			followStatus, err := s.userRepo.GetFollowStatus(*viewerID, ownerID)
+			if err != nil { return nil, err }
+			profileAccessible = (followStatus == "accepted")
+		}
+
+		// D. KEPUTUSAN FINAL
+		hasAccess = profileAccessible && isBookshelfPublic
 	}
 
-	// 3. Ambil catatan yang dipaginasi dari repo
-	notes, total, err := s.bookshelfRepo.GetNotesByBookshelfID(bookshelfID, noteType, page, limit) // <-- Kirim noteType
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. Mapping Data Penulis untuk Header
+	// 3. PERSIAPAN DATA HEADER (Selalu dipetakan agar FE bisa menampilkan info buku)
 	var authorNames []string
 	for _, ba := range entry.Book.BookAuthors {
 		if ba.Author.AuthorID > 0 {
@@ -649,7 +682,38 @@ func (s *bookshelfService) GetBookshelfNotes(viewerID *uint, bookshelfID uint, n
 		}
 	}
 
-	// 5. Mapping Notes ke DTO
+	progressVal := 0
+	if entry.ProgressPercent != nil {
+		progressVal = *entry.ProgressPercent
+	}
+
+	headerDTO := dto.BookshelfContextDTO{
+		Title:       entry.Book.Title,
+		Authors:     authorNames,
+		CoverImgURL: entry.Book.CoverImgURL,
+		Progress:    progressVal,
+		CurrentPage: entry.CurrentPage,
+		TotalPages:  entry.Book.TotalPages,
+		ShelfStatus: entry.ShelfStatus,
+	}
+
+	// 4. JIKA TIDAK PUNYA AKSES: Kembalikan Header dengan flag IsPrivate: true
+	if !hasAccess {
+		return &dto.BookshelfNotesResponseDTO{
+			Bookshelf: headerDTO,
+			Data:      []dto.NoteDTO{}, // Kirim array kosong
+			Meta:      dto.NewPaginationDTO(0, page, limit), // Meta nol
+			IsPrivate: true, // <--- KUNCI UNTUK FRONTEND
+		}, nil
+	}
+
+	// 5. JIKA PUNYA AKSES: Ambil data notes dari repository
+	notes, total, err := s.bookshelfRepo.GetNotesByBookshelfID(bookshelfID, noteType, page, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6. Mapping Notes ke DTO
 	notesDTO := make([]dto.NoteDTO, 0, len(notes))
 	for _, n := range notes {
 		notesDTO = append(notesDTO, dto.NoteDTO{
@@ -661,22 +725,12 @@ func (s *bookshelfService) GetBookshelfNotes(viewerID *uint, bookshelfID uint, n
 			CreatedAt:   n.CreatedAt,
 		})
 	}
-	progressVal := 0
-	if entry.ProgressPercent != nil {
-		progressVal = *entry.ProgressPercent
-	}
-	// 6. Rakit Response Akhir
+
+	// 7. Rakit Response Akhir (Akses Terbuka)
 	return &dto.BookshelfNotesResponseDTO{
-		Bookshelf: dto.BookshelfContextDTO{
-			Title:       entry.Book.Title,
-			Authors:     authorNames,
-			CoverImgURL: entry.Book.CoverImgURL,
-			Progress:    progressVal,
-			CurrentPage: entry.CurrentPage,
-			TotalPages: entry.Book.TotalPages,
-			ShelfStatus: entry.ShelfStatus,
-		},
-		Data: notesDTO,
-		Meta: dto.NewPaginationDTO(total, page, limit),
+		Bookshelf: headerDTO,
+		Data:      notesDTO,
+		Meta:      dto.NewPaginationDTO(total, page, limit),
+		IsPrivate: false,
 	}, nil
 }

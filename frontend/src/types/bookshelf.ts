@@ -60,6 +60,7 @@ export interface NoteRequest {
 
 export interface BookshelfResponse {
   data: BookshelfItem[]
+  isPrivate: boolean
   meta: PaginationMeta
 }
 
@@ -74,6 +75,7 @@ export interface NotesResponse {
     shelfStatus: ShelfStatus
   }
   data: Note[]
+  isPrivate: boolean
   meta: PaginationMeta
 }
 

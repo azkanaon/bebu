@@ -199,6 +199,14 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 			req.IsProfilePublic = &b
 		}
 	}
+
+	if val, ok := c.GetPostForm("is_bookshelf_public"); ok {
+		b, err := strconv.ParseBool(val)
+		if err == nil {
+			req.IsBookshelfPublic = &b
+		}
+	}
+
 	if val, ok := c.GetPostForm("allow_dm_from_public"); ok {
 		b, err := strconv.ParseBool(val)
 		if err == nil {

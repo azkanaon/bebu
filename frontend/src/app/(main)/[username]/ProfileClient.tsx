@@ -49,6 +49,7 @@ export default function ProfileClient({ params }: Props) {
   if (error || !data) {
     return <div>Error</div>
   }
+  console.log(data.settings)
 
   return (
     <motion.div

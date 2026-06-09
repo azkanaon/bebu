@@ -24,6 +24,7 @@ import { useBlockUser, useUnblockUser } from '@/api/profile/useBlockUser'
 import BlockConfirmModal from './BlockConfirmationModal'
 import UserAvatar from '@/components/UserAvatar'
 import ReportModal from '../feed/ReportModal'
+import { toast } from 'sonner'
 
 type Props = {
   userId: number
@@ -90,6 +91,31 @@ export default function ProfileHeader({
   const { mutate: followUser, isPending } = useFollowUser()
   const { mutate: unfollowUser } = useUnfollowUser()
   const queryClient = useQueryClient()
+
+  const canViewConnections =
+    !isPrivateAccount ||
+    viewerContext?.isOwnProfile ||
+    viewerContext?.isFollowing
+
+  // 2. Buat fungsi wrapper untuk membuka modal
+  const handleOpenFollowers = () => {
+    if (canViewConnections) {
+      setInitialTab('followers')
+      setOpenFollowModal(true)
+    } else {
+      // Opsional: Kasih tau user kenapa tidak bisa dibuka
+      toast.error('Follow this account to see their connections')
+    }
+  }
+
+  const handleOpenFollowing = () => {
+    if (canViewConnections) {
+      setInitialTab('following')
+      setOpenFollowModal(true)
+    } else {
+      toast.error('Follow this account to see their connections')
+    }
+  }
 
   const handleToggleFollow = () => {
     const isFollowing = viewerContext?.isFollowing
@@ -274,11 +300,8 @@ export default function ProfileHeader({
                   stiffness: 300,
                   damping: 20,
                 }}
-                className="px-3 py-1.5 rounded-xl cursor-pointer"
-                onClick={() => {
-                  setInitialTab('followers')
-                  setOpenFollowModal(true)
-                }}
+                className={`px-3 py-1.5 rounded-xl transition-all ${canViewConnections ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
+                onClick={handleOpenFollowers}
               >
                 <motion.span
                   whileHover={{
@@ -300,11 +323,8 @@ export default function ProfileHeader({
                   stiffness: 300,
                   damping: 20,
                 }}
-                className="pl-3 pr-5 py-1.5 rounded-xl cursor-pointer"
-                onClick={() => {
-                  setInitialTab('following')
-                  setOpenFollowModal(true)
-                }}
+                className={`px-3 py-1.5 rounded-xl transition-all ${canViewConnections ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
+                onClick={handleOpenFollowing}
               >
                 <motion.span
                   whileHover={{
@@ -419,6 +439,11 @@ export default function ProfileHeader({
         onClose={() => setOpenFollowModal(false)}
         initialTab={initialTab}
         username={username}
+        isLocked={
+          isPrivateAccount &&
+          !viewerContext?.isFollowing &&
+          !viewerContext?.isOwnProfile
+        }
       />
       <FollowRequestModal
         open={openRequestModal}
