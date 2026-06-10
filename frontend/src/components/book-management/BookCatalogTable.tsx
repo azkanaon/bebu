@@ -127,23 +127,24 @@ export default function BookCatalogTable({
 							{/* AUTHORS */}
 							<div className="col-span-3 pr-4">
 								<p className="text-xs text-zinc-300 font-medium truncate">
-									{book.authors?.join(", ") || "-"}
+									{book.authors
+										?.map((a) => a.name)
+										.join(", ") || "-"}
 								</p>
 							</div>
 
 							{/* GENRES */}
 							<div className="col-span-2 pr-2">
 								<div className="flex flex-wrap gap-1 max-w-[160px]">
-									{book.genres
-										?.slice(0, 2)
-										.map((genre, idx) => (
-											<span
-												key={idx}
-												className="inline-flex items-center rounded-md bg-blue-500/5 px-1.5 py-0.5 text-[10px] font-medium text-blue-400 ring-1 ring-inset ring-blue-500/10 truncate max-w-[70px]"
-											>
-												{genre}
-											</span>
-										))}
+									{book.genres?.slice(0, 2).map((genre) => (
+										<span
+											key={genre.id}
+											className="inline-flex items-center rounded-md bg-blue-500/5 px-1.5 py-0.5 text-[10px] font-medium text-blue-400 ring-1 ring-inset ring-blue-500/10 truncate max-w-[70px]"
+										>
+											{genre.name}
+										</span>
+									))}
+
 									{book.genres && book.genres.length > 2 && (
 										<span className="text-[9px] font-semibold text-zinc-600 self-center">
 											+{book.genres.length - 2}

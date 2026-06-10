@@ -162,9 +162,8 @@ export default function BookManagementPage() {
 							Book Management
 						</h1>
 						<p className="mt-3 max-w-2xl text-sm leading-relaxed text-zinc-400">
-							Verifikasi pengajuan literatur dari komunitas atau
-							kelola repositori data buku master platform secara
-							langsung.
+							Review community book submissions or manage the
+							platform&#39;s master book catalog directly.
 						</p>
 					</div>
 
@@ -192,8 +191,8 @@ export default function BookManagementPage() {
 								User Book Submissions
 							</h2>
 							<p className="text-xs text-zinc-500">
-								Daftar usulan buku baru yang diajukan oleh
-								pengguna aplikasi
+								Browse and review book submissions submitted by
+								community members
 							</p>
 						</div>
 					</div>
@@ -233,8 +232,8 @@ export default function BookManagementPage() {
 								Master Catalog Books
 							</h2>
 							<p className="text-xs text-zinc-500">
-								Database buku terverifikasi aktif yang tayang di
-								sistem aplikasi
+								Verified books currently available on the
+								platform
 							</p>
 						</div>
 					</div>

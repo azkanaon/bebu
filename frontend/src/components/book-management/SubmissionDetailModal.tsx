@@ -77,7 +77,7 @@ export default function SubmissionDetailModal({
 							<User size={12} className="text-zinc-600" />
 							Submitted by:{" "}
 							<span className="text-zinc-300 font-medium">
-								@{submission.submitted_by}
+								{submission.submitted_by}
 							</span>{" "}
 							(ID: #{submission.book_submission_id})
 						</p>
@@ -139,8 +139,12 @@ export default function SubmissionDetailModal({
 									Proposed Authors
 								</span>
 								<p className="text-xs text-zinc-300 mt-0.5 font-medium">
-									{submission.authors.join(", ") ||
-										"Unspecified Author"}
+									{submission.authors &&
+									submission.authors.length > 0
+										? submission.authors
+												.map((author) => author.name)
+												.join(", ")
+										: "Unspecified Author"}
 								</p>
 							</div>
 

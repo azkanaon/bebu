@@ -43,7 +43,9 @@ func (s *bookManagementService) FetchBooks(ctx context.Context, params dto.BookQ
 func (s *bookManagementService) AddDirectBook(ctx context.Context, req dto.UpsertBookRequest) error {
 	db := s.repo.GetDB()
 	return db.Transaction(func(tx *gorm.DB) error {
-		return s.saveBookEntity(tx, &models.Book{}, req)
+		// Pastikan kita membuat entitas kosong yang bersih untuk pembuatan buku langsung
+		newBook := models.Book{}
+		return s.saveBookEntity(tx, &newBook, req)
 	})
 }
 
@@ -55,18 +57,14 @@ func (s *bookManagementService) EditBook(ctx context.Context, id uint, req dto.U
 
 	db := s.repo.GetDB()
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("book_id = ?", id).Delete(&models.BookAuthor{}).Error; err != nil { 
-			return err 
-		}
-		if err := tx.Where("book_id = ?", id).Delete(&models.BookGenre{}).Error; err != nil { 
-			return err 
-		}
+		// Hapus jembatan lama sebelum menulis jembatan relasi baru
+		if err := tx.Where("book_id = ?", id).Delete(&models.BookAuthor{}).Error; err != nil { return err }
+if err := tx.Where("book_id = ?", id).Delete(&models.BookGenre{}).Error; err != nil { return err }
 
 		cleanBook := models.Book{
-			BookID: id, // Berikan ID agar GORM tahu ini proses UPDATE, bukan CREATE
+			BookID: id,
 		}
 
-		// Oper cleanBook (bukan &b hasil preload)
 		return s.saveBookEntity(tx, &cleanBook, req)
 	})
 }
@@ -116,7 +114,11 @@ func (s *bookManagementService) RejectSubmission(ctx context.Context, submission
 }
 
 func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req dto.UpsertBookRequest) error {
-	// Mapping request ke struct model Book
+	// 🌟 KUNCI STATUS PERUBAHAN DI AWAL SEBELUM PIVOT DAN ENTITAS TER-UPDATE
+	// Kita simpan status apakah ini data baru atau update data lama berdasarkan ID awal
+	isCreateMode := b.BookID == 0
+
+	// Mapping request dasar ke model Book
 	b.Title = req.Title
 	b.Synopsis = req.Synopsis
 	b.CoverImgURL = req.CoverImgURL
@@ -126,104 +128,154 @@ func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req 
 	b.TotalPages = req.TotalPages
 	b.Slug = slug.Make(b.Title)
 
-	if b.BookID == 0 {
+	if isCreateMode {
 		// --- PROSES CREATE ---
-		if err := tx.Create(b).Error; err != nil { 
-			return err 
+		if err := tx.Create(b).Error; err != nil {
+			return err
 		}
 
-		if strings.TrimSpace(b.GoogleBookID) == "" {
+		trimmedGoogleID := strings.TrimSpace(b.GoogleBookID)
+		if trimmedGoogleID == "" || trimmedGoogleID == "0" {
+			b.GoogleBookID = "" // Kosongkan agar tidak memicu duplikat "0"
 			if err := tx.Model(b).Update("google_book_id", gorm.Expr("NULL")).Error; err != nil {
 				return err
 			}
 		}
 
+		// Inisialisasi counter performa statistik buku master
 		initStat := models.BookStat{BookID: b.BookID}
-		if err := tx.Create(&initStat).Error; err != nil { 
-			return err 
+		if err := tx.Create(&initStat).Error; err != nil {
+			return err
 		}
 	} else {
-		if err := tx.Model(b).Omit("BookAuthors", "BookGenres", "Posts", "BookStat", "DailyStats").Updates(b).Error; err != nil { 
-			return err 
+		// --- PROSES UPDATE ---
+		if err := tx.Model(b).Omit("BookAuthors", "BookGenres", "Posts", "BookStat", "DailyStats").Updates(b).Error; err != nil {
+			return err
 		}
-
-		if strings.TrimSpace(b.GoogleBookID) == "" {
+		trimmedGoogleID := strings.TrimSpace(b.GoogleBookID)
+		if trimmedGoogleID == "" || trimmedGoogleID == "0" {
+			b.GoogleBookID = "" 
 			if err := tx.Model(b).Update("google_book_id", gorm.Expr("NULL")).Error; err != nil {
 				return err
 			}
 		}
 	}
 
-	// 4. 🌟 SINKRONISASI DATA AUTHOR (DENGAN PERLINDUNGAN ANTI-DUPLIKAT)
-	// Menggunakan map untuk menyaring nama author yang duplikat atau memiliki spasi berlebih
-	uniqueAuthors := make(map[string]bool)
-	var cleanedAuthorNames []string
+	// ==========================================
+	// 🌟 PROSES SINKRONISASI AUTHOR
+	// ==========================================
+	targetAuthorIDs := make(map[uint]bool)
 
-	for _, name := range req.AuthorNames {
+	// 1. Masukkan Author yang memang sudah memiliki ID valid dari FE
+	for _, authID := range req.AuthorIDs {
+		if authID > 0 {
+			targetAuthorIDs[authID] = true
+		}
+	}
+
+	// 2. Sterilisasi dan Find or Create untuk NewAuthorNames
+	uniqueNewAuthors := make(map[string]bool)
+	var cleanedNewAuthorNames []string
+
+	for _, name := range req.NewAuthorNames {
 		trimmedName := strings.TrimSpace(name)
 		if trimmedName == "" {
 			continue
 		}
-		
-		// Gunakan lowercase hanya sebagai key pembanding keunikan di memori
 		lowerName := strings.ToLower(trimmedName)
-		if !uniqueAuthors[lowerName] {
-			uniqueAuthors[lowerName] = true
-			cleanedAuthorNames = append(cleanedAuthorNames, trimmedName) // Simpan nama asli yang bersih
+		if !uniqueNewAuthors[lowerName] {
+			uniqueNewAuthors[lowerName] = true
+			cleanedNewAuthorNames = append(cleanedNewAuthorNames, trimmedName)
 		}
 	}
 
-	// Lakukan looping insert menggunakan list nama author yang sudah di-sterilkan
-	for _, name := range cleanedAuthorNames {
+	for _, name := range cleanedNewAuthorNames {
 		var auth models.Author
 		authorSlug := slug.Make(name)
-		
-		// Cari berdasarkan slug author
+
 		err := tx.Where("slug = ?", authorSlug).First(&auth).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			auth = models.Author{AuthorName: name, Slug: authorSlug}
-			if err := tx.Create(&auth).Error; err != nil { 
-				return err 
+			if err := tx.Create(&auth).Error; err != nil {
+				return err
 			}
 		} else if err != nil {
 			return err
 		}
+		targetAuthorIDs[auth.AuthorID] = true
+	}
 
-		ba := models.BookAuthor{BookID: b.BookID, AuthorID: auth.AuthorID}
-		if err := tx.Create(&ba).Error; err != nil { 
-			return err 
+	// 3. Bersihkan relasi lama HANYA JIKA dalam mode EDIT/UPDATE
+	if !isCreateMode {
+		if err := tx.Where("book_id = ?", b.BookID).Delete(&models.BookAuthor{}).Error; err != nil {
+			return err
 		}
 	}
 
-	// 5. SINKRONISASI JEMBATAN GENRE (Menggunakan strategi Find or Create mirip Author)
-	for _, name := range req.GenreNames {
+	// Masukkan relasi pivot baru (Berlaku untuk Create maupun Update)
+	for authID := range targetAuthorIDs {
+		ba := models.BookAuthor{BookID: b.BookID, AuthorID: authID}
+		if err := tx.Create(&ba).Error; err != nil {
+			return err
+		}
+	}
+
+	// ==========================================
+	// 🌟 PROSES SINKRONISASI GENRE
+	// ==========================================
+	targetGenreIDs := make(map[uint]bool)
+
+	// 1. Masukkan Genre yang sudah memiliki ID valid dari FE
+	for _, genID := range req.GenreIDs {
+		if genID > 0 {
+			targetGenreIDs[genID] = true
+		}
+	}
+
+	// 2. Sterilisasi dan Find or Create untuk NewGenreNames
+	uniqueNewGenres := make(map[string]bool)
+	var cleanedNewGenreNames []string
+
+	for _, name := range req.NewGenreNames {
 		trimmedName := strings.TrimSpace(name)
 		if trimmedName == "" {
 			continue
 		}
+		lowerName := strings.ToLower(trimmedName)
+		if !uniqueNewGenres[lowerName] {
+			uniqueNewGenres[lowerName] = true
+			cleanedNewGenreNames = append(cleanedNewGenreNames, trimmedName)
+		}
+	}
 
+	for _, name := range cleanedNewGenreNames {
 		var gen models.Genre
-		genreSlug := slug.Make(trimmedName)
+		genreSlug := slug.Make(name)
 
-		// Cari berdasarkan slug genre agar aman dari perbedaan huruf besar/kecil (Case-Insensitive)
 		err := tx.Where("slug = ?", genreSlug).First(&gen).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// JIKA BELUM ADA: Buat genre baru ke tabel master genre
-			gen = models.Genre{
-				GenreName: trimmedName, 
-				Slug:      genreSlug,
-			}
-			if err := tx.Create(&gen).Error; err != nil { 
-				return err 
+			gen = models.Genre{GenreName: name, Slug: genreSlug}
+			if err := tx.Create(&gen).Error; err != nil {
+				return err
 			}
 		} else if err != nil {
 			return err
 		}
+		targetGenreIDs[gen.GenreID] = true
+	}
 
-		// Ikat ID Genre tersebut (baik yang baru dibuat maupun yang sudah ada) ke tabel pivot book_genres
-		bg := models.BookGenre{BookID: b.BookID, GenreID: gen.GenreID}
-		if err := tx.Create(&bg).Error; err != nil { 
-			return err 
+	// 3. Bersihkan relasi lama HANYA JIKA dalam mode EDIT/UPDATE
+	if !isCreateMode {
+		if err := tx.Where("book_id = ?", b.BookID).Delete(&models.BookGenre{}).Error; err != nil {
+			return err
+		}
+	}
+
+	// Masukkan relasi pivot baru (Berlaku untuk Create maupun Update)
+	for genID := range targetGenreIDs {
+		bg := models.BookGenre{BookID: b.BookID, GenreID: genID}
+		if err := tx.Create(&bg).Error; err != nil {
+			return err
 		}
 	}
 

@@ -153,7 +153,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 				{/* Header */}
 				<div className="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-900/50">
 					<h3 className="text-white font-semibold">
-						Bagikan Postingan
+						Share This Post
 					</h3>
 					<button
 						onClick={onClose}
@@ -172,7 +172,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 						/>
 						<input
 							type="text"
-							placeholder="Cari teman..."
+							placeholder="Find user..."
 							className="w-full bg-gray-800 border border-gray-700 rounded-xl py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-purple-500 transition"
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
@@ -192,7 +192,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 				<div className="flex-1 max-h-[300px] overflow-y-auto p-2 custom-scrollbar">
 					{!searchQuery && displayUsers?.length > 0 && (
 						<p className="text-[10px] uppercase tracking-wider text-gray-500 font-bold px-3 mb-2">
-							Terakhir dikirim
+							Last sent
 						</p>
 					)}
 
@@ -244,8 +244,8 @@ const ShareModal: React.FC<ShareModalProps> = ({
 						) : (
 							<div className="py-10 text-center text-gray-500 text-sm">
 								{isSearching
-									? "Mencari..."
-									: "User tidak ditemukan"}
+									? "Searching..."
+									: "User not found"}
 							</div>
 						)}
 					</div>
@@ -254,7 +254,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 				{/* Footer & Message */}
 				<div className="p-4 border-t border-gray-800 bg-gray-900/50">
 					<textarea
-						placeholder="Tulis pesan (opsional)..."
+						placeholder="Write message..."
 						className="custom-scrollbar w-full bg-gray-800/50 border border-gray-700 rounded-lg p-2 text-sm text-gray-300 resize-none focus:outline-none focus:border-gray-600 transition"
 						rows={2}
 						value={optionalMessage}
@@ -275,7 +275,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 						) : (
 							<>
 								<Send size={16} />
-								Kirim{" "}
+								Send{" "}
 								{selectedUsers.length > 0 &&
 									`(${selectedUsers.length})`}
 							</>

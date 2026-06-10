@@ -11,28 +11,32 @@ interface ReportModalProps {
 }
 
 const POST_CATEGORIES = [
-	"Spam / Konten Berulang",
-	"Ujaran Kebencian atau SARA",
-	"Pelecehan atau Harassment",
-	"Kekerasan atau Ancaman",
-	"Pornografi atau Konten Seksual",
-	"Informasi Palsu / Hoax",
-	"Ketidaknyamanan Lainnya",
+	"Spam or Repetitive Content",
+	"Hate Speech or Discrimination",
+	"Harassment or Bullying",
+	"Violence or Threats",
+	"Sexual or Explicit Content",
+	"Misinformation",
+	"Copyright Infringement",
+	"Off-Topic Content",
+	"Other",
 ];
 
 const COMMENT_CATEGORIES = [
-	"Komentar Kasar / Toxic",
-	"Spam di Komentar",
-	"Ujaran Kebencian",
-	"Pelecehan / Harassment",
-	"Ketidaknyamanan Lainnya",
+	"Spam",
+	"Hate Speech or Discrimination",
+	"Harassment or Bullying",
+	"Threats or Abusive Behavior",
+	"Misinformation",
+	"Other",
 ];
 
 const USER_CATEGORIES = [
-	"Akun Palsu / Penyamaran",
-	"Foto Profil Tidak Pantas",
-	"Nama Pengguna Melanggar Aturan",
-	"Target Harassment",
+	"Impersonation or Fake Account",
+	"Inappropriate Profile Content",
+	"Harassment or Bullying",
+	"Spam Activity",
+	"Other",
 ];
 
 const ReportModal: React.FC<ReportModalProps> = ({
@@ -83,13 +87,13 @@ const ReportModal: React.FC<ReportModalProps> = ({
 	const getEntityLabel = () => {
 		switch (entityType) {
 			case "post":
-				return "Postingan";
+				return "Post";
 			case "comment":
-				return "Komentar";
+				return "Comment";
 			case "user":
-				return "Pengguna";
+				return "User";
 			default:
-				return "Konten";
+				return "Content";
 		}
 	};
 
@@ -141,7 +145,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
 							<AlertTriangle size={18} className="text-red-500" />
 						</div>
 						<h3 className="font-semibold text-white">
-							Laporkan {getEntityLabel()}
+							Report {getEntityLabel()}
 						</h3>
 					</div>
 					<button
@@ -157,8 +161,8 @@ const ReportModal: React.FC<ReportModalProps> = ({
 						{/* Body - Categories */}
 						<div className="p-2 max-h-[400px] overflow-y-auto custom-scrollbar">
 							<p className="px-3 py-2 text-xs font-medium text-gray-500 uppercase">
-								Kenapa Anda melaporkan{" "}
-								{getEntityLabel().toLowerCase()} ini?
+								Why are you reporting this{" "}
+								{getEntityLabel().toLowerCase()}?
 							</p>
 							<div className="space-y-1">
 								{currentCategories.map((cat) => (
@@ -188,7 +192,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
 								onClick={onClose}
 								className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-300 bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] hover:border-white/20 transition-all"
 							>
-								Batal
+								Cancel
 							</button>
 							<button
 								onClick={handleReport}
@@ -200,7 +204,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
 								) : (
 									<>
 										{" "}
-										<Flag size={14} /> Kirim Laporan{" "}
+										<Flag size={14} /> Send Report{" "}
 									</>
 								)}
 							</button>
@@ -216,12 +220,12 @@ const ReportModal: React.FC<ReportModalProps> = ({
 							/>
 						</div>
 						<div>
-							<h4 className="text-white font-semibold">
-								Laporan Terkirim
+							<h4 className="font-semibold text-white">
+								Report Submitted
 							</h4>
-							<p className="text-gray-500 text-xs mt-1">
-								Terima kasih, kami akan meninjau laporan Anda
-								segera.
+							<p className="mt-1 text-xs text-gray-500">
+								Thank you for your report. We&apos;ll review it
+								as soon as possible.
 							</p>
 						</div>
 					</div>

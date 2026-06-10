@@ -297,6 +297,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 				// Master Books Catalogue
 				adminBook.GET("", bookManagementHandler.GetBooks)
 				adminBook.POST("", bookManagementHandler.CreateBook)
+				adminBook.POST("/upload", bookManagementHandler.UploadCoverImage)
 				adminBook.PUT("/:id", bookManagementHandler.UpdateBook)
 				adminBook.DELETE("/:id", bookManagementHandler.DeleteBook)
 

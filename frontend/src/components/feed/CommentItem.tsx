@@ -88,7 +88,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 													</div>
 													<div>
 														<p className="text-xs font-medium text-gray-200">
-															Hapus komentar?
+															Delete Comment?
 														</p>
 														<p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
 															Tindakan ini tidak
@@ -120,7 +120,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 														}}
 														className="px-2.5 py-1 text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors"
 													>
-														Hapus
+														Delete
 													</button>
 												</div>
 											</div>
@@ -135,7 +135,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 												}}
 												className="w-full px-4 py-2 text-left text-[11px] text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors"
 											>
-												<Trash2 size={12} /> Hapus
+												<Trash2 size={12} /> Delete
 											</button>
 										)
 									) : (
@@ -150,7 +150,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 											}}
 											className="w-full px-4 py-2 text-left text-[11px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
 										>
-											<Flag size={12} /> Laporkan
+											<Flag size={12} /> Report
 										</button>
 									)}
 								</div>
@@ -183,14 +183,14 @@ const CommentItem: React.FC<CommentItemProps> = ({
 							{comment.likeCount > 0 ? (
 								<span>{comment.likeCount}</span>
 							) : (
-								"Suka"
+								"Like"
 							)}
 						</button>
 						<button
 							onClick={() => handleReplyClick(comment)}
 							className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-400 transition font-bold uppercase tracking-wider"
 						>
-							Balas
+							Reply
 						</button>
 					</div>
 				</div>
@@ -206,8 +206,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 								className="ml-4 my-2 text-[10px] text-blue-500 hover:text-blue-400 font-bold flex items-center gap-2 transition-all w-fit"
 							>
 								<span className="w-4 h-[1px] bg-blue-500/30"></span>
-								Lihat {comment.replies.length} balasan
-								lainnya...
+								See {comment.replies.length} other comment replies...
 							</button>
 						) : (
 							/* Jika belum mencapai limit atau sudah diklik 'showMore', render semua item */

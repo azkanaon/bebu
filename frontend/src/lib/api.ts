@@ -393,6 +393,20 @@ export async function updateBookAPI(bookId: number, data: UpsertBookRequest) {
 	return res.data;
 }
 
+export async function uploadBookCoverAPI(
+	file: File,
+): Promise<{ image_url: string }> {
+	const formData = new FormData();
+	formData.append("cover_image", file);
+
+	const res = await api.post("/v1/admin/books/upload", formData, {
+		headers: {
+			"Content-Type": "multipart/form-data",
+		},
+	});
+	return res.data;
+}
+
 export async function deleteBookAPI(bookId: number) {
 	const res = await api.delete(`/v1/admin/books/${bookId}`);
 	return res.data;

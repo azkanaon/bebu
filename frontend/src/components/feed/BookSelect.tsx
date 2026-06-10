@@ -83,7 +83,7 @@ flex justify-between items-center
 "
 			>
 				<span className={`${value ? "text-white" : "text-gray-400"}`}>
-					{value ? value.title : "Pilih Buku"}
+					{value ? value.title : "Choose a book..."}
 				</span>
 
 				{!isLocked && (
