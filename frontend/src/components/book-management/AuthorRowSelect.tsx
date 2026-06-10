@@ -21,7 +21,6 @@ export default function AuthorRowSelect({
 	onChange,
 	placeholder,
 	isEditMode,
-	index,
 	allSelectedAuthors,
 }: AuthorRowSelectProps) {
 	// Inisialisasi awal menggunakan value yang diberikan parent

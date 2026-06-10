@@ -74,10 +74,10 @@ export default function SubmissionTable({
 		<div className="space-y-4">
 			<div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02]">
 				<div className="grid grid-cols-12 border-b border-white/5 px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
-					<div className="col-span-5">Proposed Book / ISBN</div>
+					<div className="col-span-4">Proposed Book / ISBN</div>
 					<div className="col-span-3">Submitted By</div>
 					<div className="col-span-2">Status</div>
-					<div className="col-span-2 text-right">Actions</div>
+					<div className="col-span-3 text-right">Actions</div>
 				</div>
 
 				<div className="divide-y divide-white/[0.03]">
@@ -86,7 +86,7 @@ export default function SubmissionTable({
 							key={sub.book_submission_id}
 							className="group grid w-full grid-cols-12 items-center px-6 py-4 text-left transition-all duration-200 hover:bg-white/[0.01]"
 						>
-							<div className="col-span-5 pr-6">
+							<div className="col-span-4 pr-6">
 								<div className="flex items-center gap-3">
 									<div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-md border border-white/10 bg-zinc-800">
 										<BookCover
@@ -102,8 +102,15 @@ export default function SubmissionTable({
 										</p>
 										<p className="truncate text-xs text-zinc-400 mt-0.5 font-normal">
 											By{" "}
-											{sub.authors?.join(", ") ||
-												"Unknown Author"}
+											{sub.authors &&
+											sub.authors.length > 0
+												? sub.authors
+														.map(
+															(author) =>
+																author.name,
+														)
+														.join(", ")
+												: "Unknown Author"}
 										</p>
 										<p className="text-[10px] text-zinc-500 mt-0.5">
 											ISBN:{" "}
@@ -117,7 +124,7 @@ export default function SubmissionTable({
 
 							<div className="col-span-3 pr-4">
 								<span className="text-xs text-zinc-300 font-medium block truncate">
-									@{sub.submitted_by}
+									{sub.submitted_by}
 								</span>
 								<span className="text-[10px] text-zinc-500 block mt-0.5">
 									{sub.created_at
@@ -155,7 +162,7 @@ export default function SubmissionTable({
 								</div>
 							</div>
 
-							<div className="col-span-2 flex items-center justify-end gap-2">
+							<div className="col-span-3 flex items-center justify-end gap-3">
 								<button
 									onClick={() => onViewDetail(sub)}
 									title="View / Review Details"

@@ -78,13 +78,22 @@ func (r *bookManagementRepository) GetPaginatedBooks(ctx context.Context, params
 
 	listData := make([]dto.ManageBookResponse, 0)
 	for _, b := range books {
-		authors := []string{}
+		authors := make([]dto.BookAuthorResponse, 0)
+
 		for _, ba := range b.BookAuthors {
-			authors = append(authors, ba.Author.AuthorName)
+			authors = append(authors, dto.BookAuthorResponse{
+				ID:   ba.Author.AuthorID,
+				Name: ba.Author.AuthorName,
+			})
 		}
-		genres := []string{}
+
+		genres := make([]dto.BookGenreResponse, 0)
+
 		for _, bg := range b.BookGenres {
-			genres = append(genres, bg.Genre.GenreName)
+			genres = append(genres, dto.BookGenreResponse{
+				ID:   bg.Genre.GenreID,
+				Name: bg.Genre.GenreName,
+			})
 		}
 
 		listData = append(listData, dto.ManageBookResponse{
@@ -132,7 +141,11 @@ func (r *bookManagementRepository) DeleteBook(ctx context.Context, id uint) erro
 	return r.db.WithContext(ctx).Delete(&models.Book{}, id).Error
 }
 
-func (r *bookManagementRepository) GetPaginatedSubmissions(ctx context.Context, params dto.SubmissionQueryParams) (dto.PaginatedSubmissionResponse, error) {
+func (r *bookManagementRepository) GetPaginatedSubmissions(
+	ctx context.Context,
+	params dto.SubmissionQueryParams,
+) (dto.PaginatedSubmissionResponse, error) {
+
 	var resp dto.PaginatedSubmissionResponse
 	var subs []models.BookSubmission
 	var totalRows int64
@@ -141,10 +154,12 @@ func (r *bookManagementRepository) GetPaginatedSubmissions(ctx context.Context, 
 	if params.Limit <= 0 { params.Limit = 10 }
 	offset := (params.Page - 1) * params.Limit
 
-	// Gunakan nested preload "SubmittedByUser.Profile" agar data DisplayName bisa diakses
-	query := r.db.WithContext(ctx).Model(&models.BookSubmission{}).
+	// 1. TAMBAHKAN NESTED PRELOAD KE TABEL MASTER UTAMA
+	query := r.db.WithContext(ctx).
+		Model(&models.BookSubmission{}).
 		Preload("SubmittedByUser.Profile").
-		Preload("Authors")
+		Preload("SubmissionAuthors.Author"). // Preload tabel master author
+		Preload("SubmissionGenres.Genre")    // Preload tabel master genre
 
 	if params.Status != "" {
 		query = query.Where("status = ?", params.Status)
@@ -159,39 +174,96 @@ func (r *bookManagementRepository) GetPaginatedSubmissions(ctx context.Context, 
 		return resp, err
 	}
 
-	if err := query.Offset(offset).Limit(params.Limit).Order("created_at DESC").Find(&subs).Error; err != nil {
+	if err := query.
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(params.Limit).
+		Find(&subs).Error; err != nil {
 		return resp, err
 	}
 
-	listData := make([]dto.ManageSubmissionResponse, 0)
+	listData := make([]dto.ManageSubmissionResponse, 0, len(subs))
+
 	for _, s := range subs {
-		authors := []string{}
+		// 2. MAPPING LOGIKA DATA AUTHORS
+		authorsResponse := make([]dto.SubmissionAuthorResponse, 0)
 		for _, a := range s.SubmissionAuthors {
-			authors = append(authors, *a.AuthorName)
+			var authID uint
+			var authName string
+
+			if a.AuthorID != nil {
+				authID = *a.AuthorID
+				authName = a.Author.AuthorName // Ambil dari hasil Preload master tabel
+			}
+			
+			// Jika user mengetikkan nama penulis baru di form submission
+			if a.AuthorName != nil && *a.AuthorName != "" {
+				authName = *a.AuthorName
+			}
+
+			if authName != "" {
+				authorsResponse = append(authorsResponse, dto.SubmissionAuthorResponse{
+					ID:   authID,
+					Name: authName,
+				})
+			}
 		}
 
-		// Ambil DisplayName secara aman dari relasi Profile (antisipasi jika profile data bernilai nil)
-		displayName := s.SubmittedByUser.Username // Fallback awal ke username
+		// 3. MAPPING LOGIKA DATA GENRES
+		genresResponse := make([]dto.SubmissionGenreResponse, 0)
+		for _, g := range s.SubmissionGenres {
+			var genID uint
+			var genName string
+
+			if g.GenreID != nil {
+				genID = *g.GenreID
+				genName = g.Genre.GenreName // Ambil dari hasil Preload master tabel
+			}
+
+			// Jika user mengetikkan nama genre baru di form submission
+			if g.GenreName != nil && *g.GenreName != "" {
+				genName = *g.GenreName
+			}
+
+			if genName != "" {
+				genresResponse = append(genresResponse, dto.SubmissionGenreResponse{
+					ID:   genID,
+					Name: genName,
+				})
+			}
+		}
+
+		displayName := s.SubmittedByUser.Username
 		if s.SubmittedByUser.Profile != nil && s.SubmittedByUser.Profile.DisplayName != "" {
 			displayName = s.SubmittedByUser.Profile.DisplayName
 		}
-
 		subBy := fmt.Sprintf("%s (@%s)", displayName, s.SubmittedByUser.Username)
-		
+
+		totalPages := 0
+		if s.TotalPages != nil { totalPages = *s.TotalPages }
+
+		language := ""; if s.Language != nil { language = *s.Language }
+		isbn := ""; if s.ISBN != nil { isbn = *s.ISBN }
+		synopsis := ""; if s.Synopsis != nil { synopsis = *s.Synopsis }
+		coverImgURL := ""; if s.CoverImgURL != nil { coverImgURL = *s.CoverImgURL }
+		userNote := ""; if s.UserNote != nil { userNote = *s.UserNote }
+		adminNote := ""; if s.AdminNote != nil { adminNote = *s.AdminNote }
+
 		listData = append(listData, dto.ManageSubmissionResponse{
-			BookSubmissionID: s.BookSubmissionID,
+			BookSubmissionID:  s.BookSubmissionID,
 			SubmittedByByInfo: subBy,
-			Title:            s.Title,
-			TotalPages:       *s.TotalPages,
-			Language:         *s.Language,
-			ISBN:             *s.ISBN,
-			Synopsis:         *s.Synopsis,
-			CoverImgURL:      *s.CoverImgURL,
-			UserNote:         *s.UserNote,
-			AdminNote:        *s.AdminNote,
-			Status:           string(s.Status),
-			Authors:          authors,
-			CreatedAt:        s.CreatedAt,
+			Title:             s.Title,
+			TotalPages:        totalPages,
+			Language:          language,
+			ISBN:              isbn,
+			Synopsis:          synopsis,
+			CoverImgURL:       coverImgURL,
+			UserNote:          userNote,
+			AdminNote:         adminNote,
+			Status:            string(s.Status),
+			Authors:           authorsResponse, // Pakai data terstruktur objek
+			Genres:            genresResponse,  // Pakai data terstruktur objek
+			CreatedAt:         s.CreatedAt,
 		})
 	}
 
@@ -200,17 +272,21 @@ func (r *bookManagementRepository) GetPaginatedSubmissions(ctx context.Context, 
 	resp.Page = params.Page
 	resp.Limit = params.Limit
 	resp.TotalPages = int(math.Ceil(float64(totalRows) / float64(params.Limit)))
+
 	return resp, nil
 }
 
 func (r *bookManagementRepository) GetSubmissionByID(ctx context.Context, id uint) (models.BookSubmission, error) {
 	var s models.BookSubmission
-	err := r.db.WithContext(ctx).Preload("Authors").First(&s, id).Error
+	
+	err := r.db.WithContext(ctx).First(&s, id).Error
+	
 	return s, err
 }
 
 func (r *bookManagementRepository) UpdateSubmissionTx(tx *gorm.DB, sub *models.BookSubmission) error {
-	return tx.Save(sub).Error
+	// 💡 PERBAIKAN: Ganti gorm.Associations menjadi string literal "Associations"
+	return tx.Model(sub).Omit("Associations").Save(sub).Error
 }
 
 // Get Data Author Box

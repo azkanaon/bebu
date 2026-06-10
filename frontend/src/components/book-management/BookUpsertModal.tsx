@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import clsx from "clsx";
 import {
 	X,
@@ -14,15 +14,20 @@ import {
 	Image as ImageIcon,
 	AlignLeft,
 	Tags,
+	UploadCloud,
+	RefreshCw,
+	UserPen,
 } from "lucide-react";
 import {
 	BookResponse,
 	BookSubmissionResponse,
 	GenreResponse,
+	AuthorResponse,
+	UpsertBookRequest
 } from "@/types/book-management";
 import AuthorRowSelect from "./AuthorRowSelect";
 import GenreRowSelect from "./GenreRowSelect";
-import { createBookAPI, updateBookAPI, approveSubmissionAPI } from "@/lib/api";
+import { createBookAPI, updateBookAPI, approveSubmissionAPI, uploadBookCoverAPI } from "@/lib/api";
 import { toast } from "react-hot-toast";
 
 interface BookUpsertModalProps {
@@ -48,11 +53,16 @@ export default function BookUpsertModal({
 	const [language, setLanguage] = useState("en");
 	const [totalPages, setTotalPages] = useState<number>(0);
 
-	const [authors, setAuthors] = useState<string[]>([""]);
+	// State Tambahan untuk Management Image Upload
+	const [imageFile, setImageFile] = useState<File | null>(null);
+	const [imagePreview, setImagePreview] = useState<string | null>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
+	const [authors, setAuthors] = useState<AuthorResponse[]>([
+		{ id: 0, name: "" },
+	]);
 	// 🌟 State menampung badge genre terpilih (bisa genre lama dari DB atau genre baru ketikan admin)
 	const [selectedGenres, setSelectedGenres] = useState<GenreResponse[]>([]);
-
 	const [submitting, setSubmitting] = useState(false);
 
 	const isEditMode = !!editData;
@@ -72,6 +82,9 @@ export default function BookUpsertModal({
 
 	// Sinkronisasi data form saat modal dibuka / mode berubah
 	useEffect(() => {
+		setImageFile(null);
+		setImagePreview(null);
+
 		if (editData) {
 			setTitle(editData.title);
 			setSynopsis(editData.synopsis || "");
@@ -80,7 +93,21 @@ export default function BookUpsertModal({
 			setPubYear(editData.publication_year || new Date().getFullYear());
 			setLanguage(editData.language || "en");
 			setTotalPages(editData.total_pages || 0);
-			setAuthors(editData.authors.length ? editData.authors : [""]);
+
+			// SINKRONISASI AUTHORS (EDIT MODE)
+			if (editData.authors && editData.authors.length > 0) {
+				setAuthors(
+					editData.authors.map((a: any) => ({
+						id: a.id ?? a.author_id ?? 0,
+						name:
+							typeof a === "object"
+								? (a.name ?? a.author_name ?? "")
+								: String(a),
+					})),
+				);
+			} else {
+				setAuthors([{ id: 0, name: "" }]);
+			}
 
 			// Mapping data genre bawaan buku saat masuk Edit Mode
 			if (editData.genres) {
@@ -98,7 +125,6 @@ export default function BookUpsertModal({
 										.replace(/\s+/g, "-"),
 							};
 						}
-						// Fallback jika datanya mentah berupa array primitive/number/string
 						const fallbackName = `${g}`;
 						return {
 							id: typeof g === "number" ? g : Date.now(),
@@ -121,12 +147,39 @@ export default function BookUpsertModal({
 			setPubYear(new Date().getFullYear());
 			setLanguage(approvalSourceData.language || "id");
 			setTotalPages(approvalSourceData.total_pages || 0);
-			setAuthors(
-				approvalSourceData.authors.length
-					? approvalSourceData.authors
-					: [""],
-			);
-			setSelectedGenres([]);
+
+			// Sinkronisasi data authors bawaan submission
+			if (
+				approvalSourceData.authors &&
+				approvalSourceData.authors.length > 0
+			) {
+				setAuthors(
+					approvalSourceData.authors.map((a: any) => {
+						if (typeof a === "object" && a !== null) {
+							return {
+								id: a.id ?? a.author_id ?? 0,
+								name: a.name ?? a.author_name ?? "",
+							};
+						}
+						return { id: 0, name: String(a || "") };
+					}),
+				);
+			} else {
+				setAuthors([{ id: 0, name: "" }]);
+			}
+
+			// Sinkronisasi data genres bawaan submission ke state badges modal
+			if (approvalSourceData.genres) {
+				setSelectedGenres(
+					approvalSourceData.genres.map((g: any) => ({
+						id: g.id || 0,
+						name: g.name || "",
+						slug: (g.name || "").toLowerCase().replace(/\s+/g, "-"),
+					})),
+				);
+			} else {
+				setSelectedGenres([]);
+			}
 		} else {
 			setTitle("");
 			setSynopsis("");
@@ -135,19 +188,49 @@ export default function BookUpsertModal({
 			setPubYear(new Date().getFullYear());
 			setLanguage("en");
 			setTotalPages(0);
-			setAuthors([""]);
+			setAuthors([{ id: 0, name: "" }]);
 			setSelectedGenres([]);
 		}
 	}, [editData, approvalSourceData, isOpen]);
 
 	if (!isOpen) return null;
 
-	const handleAddAuthorRow = () => setAuthors([...authors, ""]);
+	// HANDLE IMAGE CHANGE (FILE PICKER)
+	const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (file) {
+			if (file.size > 2 * 1024 * 1024) {
+				// Limit 2MB
+				toast.error("Ukuran gambar terlalu besar. Maksimal 2MB.");
+				return;
+			}
+			setImageFile(file);
+			// Buat local URL untuk preview
+			setImagePreview(URL.createObjectURL(file));
+		}
+	};
+
+	const handleRemovePreview = () => {
+		setImageFile(null);
+		setImagePreview(null);
+		if (fileInputRef.current) fileInputRef.current.value = "";
+	};
+
+	const handleRemoveCurrentCover = () => {
+		setCoverImgUrl("");
+		handleRemovePreview();
+	};
+
+	const handleAddAuthorRow = () =>
+		setAuthors([...authors, { id: 0, name: "" }]);
+
 	const handleRemoveAuthorRow = (idx: number) =>
 		setAuthors(authors.filter((_, i) => i !== idx));
-	const handleAuthorChange = (idx: number, val: string) => {
+
+	// Mengupdate nama atau mendeteksi jika admin memilih author yang sudah ada dari komponen anak
+	const handleAuthorChange = (idx: number, newAuthor: AuthorResponse) => {
 		const updated = [...authors];
-		updated[idx] = val;
+		updated[idx] = newAuthor; // Mengganti seluruh objek
 		setAuthors(updated);
 	};
 
@@ -185,7 +268,9 @@ export default function BookUpsertModal({
 		e.preventDefault();
 
 		const cleanedAuthors = authors
-			.map((a) => a.trim())
+			.map((a) =>
+				typeof a === "object" ? a.name.trim() : String(a).trim(),
+			)
 			.filter((a) => a !== "");
 
 		const darkToastOptions = {
@@ -211,17 +296,6 @@ export default function BookUpsertModal({
 			return;
 		}
 
-		const uniqueAuthors = new Set(
-			cleanedAuthors.map((a) => a.toLowerCase()),
-		);
-		if (uniqueAuthors.size !== cleanedAuthors.length) {
-			toast.error(
-				"Ditemukan nama penulis yang duplikat di dalam form.",
-				darkToastOptions,
-			);
-			return;
-		}
-
 		if (selectedGenres.length === 0) {
 			toast.error(
 				"Silakan pilih atau buat minimal 1 Genre untuk buku ini.",
@@ -232,21 +306,90 @@ export default function BookUpsertModal({
 
 		setSubmitting(true);
 
-		const payload: any = {
-			title,
-			synopsis,
-			cover_img_url: coverImgUrl,
-			google_book_id: googleBookId || "",
-			publication_year: Number(pubYear),
-			language,
-			total_pages: Number(totalPages),
-			author_names: cleanedAuthors,
-			genre_names: selectedGenres.map((g) => g.name),
-		};
-
 		try {
+			// 🌟 STEP 1: JIKA ADA FILE BINARY GAMBAR BARU, UPLOAD TERLEBIH DAHULU
+			let finalCoverImgUrl = coverImgUrl || "";
+
+			if (imageFile) {
+				// Tampilkan loading toast khusus proses upload biner
+				toast.loading("Mengunggah gambar sampul ke Cloudinary...", {
+					id: "upload-cover-toast",
+					style: darkToastOptions.style,
+				});
+
+				const uploadResult = await uploadBookCoverAPI(imageFile);
+				finalCoverImgUrl = uploadResult.image_url; // Kunci URL hasil upload backend
+
+				toast.dismiss("upload-cover-toast");
+			}
+
+			// STEP 2: PROSES SANITISASI DATA DATA SEPERTI BIASA
+			const cleanGoogleBookId = (googleBookId || "").trim();
+			const cleanPubYear =
+				parseInt(String(pubYear).replace(/[^0-9]/g, "")) ||
+				new Date().getFullYear();
+			const cleanTotalPages =
+				parseInt(String(totalPages).replace(/[^0-9]/g, "")) || 0;
+
+			const authorIds: number[] = [];
+			const newAuthorNames: string[] = [];
+
+			authors.forEach((author) => {
+				const trimmedName = (author?.name || "").trim();
+				if (trimmedName === "") return;
+
+				const numericId = Number(author.id);
+				if (
+					numericId &&
+					!isNaN(numericId) &&
+					numericId > 0 &&
+					numericId < 1000000000
+				) {
+					authorIds.push(numericId);
+				} else {
+					newAuthorNames.push(trimmedName);
+				}
+			});
+
+			const genreIds: number[] = [];
+			const newGenreNames: string[] = [];
+
+			selectedGenres.forEach((genre) => {
+				const trimmedName = (genre?.name || "").trim();
+				if (trimmedName === "") return;
+
+				const numericId = Number(genre.id);
+				if (
+					numericId &&
+					!isNaN(numericId) &&
+					numericId > 0 &&
+					numericId < 1000000000
+				) {
+					genreIds.push(numericId);
+				} else {
+					newGenreNames.push(trimmedName);
+				}
+			});
+
+			// 🌟 STEP 3: STRUKTUR DATA PLAYLOAD SEKARANG MEMBAWA URL FIXED DARI CLOUDINARY
+			const jsonPayload: UpsertBookRequest = {
+				title: title.trim(),
+				synopsis: synopsis.trim(),
+				google_book_id:
+					cleanGoogleBookId === "0" ? "" : cleanGoogleBookId,
+				language: (language || "en").trim(),
+				cover_img_url: finalCoverImgUrl, // Menyimpan URL string dari Cloudinary
+				publication_year: cleanPubYear,
+				total_pages: cleanTotalPages,
+				author_ids: authorIds,
+				new_author_names: newAuthorNames,
+				genre_ids: genreIds,
+				new_genre_names: newGenreNames,
+			};
+
+			// STEP 4: KONTROL DISPATCH DATA KE LAYER ENDPOINT YANG SESUAI
 			if (editData) {
-				await updateBookAPI(editData.book_id, payload);
+				await updateBookAPI(editData.book_id, jsonPayload);
 				toast.success(
 					"Rekaman data buku berhasil diperbarui!",
 					darkToastOptions,
@@ -254,22 +397,25 @@ export default function BookUpsertModal({
 			} else if (approvalSourceData) {
 				await approveSubmissionAPI(
 					approvalSourceData.book_submission_id,
-					payload,
+					jsonPayload,
 				);
 				toast.success(
 					"Pengajuan buku berhasil disetujui!",
 					darkToastOptions,
 				);
 			} else {
-				await createBookAPI(payload);
+				await createBookAPI(jsonPayload);
 				toast.success(
 					"Buku baru berhasil ditambahkan!",
 					darkToastOptions,
 				);
 			}
+
 			onSuccess();
 			onClose();
 		} catch (err: any) {
+			// Bersihkan loading toast jika terjadi interupsi error di tengah jalan
+			toast.dismiss("upload-cover-toast");
 			console.error("Failed to commit book data sync", err);
 			const backendMessage = err?.response?.data?.error || err?.message;
 			toast.error(
@@ -282,6 +428,9 @@ export default function BookUpsertModal({
 			setSubmitting(false);
 		}
 	};
+
+	// Mengambil display source gambar aktif (prioritas preview baru -> data lama)
+	const activeImageDisplay = imagePreview || coverImgUrl;
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md animate-in fade-in-0 overflow-y-auto">
@@ -457,12 +606,21 @@ export default function BookUpsertModal({
 					{/* AUTHOR MANAGEMENT CARD */}
 					<div className="rounded-2xl border border-white/5 bg-white/[0.01] p-4 space-y-3">
 						<div className="flex items-center justify-between">
-							<div>
-								<p className="text-[10px] uppercase tracking-[0.15em] text-zinc-400 font-bold">
-									Author Management
-								</p>
+							<div className="space-y-1.5">
+								<label className="text-[10px] uppercase tracking-[0.15em] text-zinc-400 font-bold flex items-center gap-1.5">
+									<UserPen
+										size={12}
+										className={
+											isEditMode
+												? "text-blue-400/70"
+												: "text-emerald-400/70"
+										}
+									/>
+									Author Management *
+								</label>
 								<p className="text-[10px] text-zinc-500">
-									Provide legal or pen names of creators
+									Provide legal or pen names of creators to
+									dynamically register into the system
 								</p>
 							</div>
 							<button
@@ -485,14 +643,20 @@ export default function BookUpsertModal({
 									className="flex items-center gap-2 animate-in fade-in duration-150"
 								>
 									<AuthorRowSelect
-										value={auth}
+										// 💡 Berikan fallback || "" untuk mengamankan jika .name bernilai undefined atau null
+										value={auth?.name || ""}
 										index={idx}
 										placeholder={`Author #${idx + 1} Name`}
 										isEditMode={isEditMode}
-										allSelectedAuthors={authors}
-										onChange={(newName) =>
-											handleAuthorChange(idx, newName)
-										}
+										allSelectedAuthors={authors.map(
+											(a) => a?.name || "",
+										)}
+										onChange={(newName) => {
+											handleAuthorChange(idx, {
+												id: auth?.id || 0,
+												name: newName,
+											});
+										}}
 									/>
 									{authors.length > 1 && (
 										<button
@@ -539,8 +703,13 @@ export default function BookUpsertModal({
 								}
 								onSelect={(genre) =>
 									handleAddGenre({
-										id: genre.id,
+										id: genre.id || 0, // Beri 0 jika genre baru buatan admin
 										name: genre.name,
+										slug:
+											genre.slug ||
+											genre.name
+												.toLowerCase()
+												.replace(/\s+/g, "-"),
 									})
 								}
 							/>
@@ -579,24 +748,84 @@ export default function BookUpsertModal({
 						</div>
 					</div>
 
-					{/* COVER IMAGE */}
-					<div className="space-y-1.5">
+					{/* UPLOAD & PREVIEW IMAGE CONTAINER */}
+					<div className="space-y-2">
 						<label className="text-[10px] uppercase tracking-[0.12em] text-zinc-400 font-semibold flex items-center gap-1.5">
 							<ImageIcon size={11} className="text-zinc-500" />{" "}
-							Cover Image URL
+							Book Cover Image
 						</label>
+
 						<input
-							type="text"
-							value={coverImgUrl}
-							placeholder="https://..."
-							onChange={(e) => setCoverImgUrl(e.target.value)}
-							className={clsx(
-								"w-full rounded-2xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5 text-zinc-200 outline-none transition-all duration-300",
-								isEditMode
-									? "focus:border-blue-500/40"
-									: "focus:border-emerald-500/40",
-							)}
+							type="file"
+							ref={fileInputRef}
+							className="hidden"
+							accept="image/*"
+							onChange={handleImageChange}
 						/>
+
+						{activeImageDisplay ? (
+							/* PREVIEW MODE (Mirip style blur background postingan bapak) */
+							<div className="relative w-full h-[220px] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 flex items-center justify-center group">
+								{/* Layer 1: Blurred Background */}
+								<img
+									src={activeImageDisplay}
+									alt="blur background"
+									className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-30"
+								/>
+								{/* Layer 2: Main Image */}
+								<img
+									src={activeImageDisplay}
+									alt="book cover preview"
+									className="relative z-10 h-full max-w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.02]"
+								/>
+								{/* Overlay Actions */}
+								<div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center justify-center gap-3">
+									<button
+										type="button"
+										onClick={() =>
+											fileInputRef.current?.click()
+										}
+										className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] backdrop-blur-md border border-white/10 transition-all"
+									>
+										<RefreshCw size={12} /> Replace
+									</button>
+									<button
+										type="button"
+										onClick={
+											imagePreview
+												? handleRemovePreview
+												: handleRemoveCurrentCover
+										}
+										className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-[11px] backdrop-blur-md border border-rose-500/20 transition-all"
+									>
+										<Trash size={12} /> Remove
+									</button>
+								</div>
+							</div>
+						) : (
+							/* UPLOAD BOX PLACEHOLDER (Jika tidak ada gambar) */
+							<div
+								onClick={() => fileInputRef.current?.click()}
+								className={clsx(
+									"w-full h-[140px] rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.01] hover:bg-white/[0.03] flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-300 group",
+									isEditMode
+										? "hover:border-blue-500/30"
+										: "hover:border-emerald-500/30",
+								)}
+							>
+								<div className="p-3 rounded-full bg-white/[0.02] border border-white/5 text-zinc-500 group-hover:text-zinc-300 transition-colors">
+									<UploadCloud size={20} />
+								</div>
+								<div className="text-center">
+									<p className="text-zinc-300 font-medium">
+										Click to upload cover image
+									</p>
+									<p className="text-[10px] text-zinc-500 mt-0.5">
+										Supports JPG, PNG or WEBP (Max 2MB)
+									</p>
+								</div>
+							</div>
+						)}
 					</div>
 
 					{/* SYNOPSIS */}

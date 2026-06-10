@@ -524,10 +524,10 @@ export default function CommentModal({
 					<div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-950/50 backdrop-blur-md sticky top-0 z-10">
 						<div>
 							<h3 className="text-white font-bold text-lg leading-tight">
-								Diskusi
+								Discussion
 							</h3>
 							<p className="text-xs text-gray-500">
-								Berbagi pandangan tentang buku ini
+								Share your view about this book
 							</p>
 						</div>
 						<button
@@ -647,7 +647,7 @@ export default function CommentModal({
 					{replyTo && (
 						<div className="flex justify-between items-center bg-blue-500/10 border-l-2 border-blue-500 px-3 py-1.5 mb-2 rounded-r-lg">
 							<p className="text-[10px] text-blue-400">
-								Membalas{" "}
+								Replying to{" "}
 								<span className="font-bold">
 									@{replyTo.username}
 								</span>
@@ -668,8 +668,8 @@ export default function CommentModal({
 							onChange={(e) => setCommentText(e.target.value)}
 							placeholder={
 								replyTo
-									? `Balas @${replyTo.username}...`
-									: "Tulis pendapat Anda..."
+									? `Replying to @${replyTo.username}...`
+									: "Write your opinion..."
 							}
 							className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 resize-none transition-all"
 							rows={1}

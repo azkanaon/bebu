@@ -672,8 +672,7 @@ export default function AnalysisPost({
 								text-gray-200
 							"
 																		>
-																			Hapus
-																			komentar?
+																			Delete Comment?
 																		</p>
 
 																		<p
@@ -736,7 +735,7 @@ export default function AnalysisPost({
 							transition-colors
 						"
 																	>
-																		Hapus
+																		Delete
 																	</button>
 																</div>
 															</div>
@@ -767,7 +766,7 @@ export default function AnalysisPost({
 																		2.2
 																	}
 																/>
-																Hapus
+																Delete
 															</button>
 														)
 													) : (
@@ -800,7 +799,7 @@ export default function AnalysisPost({
 																	2.2
 																}
 															/>
-															Laporkan
+															Report
 														</button>
 													)}
 												</div>
@@ -825,11 +824,12 @@ export default function AnalysisPost({
                 text-gray-400
                 hover:text-gray-300
                 transition-colors
-                pl-12
+                pl-4
+				pb-1
                 text-left
             "
 							>
-								Lihat semua {localCommentsCount} komentar
+								See all {localCommentsCount} comments...
 							</button>
 						</Link>
 					)}
@@ -847,8 +847,8 @@ export default function AnalysisPost({
 								onChange={(e) => setCommentText(e.target.value)}
 								placeholder={
 									isSubmitting
-										? "Mengirim..."
-										: "Bagikan pendapatmu..."
+										? "Sending..."
+										: "Share your opinion..."
 								}
 								className={`
 						w-full
