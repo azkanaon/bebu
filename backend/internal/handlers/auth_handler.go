@@ -217,3 +217,20 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Logout successful"})
 }
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID, _ := c.Get("userID") // Dari middleware
+	
+	var req dto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.ChangePassword(userID.(uint), req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "Password berhasil diganti"})
+}

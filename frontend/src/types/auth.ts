@@ -28,3 +28,13 @@ export interface RegisterRequest {
   gender: string
   avatar: File | Blob // Kita kirim filenya
 }
+
+export interface ChangePasswordRequest {
+  old_password: string
+  new_password: string
+  confirm_password: string
+}
+
+export interface ChangePasswordResponse {
+  message: string
+}

@@ -4,7 +4,8 @@ import { MoreVertical, LogOut, Settings, User } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useLogout } from '@/api/auth/useLogout'
 import { User as TypeUser } from '@/types/auth'
-import UserAvatar from "@/components/UserAvatar";
+import UserAvatar from '@/components/UserAvatar'
+import Link from 'next/link'
 
 type Props = {
   user: TypeUser | null
@@ -12,14 +13,12 @@ type Props = {
 
 export function UserProfile({ user }: Props) {
   const [open, setOpen] = useState(false)
-  const [expand, setExpand] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { mutate: logout, isPending } = useLogout()
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false)
-        setExpand(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -80,10 +79,13 @@ export function UserProfile({ user }: Props) {
             overflow-hidden
             animate-in fade-in zoom-in-95"
           >
-            <button className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10  cursor-pointer">
+            <Link
+              href="/settings/password"
+              className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-white/10 cursor-pointer transition-colors"
+            >
               <Settings size={16} />
-              Settings
-            </button>
+              <span>Change Password</span>
+            </Link>
 
             <div className="border-t border-white/10" />
 

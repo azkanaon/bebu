@@ -144,6 +144,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/logout", authHandler.Logout)
+			auth.POST("/change-password", authMiddleware.RequiredAuth(), authHandler.ChangePassword)
 		}
 
 		password := v1.Group("/password")
