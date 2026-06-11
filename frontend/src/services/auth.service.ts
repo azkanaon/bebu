@@ -1,6 +1,12 @@
 // src/services/authService.ts
 import api from '@/lib/axios'
-import { LoginRequest, LoginResponse, RegisterRequest } from '@/types/auth'
+import {
+  ChangePasswordRequest,
+  ChangePasswordResponse,
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+} from '@/types/auth'
 
 export interface ResetPasswordPayload {
   token: string // Kode 6 digit
@@ -12,6 +18,16 @@ export const authService = {
     // Axios otomatis throw error jika status code bukan 2xx
     const response = await api.post<LoginResponse>('/v1/auth/login', payload)
     return response.data
+  },
+
+  changePassword: async (
+    payload: ChangePasswordRequest,
+  ): Promise<ChangePasswordResponse> => {
+    const res = await api.post<ChangePasswordResponse>(
+      '/v1/auth/change-password',
+      payload,
+    )
+    return res.data
   },
 
   register: async (payload: RegisterRequest) => {

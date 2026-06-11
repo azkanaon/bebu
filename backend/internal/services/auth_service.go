@@ -39,6 +39,7 @@ type AuthService interface {
 	RequestPasswordReset(req *dto.ForgotPasswordRequest) error
 	ResetPassword(req *dto.ResetPasswordRequest) error
 	Logout(refreshToken string) error
+	ChangePassword(userID uint, req dto.ChangePasswordRequest) error
 }
 
 
@@ -224,6 +225,10 @@ func (s *authService) Login(req *dto.LoginRequest, ipAddress, userAgent string) 
         return "", "", nil, err
     }
 
+	go func(id uint) {
+        _ = s.userRepo.UpdateLastLogin(id)
+    }(user.UserID)
+
 	// 7. Siapkan response data (tidak berubah)
 	loginResponse := &dto.LoginResponse{
 		UserPublicID: user.PublicID,
@@ -393,4 +398,32 @@ func (s *authService) Logout(refreshToken string) error {
 
 	// 2. Panggil repository untuk membatalkan sesi.
 	return s.userRepo.RevokeSessionByRefreshTokenHash(refreshTokenHash)
+}
+
+func (s *authService) ChangePassword(userID uint, req dto.ChangePasswordRequest) error {
+	// 1. Ambil data user dari DB untuk dapet hash password lamanya
+	user, err := s.userRepo.FindUserByID(userID)
+	if err != nil {
+		return err
+	}
+
+	// 2. Bandingkan Password Lama (input) dengan yang ada di DB (bcrypt)
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.OldPassword))
+	if err != nil {
+		return errors.New("password lama salah")
+	}
+
+	// 3. Cek apakah password baru & konfirmasi cocok
+	if req.NewPassword != req.ConfirmPassword {
+		return errors.New("konfirmasi password tidak cocok")
+	}
+
+	// 4. Validasi kekuatan password baru (sama seperti saat Register)
+	// hasNumber := ..., hasLetter := ..., dll.
+
+	// 5. Hash password baru
+	newHashedPassword, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+
+	// 6. Update ke Database
+	return s.userRepo.UpdatePassword(userID, string(newHashedPassword))
 }

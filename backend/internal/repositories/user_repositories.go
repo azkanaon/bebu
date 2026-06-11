@@ -22,6 +22,8 @@ type UserRepository interface {
 	FindPasswordResetByTokenHash(hash string) (*models.PasswordReset, error)
 	ResetPasswordTransaction(userID uint, newPasswordHash string, resetID uint) error
 	RevokeSessionByRefreshTokenHash(hash string) error
+	UpdatePassword(userID uint, newHash string) error
+	UpdateLastLogin(userID uint) error
 
 	// user profile
 	FindUserByPublicID(publicID uuid.UUID) (*models.User, error)
@@ -590,4 +592,14 @@ func (r *userRepository) SyncUserStats(db *gorm.DB, userID uint, field string, a
 		"hot_score":  gorm.Expr(hotScoreFormula),
 		"updated_at": time.Now(),
 	}).Error
+}
+
+func (r *userRepository) UpdatePassword(userID uint, newHash string) error {
+	return r.db.Model(&models.User{}).Where("user_id = ?", userID).Update("password_hash", newHash).Error
+}
+
+func (r *userRepository) UpdateLastLogin(userID uint) error {
+	// Kita gunakan Model(&models.User{}) untuk menunjuk tabel users
+	// Lalu kita update kolom last_login dengan waktu sekarang
+	return r.db.Model(&models.User{}).Where("user_id = ?", userID).Update("last_login", time.Now()).Error
 }
