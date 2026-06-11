@@ -24,6 +24,8 @@ type ReportRepository interface {
 	GetLatestModerationAction(summaryID uint,) (*dto.ModerationHistory, error)
 	// Admin Action
 	GetReportSummaryByID(ctx context.Context, id uint) (*models.ReportSummary, error)
+	GetPostForModeration(ctx context.Context, postID uint) (*models.Post, error)
+	GetUserProfileForModeration(ctx context.Context, userID uint) (*models.UserProfile, error)
 	ExecuteUserAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction, targetUserStatus string) error
 	ExecutePostAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction, targetPostStatus string, isHardDelete bool) error
 	ExecuteDismissAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction) error
@@ -347,6 +349,25 @@ func (r *reportRepository) GetReportSummaryByID(ctx context.Context, id uint) (*
 	var summary models.ReportSummary
 	err := r.db.WithContext(ctx).First(&summary, "report_summary_id = ?", id).Error
 	return &summary, err
+}
+
+func (r *reportRepository) GetPostForModeration(ctx context.Context, postID uint) (*models.Post, error) {
+	var post models.Post
+	// Menggunakan Unscoped() agar post yang sudah di-soft-delete sebelumnya tetap bisa terbaca
+	err := r.db.WithContext(ctx).Unscoped().Where("post_id = ?", postID).First(&post).Error
+	if err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+func (r *reportRepository) GetUserProfileForModeration(ctx context.Context, userID uint) (*models.UserProfile, error) {
+	var profile models.UserProfile
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&profile).Error
+	if err != nil {
+		return nil, err
+	}
+	return &profile, nil
 }
 
 func (r *reportRepository) ExecuteUserAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction, targetUserStatus string) error {

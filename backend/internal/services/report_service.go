@@ -4,7 +4,9 @@ import (
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/repositories"
+	"backend-bebu/pkg/utils"
 	"gorm.io/gorm"
+
 	"errors"
 	"context"
 	"time"
@@ -134,7 +136,7 @@ func (s *reportService) GetSummaryPopUpDetail(summaryID uint,) (*dto.ReportSumma
 
 /* --- ADMIN ACTION --- */
 func (s *reportService) ProcessAction(ctx context.Context, adminID uint, req dto.AdminActionRequest) (*dto.AdminActionResponse, error) {
-	// 1. Ambil meta summary data
+	// Ambil meta summary data
 	summary, err := s.repo.GetReportSummaryByID(ctx, req.ReportSummaryID)
 	if err != nil {
 		return nil, errors.New("report summary intelligence case not found")
@@ -144,20 +146,23 @@ func (s *reportService) ProcessAction(ctx context.Context, adminID uint, req dto
 		return nil, errors.New("this report summary case has already been processed")
 	}
 
-	// 2. Siapkan Objek Log Tindakan Admin
+	// Menyiapkan Objek Log Tindakan Admin
 	now := time.Now()
 	actionLog := &models.AdminAction{
 		ReportSummaryID: &req.ReportSummaryID,
-		AdminID:      adminID,
-		ActionType:   req.ActionType,
-		EntityType:   &summary.EntityType,
-		EntityID:     &summary.EntityID,
-		Reason:       &req.Reason,
-		DurationDays: req.DurationDays,
-		CreatedAt:    now,
+		AdminID:         adminID,
+		ActionType:      req.ActionType,
+		EntityType:      &summary.EntityType,
+		EntityID:        &summary.EntityID,
+		Reason:          &req.Reason,
+		DurationDays:    req.DurationDays,
+		CreatedAt:       now,
 	}
 
-	// 3. Matriks Keputusan Berdasarkan Tipe Entitas & Aksi
+	// Variabel untuk menampung URL gambar yang akan dihapus di Cloudinary nanti
+	imageToDeleteURL := ""
+
+	// Matriks Keputusan Berdasarkan Tipe Entitas & Aksi
 	switch req.ActionType {
 	case "dismiss":
 		if err := s.repo.ExecuteDismissAction(ctx, summary, actionLog); err != nil {
@@ -171,6 +176,14 @@ func (s *reportService) ProcessAction(ctx context.Context, adminID uint, req dto
 			return nil, errors.New("invalid operation: choice action mismatch with user entity")
 		}
 
+		if req.ActionType == "ban_permanent" {
+			// Ambil data profil untuk melihat apakah user memiliki avatar custom
+			profile, err := s.repo.GetUserProfileForModeration(ctx, uint(summary.EntityID))
+			if err == nil && profile != nil && profile.AvatarUrl != "" {
+				imageToDeleteURL = profile.AvatarUrl
+			}
+		}
+
 		targetStatus := "active"
 		if req.ActionType == "shadowban_user" {
 			targetStatus = "shadowbanned"
@@ -179,7 +192,6 @@ func (s *reportService) ProcessAction(ctx context.Context, adminID uint, req dto
 		} else if req.ActionType == "ban_permanent" {
 			targetStatus = "banned"
 		}
-		// Aksi "warning" tetap menjaga status user menjadi "active", melainkan mengirimkan log pemberitahuan (Bisa ditambahkan pub/sub notification service disini nanti)
 
 		if err := s.repo.ExecuteUserAction(ctx, summary, actionLog, targetStatus); err != nil {
 			return nil, err
@@ -191,6 +203,12 @@ func (s *reportService) ProcessAction(ctx context.Context, adminID uint, req dto
 			return nil, errors.New("invalid operation: choice action mismatch with post entity")
 		}
 
+		// Ambil data postingan lama untuk dianalisis datanya
+		post, err := s.repo.GetPostForModeration(ctx, uint(summary.EntityID))
+		if err != nil {
+			return nil, errors.New("post target entity record not found")
+		}
+
 		targetStatus := "published"
 		isHardDelete := false
 
@@ -198,8 +216,17 @@ func (s *reportService) ProcessAction(ctx context.Context, adminID uint, req dto
 			targetStatus = "shadowbanned"
 		} else if req.ActionType == "soft_delete" {
 			targetStatus = "soft_deleted"
+			
+			if post.PostType == "analysis" && post.ImgURL != "" {
+				imageToDeleteURL = post.ImgURL
+			}
 		} else if req.ActionType == "hard_delete" {
 			isHardDelete = true
+
+			// Hanya hapus jika postingan ini belum pernah di-soft-delete sebelumnya (gambarnya masih eksis)
+			if !post.DeletedAt.Valid && post.PostType == "analysis" && post.ImgURL != "" {
+				imageToDeleteURL = post.ImgURL
+			}
 		}
 
 		if err := s.repo.ExecutePostAction(ctx, summary, actionLog, targetStatus, isHardDelete); err != nil {
@@ -208,6 +235,11 @@ func (s *reportService) ProcessAction(ctx context.Context, adminID uint, req dto
 
 	default:
 		return nil, errors.New("unknown administrative moderation verdict type")
+	}
+
+	// EKSEKUSI PENGHAPUSAN CLOUDINARY
+	if imageToDeleteURL != "" {
+		_ = utils.DeleteFromCloudinary(imageToDeleteURL)
 	}
 
 	return &dto.AdminActionResponse{

@@ -6,6 +6,7 @@ import (
 
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/repositories"
+	"backend-bebu/pkg/utils"
 )
 
 type PostManagementService interface {
@@ -31,6 +32,9 @@ func (s *postManagementService) UpdatePostStatus(ctx context.Context, postID uin
 		return errors.New("post target not found in infrastructure records")
 	}
 
+	// Variabel penanda apakah kita perlu menghapus gambar di Cloudinary nanti
+	shouldDeleteImage := false
+
 	// Aturan Sistem Baru:
 	switch req.Status {
 	case "published":
@@ -41,21 +45,40 @@ func (s *postManagementService) UpdatePostStatus(ctx context.Context, postID uin
 			}
 		}
 		// Set publish_status ke "published"
-		return s.repo.UpdateStatus(ctx, postID, "published")
+		err = s.repo.UpdateStatus(ctx, postID, "published")
 
 	case "soft_delete":
 		// Jika data post aslinya sudah terhapus secara soft-delete, lewatkan
 		if post.DeletedAt.Valid {
 			return nil
 		}
+		
 		// Jalankan siklus soft delete bawaan GORM
-		return s.repo.SoftDeletePost(ctx, postID)
+		err = s.repo.SoftDeletePost(ctx, postID)
+		if err == nil {
+			shouldDeleteImage = true
+		}
 
 	case "hard_delete":
+		if !post.DeletedAt.Valid {
+			shouldDeleteImage = true
+		}
+
 		// Hapus permanen record data dari DB fisik
-		return s.repo.HardDeletePost(ctx, postID)
+		err = s.repo.HardDeletePost(ctx, postID)
 
 	default:
 		return errors.New("unrecognized target management status state")
 	}
+
+	if err != nil {
+		return err
+	}
+
+	// PENGHAPUSAN GAMBAR DI CLOUDINARY
+	if shouldDeleteImage && post.PostType == "analysis" && post.ImgURL != "" {
+		_ = utils.DeleteFromCloudinary(post.ImgURL)
+	}
+
+	return nil
 }

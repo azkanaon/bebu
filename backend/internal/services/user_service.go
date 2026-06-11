@@ -387,37 +387,45 @@ func (s *userService) UnfollowUser(sourceUserID uint, targetUsername string) err
 }
 
 func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDTO, avatarFile *multipart.FileHeader) (*dto.ProfileInfoDTO, error) {
-	// 1. Upload avatar baru jika ada, di luar transaksi.
-	var avatarURL string
-    var shouldUpdateAvatar bool // Flag untuk menandai apakah kolom avatar harus diupdate
-
-    // 1. Logika Prioritas Foto:
-    // Kondisi A: User mengunggah file baru
-    if avatarFile != nil {
-        url, err := utils.UploadToCloudinary(avatarFile, "bebu/avatars")
-        if err != nil {
-            return nil, fmt.Errorf("failed to upload avatar: %w", err)
-        }
-        avatarURL = url
-        shouldUpdateAvatar = true
-    } else if req.RemoveAvatar != nil && *req.RemoveAvatar == true {
-        // Kondisi B: User tidak upload file, tapi centang "Hapus Foto"
-        avatarURL = "" // Set ke string kosong di database (kembali ke default)
-        shouldUpdateAvatar = true
-    }
+	// Ambil data user saat ini di awal untuk mendapatkan info avatar lama dan settings lama
 	currentUser, err := s.userRepo.FindUserByID(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch current user data: %w", err)
 	}
+
+	// Simpan URL avatar lama untuk pengecekan nanti
+	var oldAvatarURL string
+	if currentUser.Profile != nil {
+		oldAvatarURL = currentUser.Profile.AvatarUrl
+	}
+
+	var avatarURL string
+	var shouldUpdateAvatar bool // Flag untuk menandai apakah kolom avatar harus diupdate
+
+	// 1. Logika Prioritas Foto:
+	// Kondisi A: User mengunggah file baru (Bisa memicu Kondisi 1 atau Kondisi 2)
+	if avatarFile != nil {
+		url, err := utils.UploadToCloudinary(avatarFile, "bebu/avatars")
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload avatar: %w", err)
+		}
+		avatarURL = url
+		shouldUpdateAvatar = true
+	} else if req.RemoveAvatar != nil && *req.RemoveAvatar == true {
+		// Kondisi B: User tidak upload file, tapi centang "Hapus Foto" (Memicu Kondisi 3)
+		avatarURL = "" // Set ke string kosong di database (kembali ke default)
+		shouldUpdateAvatar = true
+	}
+
 	// 2. Mulai Transaksi Database
 	tx := s.db.Begin()
 	if tx.Error != nil {
 		return nil, tx.Error // Gagal memulai transaksi
 	}
-	// Defer a rollback. Jika ada panic, transaksi akan dibatalkan.
-	// Jika sukses (commit), rollback tidak akan berpengaruh.
+	// Defer a rollback. Jika ada panic/error, transaksi akan dibatalkan.
 	defer tx.Rollback()
 	txRepo := s.userRepo.WithTx(tx) 
+
 	// 3. Siapkan dan jalankan update untuk UserProfile
 	profileUpdates := make(map[string]interface{})
 	if req.DisplayName != nil {
@@ -429,17 +437,15 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 	if req.Location != nil {
 		profileUpdates["location"] = *req.Location
 	}
-	if req.Gender != nil { // <-- TAMBAHKAN BLOK INI
+	if req.Gender != nil {
 		profileUpdates["gender"] = *req.Gender
 	}
 	if shouldUpdateAvatar {
-        profileUpdates["avatar_url"] = avatarURL
-    }
+		profileUpdates["avatar_url"] = avatarURL
+	}
 	
 	if len(profileUpdates) > 0 {
-		// Panggil repository DENGAN transaksi
 		if err := s.userRepo.WithTx(tx).UpdateProfile(userID, profileUpdates); err != nil {
-			// tx.Rollback() sudah di-defer, jadi kita cukup return error
 			return nil, fmt.Errorf("failed to update profile: %w", err)
 		}
 	}
@@ -447,23 +453,17 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 	// 4. Siapkan dan jalankan update untuk UserSettings
 	settingsUpdates := make(map[string]interface{})
 	if req.IsProfilePublic != nil {
-		
-		// Gunakan pengecekan yang aman
 		var currentIsPublic bool
 		if currentUser.Settings != nil {
 			currentIsPublic = currentUser.Settings.IsProfilePublic
 		}
 
-		// LOGIKA: Status baru TRUE (Public) DAN Status lama FALSE (Private)
 		isTurningPublic := *req.IsProfilePublic == true && currentIsPublic == false
-		
 		settingsUpdates["is_profile_public"] = *req.IsProfilePublic
 		
 		if isTurningPublic {
-			// Jalankan proses auto-accept
 			followerIDs, err := txRepo.GetPendingFollowerIDs(userID)
 			if err == nil && len(followerIDs) > 0 {
-				// Gunakan handle transaksi (txRepo dan tx) secara konsisten
 				_, _ = txRepo.AcceptAllPendingFollows(userID)
 				_ = txRepo.SyncUserStats(tx, userID, "total_followers", len(followerIDs))
 				_ = txRepo.BulkUpdateUserStat(tx, followerIDs, "total_following", 1)
@@ -474,7 +474,6 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 	if req.IsBookshelfPublic != nil {
 		settingsUpdates["is_bookshelf_public"] = *req.IsBookshelfPublic
 	}
-
 	if req.AllowDmFromPublic != nil {
 		settingsUpdates["allow_dm_from_public"] = *req.AllowDmFromPublic
 	}
@@ -485,13 +484,11 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 		}
 	}
 	
-	// 5. Siapkan dan jalankan update untuk Social Links (jika ada di request)
+	// 5. Siapkan dan jalankan update untuk Social Links
 	if req.SocialLinks != nil {
 		var links []models.UserSocialLink
 		for _, sl := range req.SocialLinks {
-			// Validasi dasar bisa ditambahkan di sini jika perlu
 			links = append(links, models.UserSocialLink{
-				// UserID akan di-set di repository, tapi kita set di sini juga untuk kejelasan
 				UserID:     userID,
 				PlatformID: sl.PlatformID,
 				SocialURL:  sl.URL,
@@ -507,23 +504,28 @@ func (s *userService) UpdateProfile(userID uint, req *dto.UpdateProfileRequestDT
 		return nil, fmt.Errorf("transaction commit failed: %w", err)
 	}
 
-	// 7. Ambil data profil terbaru untuk dikembalikan sebagai response
-	// Kita butuh method FindUserByID yang sudah preload Profile
+	// 🌟 7. LOGIKA PENGHAPUSAN AVATAR LAMA DI CLOUDINARY
+	// Dilakukan HANYA setelah commit berhasil.
+	// Kita periksa: jika sebelumnya user punya avatar (tidak kosong), dan sistem baru saja mendeteksi 
+	// adanya perubahan avatar (baik karena upload baru atau karena perintah remove).
+	if oldAvatarURL != "" && shouldUpdateAvatar {
+		// Gunakan helper reusable utils.DeleteFromCloudinary
+		_ = utils.DeleteFromCloudinary(oldAvatarURL)
+	}
+
+	// 8. Ambil data profil terbaru untuk dikembalikan sebagai response
 	updatedUser, err := s.userRepo.FindUserByID(userID)
 	if err != nil {
-		// Meskipun update berhasil, kita mungkin gagal mengambil data baru.
-		// Ini jarang terjadi, tapi baik untuk ditangani.
 		return nil, fmt.Errorf("update successful, but failed to fetch updated profile: %w", err)
 	}
 	
-	// Mapping ke DTO
 	return &dto.ProfileInfoDTO{
 		DisplayName: updatedUser.Profile.DisplayName,
 		AvatarURL:   updatedUser.Profile.AvatarUrl,
 		Bio:         updatedUser.Profile.Bio,
 		Location:    updatedUser.Profile.Location,
 		Gender:      updatedUser.Profile.Gender,
-		JoinedAt:    updatedUser.CreatedAt, // JoinedAt tidak berubah
+		JoinedAt:    updatedUser.CreatedAt,
 	}, nil
 }
 

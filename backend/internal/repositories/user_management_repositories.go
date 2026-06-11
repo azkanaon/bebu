@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"fmt"
+	"context"
+
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/models"
 
@@ -10,7 +12,8 @@ import (
 
 type UserManagementRepository interface {
 	FetchManageableUsers(filters dto.UserManagementFilterRequest) ([]dto.UserManagementResponse, int64, error)
-	UpdateUserStatus(userID uint, status string) error
+	FindUserProfileByID(ctx context.Context, userID uint) (*models.UserProfile, error)
+	UpdateUserStatus(ctx context.Context, userID uint, status string) error
 }
 
 type userManagementRepository struct {
@@ -80,11 +83,19 @@ func (r *userManagementRepository) FetchManageableUsers(filters dto.UserManageme
 	return results, totalCount, nil
 }
 
-func (r *userManagementRepository) UpdateUserStatus(userID uint, status string) error {
-	// Jika status diubah ke banned/suspended, is_active bisa diset false secara otomatis
+func (r *userManagementRepository) FindUserProfileByID(ctx context.Context, userID uint) (*models.UserProfile, error) {
+	var profile models.UserProfile
+	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&profile).Error
+	if err != nil {
+		return nil, err
+	}
+	return &profile, nil
+}
+
+func (r *userManagementRepository) UpdateUserStatus(ctx context.Context, userID uint, status string) error {
 	isActive := status == "active"
 	
-	return r.db.Model(&models.User{}).
+	return r.db.WithContext(ctx).Model(&models.User{}).
 		Where("user_id = ?", userID).
 		Updates(map[string]interface{}{
 			"status":    status,

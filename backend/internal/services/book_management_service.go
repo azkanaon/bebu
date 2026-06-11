@@ -2,13 +2,17 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"backend-bebu/internal/dto"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
+	"backend-bebu/pkg/utils"
 
 	"github.com/gosimple/slug"
 	"gorm.io/gorm"
@@ -50,16 +54,17 @@ func (s *bookManagementService) AddDirectBook(ctx context.Context, req dto.Upser
 }
 
 func (s *bookManagementService) EditBook(ctx context.Context, id uint, req dto.UpsertBookRequest) error {
-	_, err := s.repo.GetBookByID(ctx, id)
+	// Ambil data buku lama dari database sebelum di-update
+	oldBook, err := s.repo.GetBookByID(ctx, id)
 	if err != nil {
 		return errors.New("book not found")
 	}
 
 	db := s.repo.GetDB()
-	return db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		// Hapus jembatan lama sebelum menulis jembatan relasi baru
 		if err := tx.Where("book_id = ?", id).Delete(&models.BookAuthor{}).Error; err != nil { return err }
-if err := tx.Where("book_id = ?", id).Delete(&models.BookGenre{}).Error; err != nil { return err }
+		if err := tx.Where("book_id = ?", id).Delete(&models.BookGenre{}).Error; err != nil { return err }
 
 		cleanBook := models.Book{
 			BookID: id,
@@ -67,9 +72,36 @@ if err := tx.Where("book_id = ?", id).Delete(&models.BookGenre{}).Error; err != 
 
 		return s.saveBookEntity(tx, &cleanBook, req)
 	})
+
+	// Jika transaksi DB gagal, langsung return error dan batalkan hapus Cloudinary
+	if err != nil {
+		return err
+	}
+
+	// PENGHAPUSAN COVER LAMA DI CLOUDINARY	
+	if oldBook.CoverImgURL != "" && oldBook.CoverImgURL != req.CoverImgURL {
+		_ = utils.DeleteFromCloudinary(oldBook.CoverImgURL)
+	}
+
+	return nil
 }
 
 func (s *bookManagementService) RemoveBook(ctx context.Context, id uint) error {
+	// Cari data buku terlebih dahulu untuk mendapatkan CoverImgURL
+	book, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("buku tidak ditemukan")
+		}
+		return err
+	}
+
+	// Hapus gambar cover di Cloudinary jika ada (Menggunakan utilitas reusable)
+	if book.CoverImgURL != "" {
+		_ = utils.DeleteFromCloudinary(book.CoverImgURL) 
+	}
+
+	// 3. Lakukan soft-delete data buku di database
 	return s.repo.DeleteBook(ctx, id)
 }
 
@@ -113,9 +145,17 @@ func (s *bookManagementService) RejectSubmission(ctx context.Context, submission
 	return s.repo.UpdateSubmissionTx(db, &sub)
 }
 
+func generateShortID() string {
+	bytes := make([]byte, 4) // 4 bytes = 8 karakter hex
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback aman menggunakan timestamp jika crypto/rand gagal (sangat jarang terjadi)
+		return fmt.Sprintf("%x", time.Now().UnixNano())[:8]
+	}
+	return hex.EncodeToString(bytes)
+}
+
 func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req dto.UpsertBookRequest) error {
 	// 🌟 KUNCI STATUS PERUBAHAN DI AWAL SEBELUM PIVOT DAN ENTITAS TER-UPDATE
-	// Kita simpan status apakah ini data baru atau update data lama berdasarkan ID awal
 	isCreateMode := b.BookID == 0
 
 	// Mapping request dasar ke model Book
@@ -126,9 +166,19 @@ func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req 
 	b.PublicationYear = req.PublicationYear
 	b.Language = req.Language
 	b.TotalPages = req.TotalPages
-	b.Slug = slug.Make(b.Title)
 
 	if isCreateMode {
+		// 🌟 GENERATE SLUG UNIK (Hanya saat pembuatan buku baru)
+		shortID := generateShortID()
+		titleSlug := slug.Make(b.Title)
+		
+		// Antisipasi jika judul hanya berisi emoji/simbol sehingga slug-nya kosong
+		if titleSlug == "" {
+			b.Slug = shortID
+		} else {
+			b.Slug = fmt.Sprintf("%s-%s", shortID, titleSlug)
+		}
+
 		// --- PROSES CREATE ---
 		if err := tx.Create(b).Error; err != nil {
 			return err
@@ -149,9 +199,12 @@ func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req 
 		}
 	} else {
 		// --- PROSES UPDATE ---
-		if err := tx.Model(b).Omit("BookAuthors", "BookGenres", "Posts", "BookStat", "DailyStats").Updates(b).Error; err != nil {
+		// 🌟 Omit "slug" di sini memastikan slug lama tidak akan berubah/rusak 
+		// meskipun admin mengubah judul buku saat proses update data.
+		if err := tx.Model(b).Omit("slug", "BookAuthors", "BookGenres", "Posts", "BookStat", "DailyStats").Updates(b).Error; err != nil {
 			return err
 		}
+		
 		trimmedGoogleID := strings.TrimSpace(b.GoogleBookID)
 		if trimmedGoogleID == "" || trimmedGoogleID == "0" {
 			b.GoogleBookID = "" 
@@ -162,18 +215,16 @@ func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req 
 	}
 
 	// ==========================================
-	// 🌟 PROSES SINKRONISASI AUTHOR
+	// 🌟 PROSES SINKRONISASI AUTHOR (Tetap sama seperti kode Anda)
 	// ==========================================
 	targetAuthorIDs := make(map[uint]bool)
 
-	// 1. Masukkan Author yang memang sudah memiliki ID valid dari FE
 	for _, authID := range req.AuthorIDs {
 		if authID > 0 {
 			targetAuthorIDs[authID] = true
 		}
 	}
 
-	// 2. Sterilisasi dan Find or Create untuk NewAuthorNames
 	uniqueNewAuthors := make(map[string]bool)
 	var cleanedNewAuthorNames []string
 
@@ -205,14 +256,12 @@ func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req 
 		targetAuthorIDs[auth.AuthorID] = true
 	}
 
-	// 3. Bersihkan relasi lama HANYA JIKA dalam mode EDIT/UPDATE
 	if !isCreateMode {
 		if err := tx.Where("book_id = ?", b.BookID).Delete(&models.BookAuthor{}).Error; err != nil {
 			return err
 		}
 	}
 
-	// Masukkan relasi pivot baru (Berlaku untuk Create maupun Update)
 	for authID := range targetAuthorIDs {
 		ba := models.BookAuthor{BookID: b.BookID, AuthorID: authID}
 		if err := tx.Create(&ba).Error; err != nil {
@@ -221,18 +270,16 @@ func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req 
 	}
 
 	// ==========================================
-	// 🌟 PROSES SINKRONISASI GENRE
+	// 🌟 PROSES SINKRONISASI GENRE (Tetap sama seperti kode Anda)
 	// ==========================================
 	targetGenreIDs := make(map[uint]bool)
 
-	// 1. Masukkan Genre yang sudah memiliki ID valid dari FE
 	for _, genID := range req.GenreIDs {
 		if genID > 0 {
 			targetGenreIDs[genID] = true
 		}
 	}
 
-	// 2. Sterilisasi dan Find or Create untuk NewGenreNames
 	uniqueNewGenres := make(map[string]bool)
 	var cleanedNewGenreNames []string
 
@@ -264,14 +311,12 @@ func (s *bookManagementService) saveBookEntity(tx *gorm.DB, b *models.Book, req 
 		targetGenreIDs[gen.GenreID] = true
 	}
 
-	// 3. Bersihkan relasi lama HANYA JIKA dalam mode EDIT/UPDATE
 	if !isCreateMode {
 		if err := tx.Where("book_id = ?", b.BookID).Delete(&models.BookGenre{}).Error; err != nil {
 			return err
 		}
 	}
 
-	// Masukkan relasi pivot baru (Berlaku untuk Create maupun Update)
 	for genID := range targetGenreIDs {
 		bg := models.BookGenre{BookID: b.BookID, GenreID: genID}
 		if err := tx.Create(&bg).Error; err != nil {

@@ -91,11 +91,33 @@ export default function CommentModal({
 		};
 	}, [isStandalonePage, router, pathname]);
 
-	const authStorage = localStorage.getItem("bebu-auth-storage");
-	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
+	const [currentUserId, setCurrentUserId] = useState<
+		string | number | undefined
+	>(undefined);
 
-	const user = parsedStorage?.state?.user?.data;
-	const currentUserId = user?.user_public_id;
+	// Get Current User ID
+	useEffect(() => {
+		try {
+			const authStorage = localStorage.getItem("bebu-auth-storage");
+			if (authStorage) {
+				const parsedStorage = JSON.parse(authStorage);
+
+				// 💡 PERBAIKAN: Langsung tembak dari user ke user_public_id tanpa lewat .data
+				const userPublicId = parsedStorage?.state?.user?.user_public_id;
+
+				if (userPublicId) {
+					setCurrentUserId(userPublicId);
+				} else {
+					console.warn(
+						"user_public_id tidak ditemukan di dalam objek user:",
+						parsedStorage?.state?.user,
+					);
+				}
+			}
+		} catch (error) {
+			console.error("Gagal membaca token auth dari localStorage:", error);
+		}
+	}, []);
 
 	const [comments, setComments] = useState<CommentType[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -573,10 +595,10 @@ export default function CommentModal({
 								onClick={handleExitFocus}
 								className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-2 font-bold"
 							>
-								← Kembali ke diskusi utama
+								← Back to The Main Discussion
 							</button>
 							<span className="text-[10px] text-gray-500 italic">
-								Melihat sub-diskusi
+								view sub-discussion
 							</span>
 						</div>
 					)}

@@ -19,6 +19,7 @@ type BookManagementRepository interface {
 	CreateBookTx(tx *gorm.DB, book *models.Book) error
 	GetBookByID(ctx context.Context, id uint) (models.Book, error)
 	UpdateBookTx(tx *gorm.DB, book *models.Book) error
+	FindByID(ctx context.Context, id uint) (*models.Book, error)
 	DeleteBook(ctx context.Context, id uint) error
 	// Submissions
 	GetPaginatedSubmissions(ctx context.Context, params dto.SubmissionQueryParams) (dto.PaginatedSubmissionResponse, error)
@@ -135,6 +136,15 @@ func (r *bookManagementRepository) GetBookByID(ctx context.Context, id uint) (mo
 func (r *bookManagementRepository) UpdateBookTx(tx *gorm.DB, book *models.Book) error {
 	book.Slug = slug.Make(book.Title)
 	return tx.Save(book).Error
+}
+
+func (r *bookManagementRepository) FindByID(ctx context.Context, id uint) (*models.Book, error) {
+	var book models.Book
+	err := r.db.WithContext(ctx).First(&book, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &book, nil
 }
 
 func (r *bookManagementRepository) DeleteBook(ctx context.Context, id uint) error {

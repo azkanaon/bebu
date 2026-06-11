@@ -740,7 +740,8 @@ export default function ReviewPost({
 								text-gray-200
 							"
 																		>
-																			Delete Comment?
+																			Delete
+																			Comment?
 																		</p>
 
 																		<p
@@ -751,11 +752,10 @@ export default function ReviewPost({
 								leading-relaxed
 							"
 																		>
-																			Tindakan
-																			ini
-																			tidak
-																			dapat
-																			dibatalkan.
+																			This
+																			is
+																			Permanent
+																			Action!
 																		</p>
 																	</div>
 																</div>
@@ -780,7 +780,7 @@ export default function ReviewPost({
 							transition-colors
 						"
 																	>
-																		Batal
+																		Cancel
 																	</button>
 
 																	<button

@@ -91,8 +91,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 															Delete Comment?
 														</p>
 														<p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
-															Tindakan ini tidak
-															dapat dibatalkan.
+															This is Permanent Action!
 														</p>
 													</div>
 												</div>
@@ -105,7 +104,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 														}
 														className="px-2.5 py-1 text-[11px] text-gray-400 hover:text-white transition-colors"
 													>
-														Batal
+														Cancel
 													</button>
 													<button
 														onClick={() => {
@@ -206,7 +205,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
 								className="ml-4 my-2 text-[10px] text-blue-500 hover:text-blue-400 font-bold flex items-center gap-2 transition-all w-fit"
 							>
 								<span className="w-4 h-[1px] bg-blue-500/30"></span>
-								See {comment.replies.length} other comment replies...
+								See {comment.replies.length} other comment
+								replies...
 							</button>
 						) : (
 							/* Jika belum mencapai limit atau sudah diklik 'showMore', render semua item */
