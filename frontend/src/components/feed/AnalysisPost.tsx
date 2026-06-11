@@ -672,7 +672,8 @@ export default function AnalysisPost({
 								text-gray-200
 							"
 																		>
-																			Delete Comment?
+																			Delete
+																			Comment?
 																		</p>
 
 																		<p
@@ -683,11 +684,10 @@ export default function AnalysisPost({
 								leading-relaxed
 							"
 																		>
-																			Tindakan
-																			ini
-																			tidak
-																			dapat
-																			dibatalkan.
+																			This
+																			is
+																			Permanent
+																			Action!
 																		</p>
 																	</div>
 																</div>
@@ -708,7 +708,7 @@ export default function AnalysisPost({
 							transition-colors
 						"
 																	>
-																		Batal
+																		Cancel
 																	</button>
 
 																	<button

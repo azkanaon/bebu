@@ -5,15 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
 	MoreVertical,
 	Flag,
-	EyeOff,
 	Link,
-	UserX,
 	Trash2,
 	AlertTriangle,
 } from "lucide-react";
 import ReportModal from "./ReportModal";
 import { deletePostAPI } from "@/lib/api";
-import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 
 interface PostMenuProps {
@@ -51,20 +48,45 @@ export default function PostMenu({ postId, postPublicID, userPublicID }: PostMen
 	const [isDeleting, setIsDeleting] = useState(false);
 
 	const handleDelete = async () => {
+		if (isDeleting) return; // Mencegah double submit jika di-klik cepat
+
 		try {
 			setIsDeleting(true);
 
-			// Panggil API
+			// Tampilkan loading toast
+			toast.loading("Menghapus postingan...", {
+				id: "delete-post-toast",
+				style: {
+					background: "#111827", // Menyesuaikan tema gelap (gray-900)
+					color: "#fff",
+					borderRadius: "12px",
+					border: "1px solid #1f2937",
+				},
+			});
+
+			// Panggil API Backend (Proses DB & Cloudinary berjalan di BE)
 			await deletePostAPI(postPublicID);
+
+			// Ubah loading toast menjadi success toast
+			toast.success("Postingan berhasil dihapus", {
+				id: "delete-post-toast",
+			});
 
 			// Tutup semua state dropdown/konfirmasi
 			setOpen(false);
 			setShowDeleteConfirm(false);
 
-			window.location.reload();
+			// Beri jeda sedikit (misal 800ms) agar user sempat melihat toast sukses sebelum halaman di-reload
+			setTimeout(() => {
+				window.location.reload();
+			}, 800);
 		} catch (error: unknown) {
 			console.error("Delete error:", error);
-			toast.error("Failed to delete post");
+
+			// Ubah loading toast menjadi error toast jika gagal
+			toast.error("Gagal menghapus postingan", {
+				id: "delete-post-toast",
+			});
 		} finally {
 			setIsDeleting(false);
 		}
@@ -169,15 +191,26 @@ export default function PostMenu({ postId, postPublicID, userPublicID }: PostMen
 								<div className="flex flex-col gap-2 pt-1">
 									<button
 										onClick={handleDelete}
-										className="w-full py-2 bg-red-500 hover:bg-red-600 text-white text-[11px] font-bold rounded-lg transition-all shadow-lg shadow-red-500/20"
+										disabled={isDeleting} // Nonaktifkan tombol saat sedang proses hapus
+										className={`w-full py-2 text-white text-[11px] font-bold rounded-lg transition-all shadow-lg 
+                ${
+					isDeleting
+						? "bg-red-500/50 cursor-not-allowed"
+						: "bg-red-500 hover:bg-red-600 shadow-red-500/20"
+				}`}
 									>
-										DELETE PERMANENTLY
+										{isDeleting
+											? "DELETING..."
+											: "DELETE PERMANENTLY"}{" "}
 									</button>
 									<button
 										onClick={() =>
+											!isDeleting &&
 											setShowDeleteConfirm(false)
-										}
-										className="w-full py-2 bg-white/5 hover:bg-white/10 text-gray-300 text-[11px] font-medium rounded-lg transition-all"
+										} // Tidak ijinkan cancel jika sedang menghapus
+										disabled={isDeleting}
+										className={`w-full py-2 text-gray-300 text-[11px] font-medium rounded-lg transition-all
+                ${isDeleting ? "bg-white/0 text-gray-500 cursor-not-allowed" : "bg-white/5 hover:bg-white/10"}`}
 									>
 										CANCEL
 									</button>

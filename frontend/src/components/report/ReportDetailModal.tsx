@@ -113,7 +113,6 @@ export default function ReportDetailModal({
 			"suspend",
 			"shadowban_user",
 			"shadowban_post",
-			"soft_delete",
 		].includes(action);
 	};
 

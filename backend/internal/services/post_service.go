@@ -171,11 +171,12 @@ func (s *postService) CreatePost(req dto.CreatePostRequest) error {
 }
 
 func (s *postService) DeletePost(publicID string, userID uint) error {
-	// 1. Cari data post SEBELUM dihapus untuk mendapatkan info UserID, PostType, dan BookID
+	// Cari data post SEBELUM dihapus untuk mendapatkan info UserID, PostType, BookID, dan ImgURL
 	var post models.Post
 	if err := s.db.Where("public_id = ? AND user_id = ?", publicID, userID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("post not found")
+			// Menyesuaikan dengan pesan error di handler Anda: "post not found or you're not authorized"
+			return errors.New("post not found or you're not authorized")
 		}
 		return err
 	}
@@ -186,38 +187,35 @@ func (s *postService) DeletePost(publicID string, userID uint) error {
 		return err
 	}
 
-	// 2. Mulai Transaksi
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	// Transaksi Database
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		txRepo := s.postRepo.WithTx(tx)
 		txUserRepo := s.userRepo.WithTx(tx)
-		// Kita butuh bookshelfRepo untuk memanggil SyncBookStats
 		txBookRepo := s.bookshelfRepo.WithTx(tx)
 
-		// A. Hapus Post (Soft Delete)
+		// Hapus Post (Soft Delete)
 		if err := txRepo.DeletePostWithTx(tx, post.PostID, userID); err != nil {
 			return err
 		}
 
-		// B. Bersihkan relasi kategori
+		// Bersihkan relasi kategori
 		if err := txRepo.ClearPostCategories(tx, post.PostID); err != nil {
 			return err
 		}
 
-		// C. Kurangi usage_count kategori terkait
+		// Kurangi usage_count kategori terkait
 		if err := txRepo.DecrementCategoryUsage(tx, categoryIDs); err != nil {
 			return err
 		}
 
-		// --- LOGIKA SYNC SKOR DIMULAI ---
-
-		// D. SYNC SKOR USER: total_posts - 1 dan hitung ulang Hot Score User
+		// --- SYNC SKOR ---
+		// SYNC SKOR USER: total_posts - 1 dan hitung ulang Hot Score User
 		if err := txUserRepo.SyncUserStats(tx, userID, "total_posts", -1); err != nil {
 			return err
 		}
 
-		// E. SYNC SKOR BUKU: Jika yang dihapus adalah Review, kurangi total_reviews di tabel book_stats
-		if post.PostType == "review" && post.BookID > 0 { // Cek apakah ID lebih besar dari 0
-			// Panggil SyncBookStats secara langsung tanpa tanda bintang (*)
+		// SYNC SKOR BUKU: Jika yang dihapus adalah Review, kurangi total_reviews di tabel book_stats
+		if post.PostType == "review" && post.BookID > 0 {
 			if err := txBookRepo.SyncBookStats(tx, post.BookID, "total_reviews", -1); err != nil {
 				return err
 			}
@@ -225,6 +223,18 @@ func (s *postService) DeletePost(publicID string, userID uint) error {
 
 		return nil
 	})
+
+	// Jika transaksi database gagal, kembalikan error dan batalkan penghapusan gambar di Cloudinary
+	if err != nil {
+		return err
+	}
+
+	// PENGHAPUSAN GAMBAR ANALYSIS DI CLOUDINARY
+	if post.PostType == "analysis" && post.ImgURL != "" {
+		_ = utils.DeleteFromCloudinary(post.ImgURL)
+	}
+
+	return nil
 }
 
 func (s *postService) GetUserPosts(viewerID *uint, targetUsername string, page, limit int) ([]dto.PostSummaryDTO, *dto.PaginationDTO, error) {
