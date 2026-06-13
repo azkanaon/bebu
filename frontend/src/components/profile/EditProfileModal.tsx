@@ -15,12 +15,12 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import ClientPortal from '../ClientPortal'
-import Image from 'next/image'
 import { useUpdateProfile } from '@/api/profile/useUpdateProfile'
 import { base64ToBlob } from '@/lib/utils'
 import { getCroppedImg } from '@/lib/cropImage'
 import Cropper, { Area } from 'react-easy-crop'
 import { usePlatforms } from '@/api/platforms/usePlatform'
+import UserAvatar from "@/components/UserAvatar";
 
 type SocialLinkItem = {
   platformId: number
@@ -170,412 +170,475 @@ export default function EditProfileModal({
   }
 
   return (
-    <AnimatePresence>
-      {open && (
-        <ClientPortal>
-          {/* BACKDROP */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.6 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-100 bg-black backdrop-blur-sm"
-          />
+		<AnimatePresence>
+			{open && (
+				<ClientPortal>
+					{/* BACKDROP */}
+					<motion.div
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 0.6 }}
+						exit={{ opacity: 0 }}
+						onClick={onClose}
+						className="fixed inset-0 z-100 bg-black backdrop-blur-sm"
+					/>
 
-          {/* MODAL WRAPPER */}
-          <div className="fixed inset-0 z-110 flex items-center justify-center p-0 md:p-4 pointer-events-none">
-            <motion.div
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              className="pointer-events-auto relative w-full h-full md:h-auto md:max-h-[90vh] md:w-130 bg-[#0B1220] md:rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden text-white"
-            >
-              {/* HEADER */}
-              <div className="flex items-center justify-between p-5 border-b border-white/10 shrink-0">
-                <div className="flex gap-2">
-                  <UserPen size={20} className="text-gray-400" />
-                  <h2 className="text-base font-bold tracking-tight uppercase text-gray-400">
-                    Edit Profile
-                  </h2>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-full hover:bg-white/10 text-gray-400 outline-none cursor-pointer"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+					{/* MODAL WRAPPER */}
+					<div className="fixed inset-0 z-110 flex items-center justify-center p-0 md:p-4 pointer-events-none">
+						<motion.div
+							initial={{ y: 50, opacity: 0 }}
+							animate={{ y: 0, opacity: 1 }}
+							exit={{ y: 50, opacity: 0 }}
+							className="pointer-events-auto relative w-full h-full md:h-auto md:max-h-[90vh] md:w-130 bg-[#0B1220] md:rounded-3xl border border-white/10 shadow-2xl flex flex-col overflow-hidden text-white"
+						>
+							{/* HEADER */}
+							<div className="flex items-center justify-between p-5 border-b border-white/10 shrink-0">
+								<div className="flex gap-2">
+									<UserPen
+										size={20}
+										className="text-gray-400"
+									/>
+									<h2 className="text-base font-bold tracking-tight uppercase text-gray-400">
+										Edit Profile
+									</h2>
+								</div>
+								<button
+									onClick={onClose}
+									className="p-2 rounded-full hover:bg-white/10 text-gray-400 outline-none cursor-pointer"
+								>
+									<X size={20} />
+								</button>
+							</div>
 
-              {/* FORM CONTENT */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                {/* PHOTO SECTION (SIMPLIFIED) */}
-                <div className="flex flex-col items-center justify-center space-y-4">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/*"
-                    onChange={onFileSelect}
-                  />
+							{/* FORM CONTENT */}
+							<div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+								{/* PHOTO SECTION (SIMPLIFIED) */}
+								<div className="flex flex-col items-center justify-center space-y-4">
+									<input
+										type="file"
+										ref={fileInputRef}
+										className="hidden"
+										accept="image/*"
+										onChange={onFileSelect}
+									/>
 
-                  <div className="relative group">
-                    <div
-                      className="relative w-28 h-28 rounded-full border-4 border-white/5 ring-2 ring-blue-500/20 overflow-hidden cursor-pointer"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Image
-                        // Jika sedang mode "Hapus", tampilkan gambar default
-                        src={
-                          isRemovingPhoto
-                            ? '/default-avatar.png'
-                            : previewUrl ||
-                              initialData?.profile?.avatarUrl ||
-                              '/default-avatar.png'
-                        }
-                        alt="Profile"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsRemovingPhoto(false)
-                        fileInputRef.current?.click()
-                      }}
-                      className="absolute bottom-1 right-1 p-2 bg-blue-700 rounded-full border-4 border-[#0B1220] hover:bg-blue-900 transition-colors shadow-lg outline-none cursor-pointer"
-                    >
-                      <Camera size={14} className="text-white" />
-                    </button>
-                  </div>
+									<div className="relative group">
+										<div
+											className="relative w-28 h-28 rounded-full border-4 border-white/5 ring-2 ring-blue-500/20 cursor-pointer"
+											onClick={() =>
+												fileInputRef.current?.click()
+											}
+										>
+											<UserAvatar
+												user={{
+													avatar_url: isRemovingPhoto
+														? null // Jika dihapus, otomatis jatuh ke DEFAULT_AVATAR bawaan komponen
+														: previewUrl ||
+															initialData?.profile
+																?.avatarUrl,
+													display_name:
+														initialData?.profile
+															?.displayName ||
+														"Profile",
+												}}
+												size={112} // Menggantikan dimensi w-28 h-28 (28 * 4px = 112px)
+												className="w-full h-full object-cover"
+											/>
+										</div>
+										<button
+											type="button"
+											onClick={() => {
+												setIsRemovingPhoto(false);
+												fileInputRef.current?.click();
+											}}
+											className="absolute bottom-1 right-1 p-2 bg-blue-700 rounded-full border-4 border-[#0B1220] hover:bg-blue-900 transition-colors shadow-lg outline-none cursor-pointer"
+										>
+											<Camera
+												size={14}
+												className="text-white"
+											/>
+										</button>
+									</div>
 
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsRemovingPhoto(false)
-                        fileInputRef.current?.click()
-                      }}
-                      className="text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest outline-none cursor-pointer"
-                    >
-                      Change
-                    </button>
+									<div className="flex gap-4">
+										<button
+											type="button"
+											onClick={() => {
+												setIsRemovingPhoto(false);
+												fileInputRef.current?.click();
+											}}
+											className="text-[10px] font-bold text-blue-400 hover:text-blue-300 uppercase tracking-widest outline-none cursor-pointer"
+										>
+											Change
+										</button>
 
-                    {/* Tampilkan tombol Remove jika ada foto yang bisa dihapus */}
-                    {(initialData?.profile?.avatarUrl || previewUrl) &&
-                      !isRemovingPhoto && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsRemovingPhoto(true)
-                            setSelectedBlob(null)
-                            setPreviewUrl(null)
-                          }}
-                          className="text-[10px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest outline-none"
-                        >
-                          Remove
-                        </button>
-                      )}
-                  </div>
-                </div>
+										{/* Tampilkan tombol Remove jika ada foto yang bisa dihapus */}
+										{(initialData?.profile?.avatarUrl ||
+											previewUrl) &&
+											!isRemovingPhoto && (
+												<button
+													type="button"
+													onClick={() => {
+														setIsRemovingPhoto(
+															true,
+														);
+														setSelectedBlob(null);
+														setPreviewUrl(null);
+													}}
+													className="text-[10px] font-bold text-red-400 hover:text-red-300 uppercase tracking-widest outline-none"
+												>
+													Remove
+												</button>
+											)}
+									</div>
+								</div>
 
-                {/* ACCOUNT INFO */}
-                <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
-                    Account
-                  </h3>
-                  <div className="space-y-4">
-                    <InputGroup
-                      label="Username"
-                      value={`@${initialData?.username}`}
-                      disabled
-                    />
-                    <InputGroup
-                      label="Name"
-                      value={displayName}
-                      onChange={setDisplayName}
-                    />
-                    <div className="space-y-2">
-                      <label className="text-[11px] font-semibold text-gray-500 uppercase ml-1">
-                        Bio
-                      </label>
-                      <div className="relative">
-                        <textarea
-                          value={bio}
-                          onChange={(e) => setBio(e.target.value.slice(0, 80))}
-                          className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50 min-h-24 resize-none transition-all outline-none"
-                        />
-                        <span className="absolute bottom-3 right-3 text-[10px] text-gray-600 font-mono">
-                          {bio.length}/80
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+								{/* ACCOUNT INFO */}
+								<div className="space-y-4">
+									<h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
+										Account
+									</h3>
+									<div className="space-y-4">
+										<InputGroup
+											label="Username"
+											value={`@${initialData?.username}`}
+											disabled
+										/>
+										<InputGroup
+											label="Name"
+											value={displayName}
+											onChange={setDisplayName}
+										/>
+										<div className="space-y-2">
+											<label className="text-[11px] font-semibold text-gray-500 uppercase ml-1">
+												Bio
+											</label>
+											<div className="relative">
+												<textarea
+													value={bio}
+													onChange={(e) =>
+														setBio(
+															e.target.value.slice(
+																0,
+																80,
+															),
+														)
+													}
+													className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50 min-h-24 resize-none transition-all outline-none"
+												/>
+												<span className="absolute bottom-3 right-3 text-[10px] text-gray-600 font-mono">
+													{bio.length}/80
+												</span>
+											</div>
+										</div>
+									</div>
+								</div>
 
-                {/* PERSONAL INFO */}
-                <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
-                    Personal Info
-                  </h3>
-                  <div className="space-y-2 text-center sm:text-left">
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase ml-1">
-                      Gender
-                    </label>
-                    <div className="flex p-1 bg-white/5 rounded-xl border border-white/5">
-                      {['Male', 'Female', 'Prefer not to say'].map((item) => (
-                        <button
-                          key={item}
-                          onClick={() => setGender(item)}
-                          className={`flex-1 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all outline-none ring-0 ${gender === item ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'text-gray-500 hover:text-gray-300 border border-transparent'}`}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Location Input Group */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-semibold text-gray-500 uppercase ml-1">
-                      Location
-                    </label>
-                    <div className="relative">
-                      <MapPin
-                        size={16}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
-                      />
-                      <input
-                        type="text"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full bg-white/5 border border-white/5 rounded-xl px-11 py-2.5 text-sm focus:outline-none focus:border-blue-500/50 outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
+								{/* PERSONAL INFO */}
+								<div className="space-y-4">
+									<h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
+										Personal Info
+									</h3>
+									<div className="space-y-2 text-center sm:text-left">
+										<label className="text-[11px] font-semibold text-gray-500 uppercase ml-1">
+											Gender
+										</label>
+										<div className="flex p-1 bg-white/5 rounded-xl border border-white/5">
+											{[
+												"Male",
+												"Female",
+												"Prefer not to say",
+											].map((item) => (
+												<button
+													key={item}
+													onClick={() =>
+														setGender(item)
+													}
+													className={`flex-1 py-2 text-[10px] sm:text-xs font-bold rounded-lg transition-all outline-none ring-0 ${gender === item ? "bg-blue-600/20 text-blue-400 border border-blue-500/30" : "text-gray-500 hover:text-gray-300 border border-transparent"}`}
+												>
+													{item}
+												</button>
+											))}
+										</div>
+									</div>
+									{/* Location Input Group */}
+									<div className="space-y-2">
+										<label className="text-[11px] font-semibold text-gray-500 uppercase ml-1">
+											Location
+										</label>
+										<div className="relative">
+											<MapPin
+												size={16}
+												className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
+											/>
+											<input
+												type="text"
+												value={location}
+												onChange={(e) =>
+													setLocation(e.target.value)
+												}
+												className="w-full bg-white/5 border border-white/5 rounded-xl px-11 py-2.5 text-sm focus:outline-none focus:border-blue-500/50 outline-none"
+											/>
+										</div>
+									</div>
+								</div>
 
-                {/* SOCIAL LINKS (Tetap pake Reorder karena fungsional) */}
-                <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
-                    Social Links
-                  </h3>
-                  <Reorder.Group
-                    axis="y"
-                    values={socialLinks}
-                    onReorder={setSocialLinks}
-                    className="space-y-3"
-                  >
-                    {socialLinks.map((link) => (
-                      <Reorder.Item
-                        key={link.tempId}
-                        value={link}
-                        className="flex items-center gap-2 bg-[#0B1220]"
-                      >
-                        <div className="text-gray-600 cursor-grab active:cursor-grabbing p-1">
-                          <GripVertical size={18} />
-                        </div>
+								{/* SOCIAL LINKS (Tetap pake Reorder karena fungsional) */}
+								<div className="space-y-4">
+									<h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
+										Social Links
+									</h3>
+									<Reorder.Group
+										axis="y"
+										values={socialLinks}
+										onReorder={setSocialLinks}
+										className="space-y-3"
+									>
+										{socialLinks.map((link) => (
+											<Reorder.Item
+												key={link.tempId}
+												value={link}
+												className="flex items-center gap-2 bg-[#0B1220]"
+											>
+												<div className="text-gray-600 cursor-grab active:cursor-grabbing p-1">
+													<GripVertical size={18} />
+												</div>
 
-                        {/* DROP DOWNS MENGGUNAKAN DATA API */}
-                        <select
-                          value={link.platformId} // Ikat ke state
-                          onChange={(e) => {
-                            const newId = Number(e.target.value)
-                            setSocialLinks(
-                              socialLinks.map((l) =>
-                                l.tempId === link.tempId
-                                  ? { ...l, platformId: newId }
-                                  : l,
-                              ),
-                            )
-                          }}
-                          className="bg-white/5 border border-white/5 rounded-xl px-2 py-2.5 text-[10px] outline-none focus:border-blue-500/50 appearance-none min-w-[100px]"
-                        >
-                          {platformsLoading ? (
-                            <option>Loading...</option>
-                          ) : (
-                            platforms?.map((p: any) => (
-                              <option
-                                key={p.id}
-                                value={p.id}
-                                className="bg-[#0B1220]"
-                              >
-                                {p.name}
-                              </option>
-                            ))
-                          )}
-                        </select>
+												{/* DROP DOWNS MENGGUNAKAN DATA API */}
+												<select
+													value={link.platformId} // Ikat ke state
+													onChange={(e) => {
+														const newId = Number(
+															e.target.value,
+														);
+														setSocialLinks(
+															socialLinks.map(
+																(l) =>
+																	l.tempId ===
+																	link.tempId
+																		? {
+																				...l,
+																				platformId:
+																					newId,
+																			}
+																		: l,
+															),
+														);
+													}}
+													className="bg-white/5 border border-white/5 rounded-xl px-2 py-2.5 text-[10px] outline-none focus:border-blue-500/50 appearance-none min-w-[100px]"
+												>
+													{platformsLoading ? (
+														<option>
+															Loading...
+														</option>
+													) : (
+														platforms?.map(
+															(p: any) => (
+																<option
+																	key={p.id}
+																	value={p.id}
+																	className="bg-[#0B1220]"
+																>
+																	{p.name}
+																</option>
+															),
+														)
+													)}
+												</select>
 
-                        <input
-                          type="text"
-                          value={link.url}
-                          placeholder="URL"
-                          className="flex-1 bg-white/5 border border-white/5 rounded-xl px-4 py-2 text-xs outline-none focus:border-blue-500/50"
-                          onChange={(e) => {
-                            setSocialLinks(
-                              socialLinks.map((l) =>
-                                l.tempId === link.tempId
-                                  ? { ...l, url: e.target.value }
-                                  : l,
-                              ),
-                            )
-                          }}
-                        />
+												<input
+													type="text"
+													value={link.url}
+													placeholder="URL"
+													className="flex-1 bg-white/5 border border-white/5 rounded-xl px-4 py-2 text-xs outline-none focus:border-blue-500/50"
+													onChange={(e) => {
+														setSocialLinks(
+															socialLinks.map(
+																(l) =>
+																	l.tempId ===
+																	link.tempId
+																		? {
+																				...l,
+																				url: e
+																					.target
+																					.value,
+																			}
+																		: l,
+															),
+														);
+													}}
+												/>
 
-                        <button
-                          onClick={() =>
-                            setSocialLinks(
-                              socialLinks.filter(
-                                (l) => l.tempId !== link.tempId,
-                              ),
-                            )
-                          }
-                          className="text-gray-500 hover:text-red-400 p-2 outline-none"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </Reorder.Item>
-                    ))}
-                  </Reorder.Group>
-                  <button
-                    onClick={addSocialLink}
-                    className="w-full py-3 border border-dashed border-white/10 rounded-xl text-[10px] font-bold uppercase text-gray-500 hover:text-blue-400 flex items-center justify-center gap-2 outline-none"
-                  >
-                    <Plus size={14} /> Add Social Link
-                  </button>
-                </div>
+												<button
+													onClick={() =>
+														setSocialLinks(
+															socialLinks.filter(
+																(l) =>
+																	l.tempId !==
+																	link.tempId,
+															),
+														)
+													}
+													className="text-gray-500 hover:text-red-400 p-2 outline-none"
+												>
+													<Trash2 size={16} />
+												</button>
+											</Reorder.Item>
+										))}
+									</Reorder.Group>
+									<button
+										onClick={addSocialLink}
+										className="w-full py-3 border border-dashed border-white/10 rounded-xl text-[10px] font-bold uppercase text-gray-500 hover:text-blue-400 flex items-center justify-center gap-2 outline-none"
+									>
+										<Plus size={14} /> Add Social Link
+									</button>
+								</div>
 
-                {/* PRIVACY */}
-                <div className="space-y-4">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
-                    Privacy & Settings
-                  </h3>
-                  <div className="space-y-3">
-                    <ToggleRow
-                      icon={<Globe size={18} />}
-                      label="Public Profile"
-                      active={isPublic}
-                      onToggle={() => setIsPublic(!isPublic)}
-                    />
-                    <ToggleRow
-                      icon={<MessageSquare size={18} />}
-                      label="Allow DM From Public"
-                      active={allowDm}
-                      onToggle={() => setAllowDm(!allowDm)}
-                    />
-                    <ToggleRow
-                      icon={<Library size={18} />}
-                      label="Public Bookshelf"
-                      active={isBookshelfPublic}
-                      onToggle={() => setIsBookshelfPublic(!isBookshelfPublic)}
-                    />
-                  </div>
-                </div>
-              </div>
+								{/* PRIVACY */}
+								<div className="space-y-4">
+									<h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
+										Privacy & Settings
+									</h3>
+									<div className="space-y-3">
+										<ToggleRow
+											icon={<Globe size={18} />}
+											label="Public Profile"
+											active={isPublic}
+											onToggle={() =>
+												setIsPublic(!isPublic)
+											}
+										/>
+										<ToggleRow
+											icon={<MessageSquare size={18} />}
+											label="Allow DM From Public"
+											active={allowDm}
+											onToggle={() =>
+												setAllowDm(!allowDm)
+											}
+										/>
+										<ToggleRow
+											icon={<Library size={18} />}
+											label="Public Bookshelf"
+											active={isBookshelfPublic}
+											onToggle={() =>
+												setIsBookshelfPublic(
+													!isBookshelfPublic,
+												)
+											}
+										/>
+									</div>
+								</div>
+							</div>
 
-              {/* FOOTER */}
-              <div className="p-5 border-t border-white/10 flex gap-3 shrink-0">
-                <button
-                  onClick={onClose}
-                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-white bg-white/5 rounded-xl outline-none"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={isPending}
-                  className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-600/20 outline-none"
-                >
-                  {isPending ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
+							{/* FOOTER */}
+							<div className="p-5 border-t border-white/10 flex gap-3 shrink-0">
+								<button
+									onClick={onClose}
+									className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-white bg-white/5 rounded-xl outline-none"
+								>
+									Cancel
+								</button>
+								<button
+									onClick={handleSave}
+									disabled={isPending}
+									className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest bg-blue-600 hover:bg-blue-500 rounded-xl shadow-lg shadow-blue-600/20 outline-none"
+								>
+									{isPending ? "Saving..." : "Save Changes"}
+								</button>
+							</div>
+						</motion.div>
+					</div>
 
-          {/* POPUP CROP (FULL SCREEN OVERLAY) */}
-          <AnimatePresence>
-            {imageToCrop && (
-              <div className="fixed inset-0 z-200 flex items-center justify-center p-4">
-                {/* Backdrop Hitam Pekat khusus Crop */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.8 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setImageToCrop(null)}
-                  className="absolute inset-0 bg-black/90"
-                />
+					{/* POPUP CROP (FULL SCREEN OVERLAY) */}
+					<AnimatePresence>
+						{imageToCrop && (
+							<div className="fixed inset-0 z-200 flex items-center justify-center p-4">
+								{/* Backdrop Hitam Pekat khusus Crop */}
+								<motion.div
+									initial={{ opacity: 0 }}
+									animate={{ opacity: 0.8 }}
+									exit={{ opacity: 0 }}
+									onClick={() => setImageToCrop(null)}
+									className="absolute inset-0 bg-black/90"
+								/>
 
-                <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  className="relative w-[90vw] h-[70vh] md:w-[30vw] md:h-[55vh] bg-[#0B1220] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col"
-                >
-                  <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#0B1220] z-10">
-                    <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
-                      Crop Image
-                    </h2>
-                    <button
-                      onClick={() => setImageToCrop(null)}
-                      className="p-1 text-gray-500 hover:text-white outline-none"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
+								<motion.div
+									initial={{ scale: 0.9, opacity: 0 }}
+									animate={{ scale: 1, opacity: 1 }}
+									exit={{ scale: 0.9, opacity: 0 }}
+									className="relative w-[90vw] h-[70vh] md:w-[30vw] md:h-[55vh] bg-[#0B1220] rounded-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col"
+								>
+									<div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#0B1220] z-10">
+										<h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-500">
+											Crop Image
+										</h2>
+										<button
+											onClick={() => setImageToCrop(null)}
+											className="p-1 text-gray-500 hover:text-white outline-none"
+										>
+											<X size={18} />
+										</button>
+									</div>
 
-                  <div className="relative flex-1 bg-black">
-                    <Cropper
-                      image={imageToCrop}
-                      crop={crop}
-                      zoom={zoom}
-                      aspect={1 / 1}
-                      cropShape="round"
-                      showGrid={false}
-                      onCropChange={setCrop}
-                      onZoomChange={setZoom}
-                      onCropComplete={(_, pixels) =>
-                        setCroppedAreaPixels(pixels)
-                      }
-                    />
-                  </div>
+									<div className="relative flex-1 bg-black">
+										<Cropper
+											image={imageToCrop}
+											crop={crop}
+											zoom={zoom}
+											aspect={1 / 1}
+											cropShape="round"
+											showGrid={false}
+											onCropChange={setCrop}
+											onZoomChange={setZoom}
+											onCropComplete={(_, pixels) =>
+												setCroppedAreaPixels(pixels)
+											}
+										/>
+									</div>
 
-                  <div className="p-5 border-t border-white/10 bg-[#0B1220] space-y-4 z-10">
-                    <div className="flex items-center gap-4">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase">
-                        Zoom
-                      </span>
-                      <input
-                        type="range"
-                        value={zoom}
-                        min={1}
-                        max={3}
-                        step={0.1}
-                        onChange={(e) => setZoom(Number(e.target.value))}
-                        className="w-full h-1 bg-white/10 accent-blue-500 rounded-lg appearance-none cursor-pointer outline-none"
-                      />
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => setImageToCrop(null)}
-                        className="flex-1 py-2.5 text-[10px] font-bold uppercase text-gray-500 bg-white/5 rounded-xl outline-none"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={onCropConfirm}
-                        className="flex-1 py-2.5 text-[10px] font-bold uppercase bg-blue-600 rounded-xl outline-none transition-all active:scale-95"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
-        </ClientPortal>
-      )}
-    </AnimatePresence>
-  )
+									<div className="p-5 border-t border-white/10 bg-[#0B1220] space-y-4 z-10">
+										<div className="flex items-center gap-4">
+											<span className="text-[10px] font-bold text-gray-500 uppercase">
+												Zoom
+											</span>
+											<input
+												type="range"
+												value={zoom}
+												min={1}
+												max={3}
+												step={0.1}
+												onChange={(e) =>
+													setZoom(
+														Number(e.target.value),
+													)
+												}
+												className="w-full h-1 bg-white/10 accent-blue-500 rounded-lg appearance-none cursor-pointer outline-none"
+											/>
+										</div>
+										<div className="flex gap-3">
+											<button
+												onClick={() =>
+													setImageToCrop(null)
+												}
+												className="flex-1 py-2.5 text-[10px] font-bold uppercase text-gray-500 bg-white/5 rounded-xl outline-none"
+											>
+												Cancel
+											</button>
+											<button
+												onClick={onCropConfirm}
+												className="flex-1 py-2.5 text-[10px] font-bold uppercase bg-blue-600 rounded-xl outline-none transition-all active:scale-95"
+											>
+												Apply
+											</button>
+										</div>
+									</div>
+								</motion.div>
+							</div>
+						)}
+					</AnimatePresence>
+				</ClientPortal>
+			)}
+		</AnimatePresence>
+  );
 }
 
 // SUB-COMPONENTS UNTUK KEBERSIHAN KODE

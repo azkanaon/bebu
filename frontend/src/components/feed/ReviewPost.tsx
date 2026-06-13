@@ -12,6 +12,7 @@ import {
 	Trash2,
 	Flag,
 	AlertTriangle,
+	Lock, // 🔥 Tambahkan ikon gembok untuk indikator proteksi
 } from "lucide-react";
 import PostMenu from "./PostMenu";
 import {
@@ -68,8 +69,19 @@ export default function ReviewPost({
 		shares: post.shares,
 	};
 
+	// 🔥 Ambil data auth untuk pengecekan status akun ter-suspend
+	const authStorage =
+		typeof window !== "undefined"
+			? localStorage.getItem("bebu-auth-storage")
+			: null;
+	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
+	const user = parsedStorage?.state?.user;
+	const currentUserId = user?.user_public_id;
+
+	const isSuspended = user?.status === "suspended";
+
 	const handleLike = async () => {
-		if (isLoading) return;
+		if (isLoading || isSuspended) return; // 🔥 Kunci interaksi like
 
 		toggleLikeStore(post.id);
 
@@ -87,7 +99,7 @@ export default function ReviewPost({
 	const [isSaveLoading, setIsSaveLoading] = useState(false);
 
 	const handleSave = async () => {
-		if (isSaveLoading) return;
+		if (isSaveLoading || isSuspended) return; // 🔥 Kunci interaksi save
 
 		toggleSaveStore(post.id);
 
@@ -112,7 +124,7 @@ export default function ReviewPost({
 
 	const handlePostComment = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (!commentText.trim() || isSubmitting) return;
+		if (!commentText.trim() || isSubmitting || isSuspended) return; // 🔥 Kunci interaksi submit comment
 
 		setIsSubmitting(true);
 		try {
@@ -125,7 +137,6 @@ export default function ReviewPost({
 			const response = await createCommentAPI(payload);
 			const newComment = response.data;
 
-			// ✅ UPDATE STATE LOKAL (BUKAN PROPS)
 			setLocalCommentsCount((prev) => prev + 1);
 			setLocalCommentList((prev) => [newComment, ...prev].slice(0, 2));
 
@@ -191,15 +202,11 @@ export default function ReviewPost({
 
 	const ratingStyle = getRatingStyle(post.book.rating);
 
-	const authStorage = localStorage.getItem("bebu-auth-storage");
-	const parsedStorage = authStorage ? JSON.parse(authStorage) : null;
-	const user = parsedStorage?.state?.user;
-	const currentUserId = user?.user_public_id;
-
 	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 	const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
 	const handleDelete = async (commentId: number, postId: number) => {
+		if (isSuspended) return; // 🔥 Kunci interaksi hapus komentar
 		const previousComments = localCommentList;
 		const previousCount = localCommentsCount;
 
@@ -247,7 +254,6 @@ export default function ReviewPost({
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
 
-			// kalau klik masih di area dropdown/menu
 			if (target.closest("[data-comment-menu]")) {
 				return;
 			}
@@ -265,19 +271,15 @@ export default function ReviewPost({
 
 	const commentButtonContent = (
 		<motion.button
-			whileTap={disableCommentLink ? {} : { scale: 0.97 }} // opsional: matikan efek membalas/tekan jika link mati, atau biarkan saja
+			whileTap={disableCommentLink || isSuspended ? {} : { scale: 0.97 }}
 			className={`
-        flex items-center gap-1.5
-        px-2 py-1.5
-        rounded-full
-        text-gray-500
-        transition-all duration-200
-        hover:bg-white/[0.03]
-        hover:text-green-400
-        ${disableCommentLink ? "cursor-default" : "cursor-pointer"} 
-      `}
-			// cursor-default membuat kursor mouse tidak berubah jadi tangan (pointer)
-			// karena tombolnya sudah tidak bisa diklik lagi.
+				flex items-center gap-1.5
+				px-2 py-1.5
+				rounded-full
+				text-gray-500
+				transition-all duration-200
+				${disableCommentLink || isSuspended ? "cursor-default" : "cursor-pointer hover:bg-white/[0.03] hover:text-green-400"} 
+			`}
 		>
 			<MessageCircle size={18} strokeWidth={2.3} />
 			<span className="font-medium tabular-nums">{post.comments}</span>
@@ -299,7 +301,7 @@ export default function ReviewPost({
 				shadow-[0_6px_30px_rgba(0,0,0,0.4)]
 				${
 					isModalView
-						? "w-full border-none shadow-none rounded-none" // Gaya menyatu dengan modal
+						? "w-full border-none shadow-none rounded-none"
 						: "border border-gray-800 rounded-2xl shadow-[0_6px_30px_rgba(0,0,0,0.4)]"
 				}
 			`}
@@ -359,28 +361,23 @@ export default function ReviewPost({
 
 			{/* Book Card */}
 			<MotionLink
-				href={`/books/${post.book.slug}`} // Mengarah ke ./books/[slug]
+				href={`/books/${post.book.slug}`}
 				whileHover={{ y: -1 }}
 				transition={{ duration: 0.18 }}
 				className="
-        relative flex gap-4
-        bg-gradient-to-br from-gray-800/70 to-gray-900/80
-        border border-gray-700/40
-        backdrop-blur-md
-        p-3
-        rounded-2xl
-        overflow-hidden
-        cursor-pointer
-        block
-    "
+					relative flex gap-4
+					bg-gradient-to-br from-gray-800/70 to-gray-900/80
+					border border-gray-700/40
+					backdrop-blur-md
+					p-3
+					rounded-2xl
+					overflow-hidden
+					cursor-pointer
+					block
+				"
 			>
-				{/* Subtle ambient glow */}
 				<div className="absolute inset-0 bg-gradient-to-r from-blue-500/[0.03] to-purple-500/[0.03] pointer-events-none" />
-
-				{/* Left accent glow */}
 				<div className="absolute left-0 top-0 h-full w-24 bg-gradient-to-r from-white/[0.03] to-transparent pointer-events-none" />
-
-				{/* Soft texture overlay */}
 				<div className="absolute inset-0 bg-white/[0.015] pointer-events-none" />
 
 				{/* Cover */}
@@ -390,44 +387,20 @@ export default function ReviewPost({
 						title={post.book.title}
 						width={80}
 						height={112}
-						className="
-    rounded-lg
-    border border-white/10
-    ring-1 ring-white/5
-    shadow-[0_8px_24px_rgba(0,0,0,0.35)]
-  "
+						className="rounded-lg border border-white/10 ring-1 ring-white/5 shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
 					/>
 				</div>
 
 				{/* Info */}
 				<div className="flex-1 min-w-0 space-y-0.5 pr-16">
-					{/* Title */}
-					<div
-						className="
-				font-semibold
-				tracking-tight
-				text-white
-				text-[15px]
-				leading-snug
-				line-clamp-2
-			"
-					>
+					<div className="font-semibold tracking-tight text-white text-[15px] leading-snug line-clamp-2">
 						{post.book.title}
 					</div>
 
-					{/* Author */}
-					<div
-						className="
-				text-sm
-				font-medium
-				text-gray-300
-				truncate
-			"
-					>
+					<div className="text-sm font-medium text-gray-300 truncate">
 						{post.book.author}
 					</div>
 
-					{/* Meta */}
 					<div className="text-xs text-gray-500">
 						{post.book.pages} halaman
 					</div>
@@ -437,15 +410,7 @@ export default function ReviewPost({
 						{post.book.genres?.map((g) => (
 							<span
 								key={g}
-								className="
-						text-[11px]
-						bg-gray-700/40
-						backdrop-blur-sm
-						border border-gray-600/30
-						px-2 py-[3px]
-						rounded-full
-						text-gray-300
-					"
+								className="text-[11px] bg-gray-700/40 backdrop-blur-sm border border-gray-600/30 px-2 py-[3px] rounded-full text-gray-300"
 							>
 								{g}
 							</span>
@@ -473,7 +438,6 @@ export default function ReviewPost({
 					`}
 				>
 					<span className="text-[10px] opacity-80">★</span>
-
 					<span>{post.book.rating.toFixed(1)}</span>
 				</div>
 			</MotionLink>
@@ -483,42 +447,55 @@ export default function ReviewPost({
 				<div className="flex gap-1 text-sm">
 					{/* Like */}
 					<motion.button
-						whileTap={{ scale: 0.97 }}
+						whileTap={isSuspended ? {} : { scale: 0.97 }}
 						onClick={handleLike}
-						disabled={isLoading}
+						disabled={isLoading || isSuspended}
 						className={`
-				flex items-center gap-1.5
-				px-2 py-1.5
-				rounded-full
-				transition-all duration-200
-				hover:bg-white/[0.03]
-				${
-					currentData.is_liked
-						? "text-blue-400 bg-blue-500/10"
-						: "text-gray-400 hover:text-blue-400"
-				}
-			`}
+							flex items-center gap-1.5
+							px-2 py-1.5
+							rounded-full
+							transition-all duration-200
+							${
+								isSuspended
+									? "text-gray-600 cursor-not-allowed"
+									: currentData.is_liked
+										? "text-blue-400 bg-blue-500/10 cursor-pointer hover:bg-white/[0.03]"
+										: "text-gray-400 hover:text-blue-400 cursor-pointer hover:bg-white/[0.03]"
+							}
+						`}
 					>
 						<ThumbsUp
 							size={18}
 							strokeWidth={2.3}
 							fill={
-								currentData.is_liked ? "currentColor" : "none"
+								currentData.is_liked && !isSuspended
+									? "currentColor"
+									: "none"
 							}
 						/>
-
 						<span className="font-medium tabular-nums">
 							{currentData.likes}
 						</span>
 					</motion.button>
 
 					{/* Comment */}
-					{disableCommentLink ? (
+					{disableCommentLink || isSuspended ? (
 						commentButtonContent
 					) : (
 						<Link
 							href={`/post/${post.post_public_id}`}
 							scroll={false}
+							onClick={() => {
+								if (typeof window !== "undefined") {
+									window.history.replaceState(
+										{
+											...window.history.state,
+											isModalView: true,
+										},
+										"",
+									);
+								}
+							}}
 						>
 							{commentButtonContent}
 						</Link>
@@ -526,20 +503,22 @@ export default function ReviewPost({
 
 					{/* Share */}
 					<motion.button
-						whileTap={{ scale: 0.97 }}
-						onClick={() => setIsShareOpen(true)}
-						className="
-				flex items-center gap-1.5
-				px-2 py-1.5
-				rounded-full
-				text-gray-500
-				transition-all duration-200
-				hover:bg-white/[0.03]
-				hover:text-violet-400
-			"
+						whileTap={isSuspended ? {} : { scale: 0.97 }}
+						onClick={() => !isSuspended && setIsShareOpen(true)}
+						disabled={isSuspended}
+						className={`
+							flex items-center gap-1.5
+							px-2 py-1.5
+							rounded-full
+							transition-all duration-200
+							${
+								isSuspended
+									? "text-gray-600 cursor-not-allowed"
+									: "text-gray-500 hover:bg-white/[0.03] hover:text-violet-400 cursor-pointer"
+							}
+						`}
 					>
 						<Share2 size={18} strokeWidth={2.3} />
-
 						<span className="font-medium tabular-nums">
 							{currentData.shares}
 						</span>
@@ -548,32 +527,29 @@ export default function ReviewPost({
 
 				{/* Save */}
 				<motion.button
-					whileTap={{ scale: 0.95 }}
+					whileTap={isSuspended ? {} : { scale: 0.95 }}
 					onClick={handleSave}
-					disabled={isSaveLoading}
+					disabled={isSaveLoading || isSuspended}
 					className={`
-			p-2 rounded-full
-			bg-white/[0.02]
-			transition-all duration-200
-			${
-				currentData.is_saved
-					? `
-						text-yellow-400
-						bg-yellow-500/10
-						shadow-[0_0_16px_rgba(250,204,21,0.10)]
-					`
-					: `
-						text-gray-500
-						hover:text-yellow-400
-						hover:bg-yellow-500/10
-					`
-			}
-		`}
+						p-2 rounded-full
+						transition-all duration-200
+						${
+							isSuspended
+								? "text-gray-600 bg-transparent cursor-not-allowed"
+								: currentData.is_saved
+									? "text-yellow-400 bg-yellow-500/10 shadow-[0_0_16px_rgba(250,204,21,0.10)] cursor-pointer"
+									: "text-gray-500 hover:text-yellow-400 hover:bg-yellow-500/10 cursor-pointer bg-white/[0.02]"
+						}
+					`}
 				>
 					<Bookmark
 						size={18}
 						strokeWidth={2.3}
-						fill={currentData.is_saved ? "currentColor" : "none"}
+						fill={
+							currentData.is_saved && !isSuspended
+								? "currentColor"
+								: "none"
+						}
 					/>
 				</motion.button>
 			</div>
@@ -584,38 +560,26 @@ export default function ReviewPost({
 						<div
 							key={c.id}
 							className={`
-		group/comment relative
-		flex gap-3 items-start
-		px-2 pb-1
-		rounded-xl
-		transition-all duration-200
-		hover:bg-white/[0.02]
-
-		${openMenuId === c.id ? "z-50 bg-white/[0.025]" : "z-0"}
-	`}
+								group/comment relative
+								flex gap-3 items-start
+								px-2 pb-1
+								rounded-xl
+								transition-all duration-200
+								hover:bg-white/[0.02]
+								${openMenuId === c.id ? "z-50 bg-white/[0.025]" : "z-0"}
+							`}
 						>
-							{/* Avatar */}
 							<UserAvatar
-								user={{
-									avatar_url: c.avatar,
-								}}
+								user={{ avatar_url: c.avatar }}
 								size={28}
 								className="mt-0.5 ring-1 ring-white/5"
 							/>
 
-							{/* Content */}
 							<div className="flex-1 min-w-0">
 								<div className="flex items-baseline gap-2 flex-wrap">
 									<Link
 										href={`/${c.username}`}
-										className="
-											font-medium
-											text-gray-200
-											text-sm
-											hover:text-blue-400
-											transition-colors
-											cursor-pointer
-										"
+										className="font-medium text-gray-200 text-sm hover:text-blue-400 transition-colors cursor-pointer"
 									>
 										@{c.username}
 									</Link>
@@ -625,40 +589,23 @@ export default function ReviewPost({
 									</span>
 								</div>
 
-								<p
-									className="
-								text-sm
-								text-gray-400
-								leading-relaxed
-								antialiased
-								break-words
-							"
-								>
+								<p className="text-sm text-gray-400 leading-relaxed antialiased break-words">
 									{c.comment}
 								</p>
 							</div>
 
-							{/* Action Menu */}
 							<div className="absolute top-2 right-1 z-20">
 								<div data-comment-menu className="relative">
 									<button
 										onClick={(e) => {
 											e.stopPropagation();
-
 											setOpenMenuId(
 												openMenuId === c.id
 													? null
 													: c.id,
 											);
 										}}
-										className="
-				p-1.5
-				rounded-full
-				text-gray-600
-				hover:text-gray-300
-				hover:bg-white/[0.04]
-				transition-all duration-200
-			"
+										className="p-1.5 rounded-full text-gray-600 hover:text-gray-300 hover:bg-white/[0.04] transition-all duration-200"
 									>
 										<MoreVertical
 											size={15}
@@ -666,7 +613,6 @@ export default function ReviewPost({
 										/>
 									</button>
 
-									{/* Dropdown */}
 									<AnimatePresence>
 										{openMenuId === c.id && (
 											<motion.div
@@ -688,25 +634,10 @@ export default function ReviewPost({
 													y: -4,
 													scale: 0.96,
 												}}
-												transition={{
-													duration: 0.16,
-												}}
-												className="
-						absolute right-0 top-9
-						w-46
-						z-[999]
-					"
+												transition={{ duration: 0.16 }}
+												className="absolute right-0 top-9 w-46 z-[999]"
 											>
-												<div
-													className="
-		overflow-hidden
-		rounded-2xl
-		border border-white/[0.06]
-		bg-gray-900/95
-		backdrop-blur-xl
-		shadow-[0_12px_40px_rgba(0,0,0,0.45)]
-	"
-												>
+												<div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-gray-900/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
 													{String(
 														c.user_public_id,
 													) ===
@@ -714,14 +645,8 @@ export default function ReviewPost({
 														confirmDeleteId ===
 														c.id ? (
 															<div className="w-44 p-3 space-y-2">
-																{/* Header */}
 																<div className="flex items-start gap-2">
-																	<div
-																		className="
-							mt-[1px]
-							text-red-400
-						"
-																	>
+																	<div className="mt-[1px] text-red-400">
 																		<AlertTriangle
 																			size={
 																				13
@@ -731,27 +656,12 @@ export default function ReviewPost({
 																			}
 																		/>
 																	</div>
-
 																	<div>
-																		<p
-																			className="
-								text-xs
-								font-medium
-								text-gray-200
-							"
-																		>
+																		<p className="text-xs font-medium text-gray-200">
 																			Delete
 																			Comment?
 																		</p>
-
-																		<p
-																			className="
-								text-[11px]
-								text-gray-500
-								mt-0.5
-								leading-relaxed
-							"
-																		>
+																		<p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
 																			This
 																			is
 																			Permanent
@@ -760,52 +670,38 @@ export default function ReviewPost({
 																	</div>
 																</div>
 
-																{/* Actions */}
 																<div className="flex justify-end">
 																	<button
 																		onClick={(
 																			e,
 																		) => {
 																			e.stopPropagation();
-
 																			setConfirmDeleteId(
-																				c.id,
+																				null,
 																			);
 																		}}
-																		className="
-							px-2.5 py-1
-							text-[11px]
-							text-gray-400
-							hover:text-white
-							transition-colors
-						"
+																		className="px-2.5 py-1 text-[11px] text-gray-400 hover:text-white transition-colors"
 																	>
 																		Cancel
 																	</button>
 
 																	<button
+																		disabled={
+																			isSuspended
+																		}
 																		onClick={() => {
 																			handleDelete(
 																				c.id,
 																				post.id,
 																			);
-
 																			setConfirmDeleteId(
 																				null,
 																			);
-
 																			setOpenMenuId(
 																				null,
 																			);
 																		}}
-																		className="
-							px-2.5 py-1
-							text-[11px]
-							font-medium
-							text-red-400
-							hover:text-red-300
-							transition-colors
-						"
+																		className="px-2.5 py-1 text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
 																	>
 																		Delete
 																	</button>
@@ -813,20 +709,15 @@ export default function ReviewPost({
 															</div>
 														) : (
 															<button
+																disabled={
+																	isSuspended
+																}
 																onClick={() =>
 																	setConfirmDeleteId(
 																		c.id,
 																	)
 																}
-																className="
-					w-full
-					flex items-center gap-2
-					px-4 py-2.5
-					text-xs
-					text-red-400
-					hover:bg-red-500/10
-					transition-colors
-				"
+																className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 															>
 																<Trash2
 																	size={13}
@@ -839,35 +730,47 @@ export default function ReviewPost({
 														)
 													) : (
 														<button
+															disabled={
+																isSuspended
+															}
 															onClick={() => {
+																if (isSuspended)
+																	return; // Proteksi berlapis
 																setReportTarget(
 																	{
-																		id: c.user_id,
+																		id: c.id, // 🔥 Sekaligus perbaikan agar mereferensikan ID Komentar (c.id), bukan c.user_id
 																		type: "comment",
 																	},
 																);
-
 																setOpenMenuId(
 																	null,
 																);
 															}}
-															className="
-				w-full
-				flex items-center gap-2
-				px-4 py-2.5
-				text-xs
-				text-gray-300
-				hover:bg-white/[0.04]
-				transition-colors
-			"
+															className={`w-full flex items-center px-4 py-2.5 text-xs transition-colors justify-between ${
+																isSuspended
+																	? "text-red-400/50 bg-red-950/10 cursor-not-allowed"
+																	: "text-gray-300 hover:bg-white/[0.04] hover:text-red-400"
+															}`}
 														>
-															<Flag
-																size={13}
-																strokeWidth={
-																	2.2
-																}
-															/>
-															Report
+															<div className="flex items-center gap-2">
+																<Flag
+																	size={13}
+																	strokeWidth={
+																		2.2
+																	}
+																/>
+																<span>
+																	{isSuspended
+																		? "Report Locked"
+																		: "Report"}
+																</span>
+															</div>
+															{isSuspended && (
+																<Lock
+																	size={12}
+																	className="text-red-400/40 ml-auto"
+																/>
+															)}
 														</button>
 													)}
 												</div>
@@ -880,68 +783,79 @@ export default function ReviewPost({
 					))}
 
 					{/* View All Comments */}
-					{!disableCommentLink && localCommentsCount > 2 && (
-						<Link
-							href={`/post/${post.post_public_id}`}
-							scroll={false}
-						>
-							<button
-								className="
-                text-xs
-                font-medium
-                text-gray-400
-                hover:text-gray-300
-                transition-colors
-                pl-4
-				pb-1
-                text-left
-            "
-							>
+					{!disableCommentLink &&
+						localCommentsCount > 2 &&
+						(isSuspended ? (
+							<span className="text-xs font-medium text-gray-600 pl-4 pb-1 text-left block select-none">
 								See all {localCommentsCount} comments...
-							</button>
-						</Link>
-					)}
+							</span>
+						) : (
+							<Link
+								href={`/post/${post.post_public_id}`}
+								scroll={false}
+								onClick={() => {
+									if (typeof window !== "undefined") {
+										window.history.replaceState(
+											{
+												...window.history.state,
+												isModalView: true,
+											},
+											"",
+										);
+									}
+								}}
+							>
+								<button className="text-xs font-medium text-gray-400 hover:text-gray-300 transition-colors pl-4 pb-1 text-left">
+									See all {localCommentsCount} comments...
+								</button>
+							</Link>
+						))}
 
 					{/* Quick Comment Input */}
 					<form
 						onSubmit={handlePostComment}
 						className="flex items-center gap-3 pt-1"
 					>
-						{/* Input Wrapper */}
 						<div className="flex-1 relative">
 							<input
-								disabled={isSubmitting}
+								disabled={isSubmitting || isSuspended}
 								value={commentText}
 								onChange={(e) => setCommentText(e.target.value)}
 								placeholder={
-									isSubmitting
-										? "Sending..."
-										: "Share your opinion..."
+									isSuspended
+										? "Interactions are restricted due to account suspension."
+										: isSubmitting
+											? "Sending..."
+											: "Share your opinion..."
 								}
 								className={`
-						w-full
-						bg-white/[0.03]
-						border border-white/[0.05]
-						backdrop-blur-sm
-						rounded-full
-						px-4 py-2
-						text-sm
-						text-gray-200
-						placeholder:text-gray-500
-						transition-all duration-200
-						focus:outline-none
-						focus:border-blue-500/30
-						focus:bg-white/[0.045]
-						${isSubmitting ? "opacity-50" : ""}
-					`}
+									w-full
+									backdrop-blur-sm
+									rounded-full
+									px-4 py-2
+									text-sm
+									transition-all duration-200
+									focus:outline-none
+									${
+										isSuspended
+											? "bg-red-950/10 border border-red-500/10 text-red-400/60 placeholder:text-red-400/40 cursor-not-allowed select-none"
+											: "bg-white/[0.03] border border-white/[0.05] text-gray-200 placeholder:text-gray-500 focus:border-blue-500/30 focus:bg-white/[0.045]"
+									}
+									${isSubmitting ? "opacity-50" : ""}
+								`}
 							/>
+							{isSuspended && (
+								<div className="absolute right-4 top-1/2 -translate-y-1/2 text-red-400/40">
+									<Lock size={14} />
+								</div>
+							)}
 						</div>
 					</form>
 				</div>
 			)}
 
 			<AnimatePresence>
-				{showComments && (
+				{showComments && !isSuspended && (
 					<CommentModal
 						postId={post.id}
 						post={{ ...post, comments: localCommentsCount }}
@@ -956,13 +870,9 @@ export default function ReviewPost({
 							}
 						}}
 						onCommentDeleted={(deletedId, amount = 1) => {
-							// Kurangi count sesuai jumlah total (parent + children)
 							setLocalCommentsCount((prev) =>
 								Math.max(prev - amount, 0),
 							);
-
-							// Filter list luar (tetap filter berdasarkan ID yang dihapus saja
-							// karena children-nya otomatis hilang saat parent-nya difilter)
 							setLocalCommentList((prev) =>
 								prev.filter((c) => c.id !== deletedId),
 							);
@@ -972,7 +882,7 @@ export default function ReviewPost({
 			</AnimatePresence>
 
 			<ShareModal
-				isOpen={isShareOpen}
+				isOpen={isShareOpen && !isSuspended}
 				onClose={() => setIsShareOpen(false)}
 				postId={post.id}
 				onShareSuccess={handleShareSuccess}

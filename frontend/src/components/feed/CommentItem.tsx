@@ -1,8 +1,16 @@
-import React, { useState } from "react";
-import { MoreVertical, Trash2, Flag, Heart, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+	MoreVertical,
+	Trash2,
+	Flag,
+	Heart,
+	AlertTriangle,
+	Lock,
+} from "lucide-react";
 import { CommentType } from "@/types/post";
 import { timeAgo } from "@/lib/utils";
 import Link from "next/link";
+import UserAvatar from "@/components/UserAvatar";
 
 interface CommentItemProps {
 	comment: CommentType;
@@ -35,17 +43,37 @@ const CommentItem: React.FC<CommentItemProps> = ({
 	const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 	const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
+	// State untuk melacak status suspensi user
+	const [isSuspended, setIsSuspended] = useState(false);
+
+	// Ambil status user dari localStorage
+	useEffect(() => {
+		try {
+			const authStorage = localStorage.getItem("bebu-auth-storage");
+			if (authStorage) {
+				const parsedStorage = JSON.parse(authStorage);
+				const user = parsedStorage?.state?.user;
+				if (user?.status === "suspended") {
+					setIsSuspended(true);
+				}
+			}
+		} catch (error) {
+			console.error("Gagal membaca status auth di CommentItem:", error);
+		}
+	}, []);
+
 	return (
 		<div className={`flex flex-col gap-3 ${isReply ? "pl-6" : ""}`}>
 			{/* Konten Komentar */}
 			<div className="flex gap-3 items-start relative group/item">
-				<img
-					src={
-						comment.avatar ||
-						`https://ui-avatars.com/api/?name=${comment.username}`
-					}
-					alt={comment.username}
-					className="w-9 h-9 rounded-full object-cover ring-1 ring-gray-800"
+				<UserAvatar
+					user={{
+						avatar_url:
+							comment.avatar,
+						display_name: comment.username,
+					}}
+					size={36} // Menggantikan w-9 h-9 (9 * 4px = 36px)
+					className="ring-1 ring-gray-800 object-cover"
 				/>
 				<div className="flex-1">
 					<div className="bg-gray-900/30 border border-gray-800/50 rounded-2xl p-3 relative group-hover:bg-gray-900 transition-colors">
@@ -54,11 +82,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
 								<Link
 									href={`/${comment.username}`}
 									className="
-										text-sm font-bold text-gray-200
-										hover:text-blue-300
-										transition-colors duration-150 
-										cursor-pointer inline-block
-									"
+                                        text-sm font-bold text-gray-200
+                                        hover:text-blue-300
+                                        transition-colors duration-150 
+                                        cursor-pointer inline-block
+                                    "
 								>
 									@{comment.username}
 								</Link>
@@ -91,7 +119,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
 															Delete Comment?
 														</p>
 														<p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
-															This is Permanent Action!
+															This is Permanent
+															Action!
 														</p>
 													</div>
 												</div>
@@ -115,7 +144,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 															setConfirmDeleteId(
 																null,
 															);
-															setOpenMenuId(null); // Tutup dropdown setelah hapus
+															setOpenMenuId(null);
 														}}
 														className="px-2.5 py-1 text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors"
 													>
@@ -138,18 +167,37 @@ const CommentItem: React.FC<CommentItemProps> = ({
 											</button>
 										)
 									) : (
-										// Tombol Laporkan
+										/* 🔥 ADAPTASI GAYA MERAH TRANSMISI JIKA USER DI-SUSPEND */
 										<button
+											disabled={isSuspended}
 											onClick={() => {
+												if (isSuspended) return; // Proteksi berlapis
 												setReportTarget({
-													id: comment.user_id,
+													id: comment.id,
 													type: "comment",
 												});
 												setOpenMenuId(null);
 											}}
-											className="w-full px-4 py-2 text-left text-[11px] text-gray-400 hover:bg-gray-800 flex items-center gap-2 transition-colors"
+											className={`w-full px-4 py-2 text-left text-[11px] flex items-center gap-2 transition-colors justify-between ${
+												isSuspended
+													? "text-red-400/50 bg-red-950/10 cursor-not-allowed"
+													: "text-gray-400 hover:bg-gray-800 hover:text-red-400"
+											}`}
 										>
-											<Flag size={12} /> Report
+											<div className="flex items-center gap-2">
+												<Flag size={12} />
+												<span>
+													{isSuspended
+														? "Report Locked"
+														: "Report"}
+												</span>
+											</div>
+											{isSuspended && (
+												<Lock
+													size={12}
+													className="text-red-400/40 ml-auto"
+												/>
+											)}
 										</button>
 									)}
 								</div>
@@ -187,7 +235,12 @@ const CommentItem: React.FC<CommentItemProps> = ({
 						</button>
 						<button
 							onClick={() => handleReplyClick(comment)}
-							className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-blue-400 transition font-bold uppercase tracking-wider"
+							disabled={isSuspended}
+							className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider transition ${
+								isSuspended
+									? "text-gray-700 cursor-not-allowed"
+									: "text-gray-500 hover:text-blue-400"
+							}`}
 						>
 							Reply
 						</button>
@@ -209,7 +262,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
 								replies...
 							</button>
 						) : (
-							/* Jika belum mencapai limit atau sudah diklik 'showMore', render semua item */
 							comment.replies.map((reply) => (
 								<CommentItem
 									key={reply.id}

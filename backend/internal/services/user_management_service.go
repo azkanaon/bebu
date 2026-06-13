@@ -60,16 +60,20 @@ func (s *userManagementService) ModerateUserStatus(ctx context.Context, userID u
 		if err == nil && profile != nil && profile.AvatarUrl != "" {
 			avatarToDelete = profile.AvatarUrl
 		}
-	}
 
-	// Pembaruan status user di database
-	if err := s.repo.UpdateUserStatus(ctx, userID, status); err != nil {
-		return fmt.Errorf("failed to update user management status: %w", err)
+		// Eksekusi fungsi khusus BannedPermanent di Repo (Soft delete user + Hard delete dependency)
+		if err := s.repo.BannedPermanentUser(ctx, userID); err != nil {
+			return fmt.Errorf("failed to permanently ban user and clear dependencies: %w", err)
+		}
+	} else {
+		// Pembaruan status biasa untuk "active" atau "suspended"
+		if err := s.repo.UpdateUserStatus(ctx, userID, status); err != nil {
+			return fmt.Errorf("failed to update user management status: %w", err)
+		}
 	}
 
 	// Hanya dieksekusi jika database sukses di-update dan user memiliki avatar
 	if avatarToDelete != "" {
-		// Panggil helper utilitas reusable Anda
 		_ = utils.DeleteFromCloudinary(avatarToDelete)
 	}
 

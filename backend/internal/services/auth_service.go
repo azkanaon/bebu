@@ -237,7 +237,8 @@ func (s *authService) Login(req *dto.LoginRequest, ipAddress, userAgent string) 
 		AvatarUrl:    user.Profile.AvatarUrl,
 		Bio:          user.Profile.Bio,
 		Gender:	   	  user.Profile.Gender,
-		Role: 		  user.Role,		
+		Role: 		  user.Role,
+		Status:		  user.Status,	
 	}
 
 	// 8. Kembalikan KEDUA token

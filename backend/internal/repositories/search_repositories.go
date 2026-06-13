@@ -99,7 +99,7 @@ func (r *searchRepository) SearchPosts(query string, page, limit int) ([]models.
 
 	baseQuery := r.db.Model(&models.Post{}).
 		Joins("LEFT JOIN post_stats ON post_stats.post_id = posts.post_id").
-		Where("publish_status = ?", "published").
+		Where("publish_status = ? OR publish_status = ?", "published", "shadowbanned").
 		Where("LOWER(description) LIKE ?", "%"+strings.ToLower(query)+"%")
 
 	baseQuery.Count(&total)

@@ -39,6 +39,7 @@ type LoginResponse struct {
 	Bio          string    `json:"bio"`
 	Gender       string    `json:"gender"`
 	Role		 string	   `json:"role"`
+	Status    	 string    `json:"status"`
 }
 
 type ForgotPasswordRequest struct {

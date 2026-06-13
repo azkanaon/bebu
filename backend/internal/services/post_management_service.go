@@ -32,28 +32,24 @@ func (s *postManagementService) UpdatePostStatus(ctx context.Context, postID uin
 		return errors.New("post target not found in infrastructure records")
 	}
 
-	// Variabel penanda apakah kita perlu menghapus gambar di Cloudinary nanti
 	shouldDeleteImage := false
 
-	// Aturan Sistem Baru:
 	switch req.Status {
 	case "published":
-		// Jika post saat ini berstatus soft_deleted, kembalikan data (restore) terlebih dahulu
+		// Catatan: Jika memang mutlak tidak ada restore, case ini bisa diabaikan/dihapus kelak.
 		if post.DeletedAt.Valid {
 			if err := s.repo.RestorePost(ctx, postID); err != nil {
 				return errors.New("failed to restore post records from soft-deleted block")
 			}
 		}
-		// Set publish_status ke "published"
 		err = s.repo.UpdateStatus(ctx, postID, "published")
 
 	case "soft_delete":
-		// Jika data post aslinya sudah terhapus secara soft-delete, lewatkan
 		if post.DeletedAt.Valid {
 			return nil
 		}
 		
-		// Jalankan siklus soft delete bawaan GORM
+		// Sekarang repo SoftDeletePost juga bertanggung jawab me-hard delete relasinya
 		err = s.repo.SoftDeletePost(ctx, postID)
 		if err == nil {
 			shouldDeleteImage = true
@@ -64,7 +60,7 @@ func (s *postManagementService) UpdatePostStatus(ctx context.Context, postID uin
 			shouldDeleteImage = true
 		}
 
-		// Hapus permanen record data dari DB fisik
+		// Hard delete total (Post & Relasi)
 		err = s.repo.HardDeletePost(ctx, postID)
 
 	default:

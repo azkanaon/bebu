@@ -17,9 +17,10 @@ type PostManagementRepository interface {
 	GetPaginatedPosts(ctx context.Context, params dto.PostQueryParams) (dto.PaginatedPostAPIResponse, error)
 	FindPostByID(ctx context.Context, postID uint) (*models.Post, error)
 	UpdateStatus(ctx context.Context, postID uint, status string) error
+	RestorePost(ctx context.Context, postID uint) error
 	SoftDeletePost(ctx context.Context, postID uint) error
 	HardDeletePost(ctx context.Context, postID uint) error
-	RestorePost(ctx context.Context, postID uint) error
+	clearPostDependencies(tx *gorm.DB, postID uint) error
 }
 
 type postManagementRepository struct {
@@ -251,18 +252,76 @@ func (r *postManagementRepository) UpdateStatus(ctx context.Context, postID uint
 		Where("post_id = ?", postID).Update("publish_status", status).Error
 }
 
-func (r *postManagementRepository) SoftDeletePost(ctx context.Context, postID uint) error {
-	// GORM secara otomatis melakukan Soft Delete jika struct memiliki field gorm.DeletedAt
-	return r.db.WithContext(ctx).Where("post_id = ?", postID).Delete(&models.Post{}).Error
-}
-
 func (r *postManagementRepository) RestorePost(ctx context.Context, postID uint) error {
 	// Mengembalikan post yang di-softdelete dengan mengosongkan nilai deleted_at
 	return r.db.WithContext(ctx).Model(&models.Post{}).Unscoped().
 		Where("post_id = ?", postID).Update("deleted_at", nil).Error
 }
 
+func (r *postManagementRepository) SoftDeletePost(ctx context.Context, postID uint) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. HARD DELETE semua data relasi/dependency terlebih dahulu
+		if err := r.clearPostDependencies(tx, postID); err != nil {
+			return err // otomatis rollback jika gagal
+		}
+
+		// 2. SOFT DELETE postingan utama
+		if err := tx.Where("post_id = ?", postID).Delete(&models.Post{}).Error; err != nil {
+			return err
+		}
+
+		return nil // commit transaksi
+	})
+}
+
 func (r *postManagementRepository) HardDeletePost(ctx context.Context, postID uint) error {
-	// Menggunakan Unscoped().Delete() untuk menghapus baris data secara permanen dari physical table
-	return r.db.WithContext(ctx).Unscoped().Where("post_id = ?", postID).Delete(&models.Post{}).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. HARD DELETE semua data relasi/dependency
+		if err := r.clearPostDependencies(tx, postID); err != nil {
+			return err
+		}
+
+		// 2. HARD DELETE postingan utama secara fisik dari DB (.Unscoped)
+		if err := tx.Unscoped().Where("post_id = ?", postID).Delete(&models.Post{}).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+// Helper function internal (private) untuk membersihkan foreign key
+func (r *postManagementRepository) clearPostDependencies(tx *gorm.DB, postID uint) error {
+	// Hapus data dari tabel relasi many-to-many (Post Categories)
+	// Pastikan nama tabel "post_categories" sesuai dengan yang ada di DB Anda
+	if err := tx.Exec("DELETE FROM post_categories WHERE post_id = ?", postID).Error; err != nil {
+		return err
+	}
+
+	// Hapus Comments (Hard Delete)
+	if err := tx.Exec("DELETE FROM post_comments WHERE post_id = ?", postID).Error; err != nil {
+		return err
+	}
+
+	// Hapus Likes (Hard Delete)
+	if err := tx.Exec("DELETE FROM post_likes WHERE post_id = ?", postID).Error; err != nil {
+		return err
+	}
+
+	// Hapus Saves (Hard Delete)
+	if err := tx.Exec("DELETE FROM post_saves WHERE post_id = ?", postID).Error; err != nil {
+		return err
+	}
+
+	// Hapus Shares (Hard Delete)
+	if err := tx.Exec("DELETE FROM post_shares WHERE post_id = ?", postID).Error; err != nil {
+		return err
+	}
+
+	// Hapus Post Stats jika ada record-nya
+	if err := tx.Exec("DELETE FROM post_stats WHERE post_id = ?", postID).Error; err != nil {
+		return err
+	}
+
+	return nil
 }

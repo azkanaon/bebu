@@ -21,6 +21,7 @@ type BookManagementRepository interface {
 	UpdateBookTx(tx *gorm.DB, book *models.Book) error
 	FindByID(ctx context.Context, id uint) (*models.Book, error)
 	DeleteBook(ctx context.Context, id uint) error
+	clearBookDependencies(tx *gorm.DB, bookID uint) error
 	// Submissions
 	GetPaginatedSubmissions(ctx context.Context, params dto.SubmissionQueryParams) (dto.PaginatedSubmissionResponse, error)
 	GetSubmissionByID(ctx context.Context, id uint) (models.BookSubmission, error)
@@ -148,7 +149,74 @@ func (r *bookManagementRepository) FindByID(ctx context.Context, id uint) (*mode
 }
 
 func (r *bookManagementRepository) DeleteBook(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&models.Book{}, id).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. HARD DELETE semua dependensi yang melekat pada book_id ini
+		if err := r.clearBookDependencies(tx, id); err != nil {
+			return err // Otomatis rollback jika salah satu query gagal
+		}
+
+		// 2. SOFT DELETE data buku utama (mengisi kolom deleted_at)
+		if err := tx.Delete(&models.Book{}, id).Error; err != nil {
+			return err
+		}
+
+		return nil // Commit transaksi jika sukses sepenuhnya
+	})
+}
+
+// Private helper function untuk membersihkan data dependensi buku secara menyeluruh
+func (r *bookManagementRepository) clearBookDependencies(tx *gorm.DB, bookID uint) error {
+	// A. Hapus tabel-tabel relasi direct / metadata buku
+	directTables := []string{
+		"book_authors",
+		"book_genres",
+		"book_stats",
+		"book_daily_stats",
+	}
+
+	for _, table := range directTables {
+		if err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE book_id = ?", table), bookID).Error; err != nil {
+			return err
+		}
+	}
+
+	// B. EFEK DOMINO: Ambil semua post_id yang mengulas buku ini
+	var postIDs []uint
+	// Pastikan model Post memiliki field/column tag book_id yang mengarah ke buku
+	if err := tx.Model(&models.Post{}).Where("book_id = ?", bookID).Pluck("post_id", &postIDs).Error; err != nil {
+		return err
+	}
+
+	// Jika ada postingan yang membahas buku tersebut, bersihkan ekosistem postingannya
+	if len(postIDs) > 0 {
+		// 1. Putuskan hubungan dengan tabel messages (Ubah menjadi NULL) agar tidak melanggar Foreign Key
+		if err := tx.Exec("UPDATE messages SET post_id = NULL WHERE post_id IN ?", postIDs).Error; err != nil {
+			return err
+		}
+
+		// 2. Hard Delete semua dependensi interaksi sosial postingan tersebut
+		postDependencyTables := []string{
+			"post_categories",
+			"post_comments",
+			"post_likes",
+			"post_saves",
+			"post_shares",
+			"post_stats",
+		}
+
+		for _, table := range postDependencyTables {
+			if err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE post_id IN ?", table), postIDs).Error; err != nil {
+				return err
+			}
+		}
+
+		// 3. Hard Delete fisik postingan dari tabel 'posts' karena buku panduannya sudah tidak ada
+		if err := tx.Exec("DELETE FROM posts WHERE post_id IN ?", postIDs).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *bookManagementRepository) GetPaginatedSubmissions(

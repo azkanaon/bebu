@@ -574,22 +574,27 @@ func (r *userRepository) SyncUserStats(db *gorm.DB, userID uint, field string, a
 	fFollowers := "COALESCE(user_stats.total_followers, 0)"
 	fPosts := "COALESCE(user_stats.total_posts, 0)"
 	fBadges := "COALESCE(user_stats.total_badges, 0)"
-	fAchievements := "COALESCE(user_stats.total_achievements, 0)" // Tambahkan ini
+	fAchievements := "COALESCE(user_stats.total_achievements, 0)"
 
-	// Update field yang sedang dikirim
 	if field == "total_followers" { fFollowers = fmt.Sprintf("(%s + %d)", fFollowers, amount) }
 	if field == "total_posts" { fPosts = fmt.Sprintf("(%s + %d)", fPosts, amount) }
 	if field == "total_badges" { fBadges = fmt.Sprintf("(%s + %d)", fBadges, amount) }
 	if field == "total_achievements" { fAchievements = fmt.Sprintf("(%s + %d)", fAchievements, amount) }
 
-	// Rumus baru: Badge bobot 10, Achievement bobot 5
-	hotScoreFormula := fmt.Sprintf(`
-		(%s * 2) + (%s * 5) + (%s * 10) + (%s * 5)
-	`, fFollowers, fPosts, fBadges, fAchievements)
+	// Formula dasar perhitungan hot score user
+	baseFormula := fmt.Sprintf(`(%s * 2) + (%s * 5) + (%s * 10) + (%s * 5)`, fFollowers, fPosts, fBadges, fAchievements)
+
+	// KONDISI BARU: Cek apakah user berstatus shadowbanned di tabel users
+	hotScoreFormulaWithShadowban := fmt.Sprintf(`
+		CASE 
+			WHEN (SELECT TRUE FROM users WHERE user_id = %d AND status = 'shadowbanned' LIMIT 1) THEN 0
+			ELSE %s
+		END
+	`, userID, baseFormula)
 
 	return db.Model(&models.UserStat{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
-		field:       gorm.Expr("user_stats."+field+" + ?", amount),
-		"hot_score":  gorm.Expr(hotScoreFormula),
+		field:        gorm.Expr("user_stats."+field+" + ?", amount),
+		"hot_score":  gorm.Expr(hotScoreFormulaWithShadowban),
 		"updated_at": time.Now(),
 	}).Error
 }

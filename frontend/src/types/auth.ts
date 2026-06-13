@@ -1,11 +1,12 @@
 export interface User {
-  user_public_id: string
-  username: string
-  display_name: string
-  avatar_url: string
-  bio: string
-  gender: string
-  role: string
+	user_public_id: string;
+	username: string;
+	display_name: string;
+	avatar_url: string;
+	bio: string;
+	gender: string;
+	role: string;
+	status: "active" | "shadowbanned" | "suspended" | "banned" | string;
 }
 
 export interface LoginResponse {
