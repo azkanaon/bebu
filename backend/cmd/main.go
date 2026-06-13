@@ -40,10 +40,14 @@ func main() {
 	bookshelfHandler := handlers.NewBookshelfHandler(bookshelfService)
 
 	hub := ws.NewHub()
+	chatRepo := repositories.NewChatRepository(db)
+	chatService := services.NewChatService(chatRepo, userRepo, hub, db)
+	chatHandler := handlers.NewChatHandler(chatService)
+
 	notifRepo := repositories.NewNotificationRepository(db)
 	notifService := services.NewNotificationService(notifRepo, hub)
 	notifHandler := handlers.NewNotificationHandler(notifService)
-	wsHandler := handlers.NewWSHandler(hub)
+	wsHandler := handlers.NewWSHandler(hub, chatRepo)
 
 	pgRepo := repositories.NewPostgresRepository(db)
 	redisRepo := repositories.NewRedisRepository(rdb)
@@ -106,10 +110,6 @@ func main() {
 	submissionRepo := repositories.NewBookSubmissionRepository(db)
 	submissionService := services.NewBookSubmissionService(submissionRepo, db)
 	submissionHandler := handlers.NewBookSubmissionHandler(submissionService)
-
-	chatRepo := repositories.NewChatRepository(db)
-	chatService := services.NewChatService(chatRepo, userRepo, db)
-	chatHandler := handlers.NewChatHandler(chatService)
 
 	leaderboardHandler := handlers.NewLeaderboardHandler(leaderboardService)
 
@@ -188,7 +188,15 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 
 		chats := v1.Group("/chats").Use(authMiddleware.RequiredAuth())
 		{
-			chats.POST("/send", authMiddleware.RequiredAuth(), chatHandler.SendMessage)
+			chats.POST("/send", chatHandler.SendMessage)
+			chats.GET("/conversations", chatHandler.GetInbox)
+			chats.GET("/conversations/:id/messages", chatHandler.GetMessages)
+			chats.PUT("/conversations/:id/read", chatHandler.MarkAsRead)
+			chats.POST("/groups", chatHandler.CreateGroup)
+			chats.POST("/conversations/:id/members", chatHandler.AddMembers)
+    		chats.PUT("/conversations/:id/rename", chatHandler.RenameGroup)
+			chats.DELETE("/conversations/:id/leave", chatHandler.LeaveGroup)
+    		chats.DELETE("/conversations/:id/members/:userId", chatHandler.KickMember)
 		}
 
 		profile := v1.Group("/profile").Use(authMiddleware.RequiredAuth())

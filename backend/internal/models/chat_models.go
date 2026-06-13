@@ -3,6 +3,7 @@ package models
 
 import (
 	"time"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -13,6 +14,9 @@ type Conversation struct {
 	CreatedByUserID  uint      `gorm:"column:created_by_user_id;not null"`
 	ConversationType string    `gorm:"column:conversation_type;size:50;not null;default:direct"`
 	LastMessageAt    *time.Time `gorm:"column:last_message_at"`
+	LastMessageBody string `gorm:"column:last_message_body"`
+	Title            *string    `gorm:"column:title"`   // NULL jika DM
+    ImgURL           *string    `gorm:"column:img_url"`
 	CreatedAt        time.Time `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt        time.Time `gorm:"column:updated_at;autoUpdateTime"`
 
@@ -26,7 +30,10 @@ type Message struct {
 	MessageID      uint           `gorm:"column:message_id;primaryKey;autoIncrement"`
 	ConversationID uint           `gorm:"column:conversation_id;not null"`
 	SenderUserID   uint           `gorm:"column:sender_user_id;not null"`
+	ParentMessageID *uint    `gorm:"column:parent_message_id"`
+    ParentMessage   *Message `gorm:"foreignKey:ParentMessageID"`
 	PostID         *uint          `gorm:"column:post_id"`
+	BookID         *uint          `gorm:"column:book_id"`
 	MessageType    string         `gorm:"column:message_type;size:50;not null;default:text"`
 	Body           *string        `gorm:"column:body;type:text"`
 	CreatedAt      time.Time      `gorm:"column:created_at;autoCreateTime"`
@@ -36,6 +43,7 @@ type Message struct {
 	Conversation Conversation `gorm:"foreignKey:ConversationID;references:ConversationID"`
 	Sender       User         `gorm:"foreignKey:SenderUserID;references:UserID"`
 	Post         *Post        `gorm:"foreignKey:PostID;references:PostID"`
+	Book         *Book        `gorm:"foreignKey:BookID;references:BookID"`
 	Reads        []MessageRead `gorm:"foreignKey:MessageID"`
 }
 

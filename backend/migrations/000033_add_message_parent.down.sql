@@ -1,0 +1,1 @@
+ALTER TABLE messages DROP COLUMN IF EXISTS parent_message_id;
