@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { X, Send } from "lucide-react";
+import { X, Send, AlertCircle } from "lucide-react"; // 🔥 Tambah AlertCircle untuk info suspend
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -45,45 +45,35 @@ export default function CommentModal({
 	const pathname = usePathname();
 
 	useEffect(() => {
-		// Logika ini HANYA berjalan jika ini adalah pop-up modal, bukan standalone page
 		if (isStandalonePage) return;
 
 		const handleGlobalClick = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
-			// Cari apakah elemen yang diklik (atau parent-nya) adalah sebuah Link/Anchor tag
 			const anchor = target.closest("a");
 
-			// Jika yang diklik adalah link, memiliki href, dan href-nya mengarah ke rute internal aplikasi
 			if (
 				anchor &&
 				anchor.href &&
 				anchor.href.startsWith(window.location.origin)
 			) {
-				// Ambil path tujuannya saja (misal: /[username] atau /books/[slug])
 				const targetPath = anchor.href.replace(
 					window.location.origin,
 					"",
 				);
 
-				// Jika link tujuan sama dengan URL modal saat ini, abaikan
 				if (targetPath === pathname) return;
 
-				// 1. Cegah navigasi bawaan Next.js/Browser agar tidak terjadi tabrakan history
 				e.preventDefault();
 				e.stopPropagation();
 
-				// 2. Tutup slot @modal secara resmi dengan memerintahkan router mundur 1 langkah
 				router.back();
 
-				// 3. Berikan jeda super singkat (micro-task) agar rute intersep mati total dari layar,
-				// kemudian arahkan router Next.js ke halaman tujuan asli secara absolut.
 				setTimeout(() => {
 					router.push(targetPath);
 				}, 50);
 			}
 		};
 
-		// Daftarkan event listener klik di seluruh area modal
 		document.addEventListener("click", handleGlobalClick, true);
 
 		return () => {
@@ -95,23 +85,30 @@ export default function CommentModal({
 		string | number | undefined
 	>(undefined);
 
-	// Get Current User ID
+	// 🔥 State untuk melacak status suspensi user
+	const [isSuspended, setIsSuspended] = useState(false);
+
+	// Get Current User ID & Status
 	useEffect(() => {
 		try {
 			const authStorage = localStorage.getItem("bebu-auth-storage");
 			if (authStorage) {
 				const parsedStorage = JSON.parse(authStorage);
-
-				// 💡 PERBAIKAN: Langsung tembak dari user ke user_public_id tanpa lewat .data
-				const userPublicId = parsedStorage?.state?.user?.user_public_id;
+				const user = parsedStorage?.state?.user;
+				const userPublicId = user?.user_public_id;
 
 				if (userPublicId) {
 					setCurrentUserId(userPublicId);
 				} else {
 					console.warn(
 						"user_public_id tidak ditemukan di dalam objek user:",
-						parsedStorage?.state?.user,
+						user,
 					);
+				}
+
+				// 🔥 Validasi status suspensi dari local storage
+				if (user?.status === "suspended") {
+					setIsSuspended(true);
 				}
 			}
 		} catch (error) {
@@ -123,7 +120,6 @@ export default function CommentModal({
 	const [loading, setLoading] = useState(true);
 
 	const fetchComments = useCallback(async () => {
-		// Set loading true hanya jika ini bukan render pertama yang sudah default true
 		setLoading(true);
 		try {
 			const data = await getCommentsAPI(postId);
@@ -142,14 +138,14 @@ export default function CommentModal({
 	const [prevPost, setPrevPost] = useState(post);
 	const [currentPost, setCurrentPost] = useState(post);
 
-	// 2. Cek perubahan saat render (bukan di useEffect)
 	if (post.comments !== prevPost.comments) {
 		setPrevPost(post);
 		setCurrentPost(post);
 	}
 
 	const handleSendComment = async () => {
-		if (!commentText.trim() || submitting) return;
+		// 🔥 Blokir eksekusi fungsi jika user terdeteksi suspended
+		if (!commentText.trim() || submitting || isSuspended) return;
 
 		setSubmitting(true);
 		try {
@@ -162,25 +158,16 @@ export default function CommentModal({
 			const response = await createCommentAPI(payload);
 			const newComment = response.data;
 
-			// Tambah comment count
 			setCurrentPost((prev) => ({
 				...prev,
 				comments: (prev.comments || 0) + 1,
 			}));
 
-			// Update Parent (...Post.tsx)
 			if (onCommentAdded) {
-				// Jika kita mengirim komentar utama (bukan reply), kirim objeknya ke parent
-				if (!replyTo) {
-					onCommentAdded(newComment);
-				} else {
-					// Jika reply, panggil tanpa parameter (hanya untuk trigger count)
-					onCommentAdded(newComment);
-				}
+				onCommentAdded(newComment);
 			}
 
 			if (replyTo) {
-				// UPDATE STATE SECARA REKURSIF
 				setComments((prevComments) => {
 					const currentComments = Array.isArray(prevComments)
 						? prevComments
@@ -190,16 +177,13 @@ export default function CommentModal({
 						list: CommentType[],
 					): CommentType[] => {
 						return list.map((c) => {
-							// Jika ID cocok dengan yang sedang kita balas
 							if (c.id === replyTo.id) {
 								return {
 									...c,
-									// Masukkan komentar baru ke awal atau akhir list replies
 									replies: [newComment, ...(c.replies || [])],
 								};
 							}
 
-							// Jika tidak cocok, tapi comment ini punya anak, cari ke dalam anaknya
 							if (c.replies && c.replies.length > 0) {
 								return {
 									...c,
@@ -214,7 +198,6 @@ export default function CommentModal({
 					return insertReplyRecursive(currentComments);
 				});
 			} else {
-				// JIKA KOMENTAR UTAMA
 				setComments((prevComments) => {
 					const currentComments = Array.isArray(prevComments)
 						? prevComments
@@ -234,7 +217,6 @@ export default function CommentModal({
 						};
 					}
 
-					// Jika kita membalas salah satu anak di dalam thread fokus
 					const insertInFocusRecursive = (
 						list: CommentType[],
 					): CommentType[] => {
@@ -262,7 +244,6 @@ export default function CommentModal({
 				});
 			}
 
-			// Reset Form
 			setCommentText("");
 			setReplyTo(null);
 		} catch (err: unknown) {
@@ -274,12 +255,10 @@ export default function CommentModal({
 
 	useEffect(() => {
 		if (isStandalonePage) {
-			// Panggil fungsi fetch data langsung tanpa mengunci body scroll
 			fetchComments();
 			return;
 		}
 
-		// Mengunci scroll HANYA jika berbentuk pop-up modal
 		document.body.style.overflow = "hidden";
 
 		const initModal = async () => {
@@ -287,7 +266,6 @@ export default function CommentModal({
 		};
 		initModal();
 
-		// Cleanup function
 		return () => {
 			document.body.style.overflow = "unset";
 		};
@@ -296,9 +274,11 @@ export default function CommentModal({
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 
 	const handleReplyClick = (comment: CommentType) => {
+		// 🔥 Cegah reply jikalau user disuspensi
+		if (isSuspended) return;
+
 		setReplyTo(comment);
 
-		// Gunakan timeout sedikit agar UI sempat merender indikator "Membalas @..."
 		setTimeout(() => {
 			inputRef.current?.focus();
 		}, 100);
@@ -337,7 +317,6 @@ export default function CommentModal({
 				setFocusedComment((prev) => {
 					if (!prev) return null;
 
-					// Jika yang di-like adalah "Kepala" thread fokus
 					if (prev.id === commentId) {
 						const currentlyLiked = prev.is_liked;
 						return {
@@ -349,7 +328,6 @@ export default function CommentModal({
 						};
 					}
 
-					// Jika yang di-like adalah salah satu balasan di dalam thread fokus
 					const updateRepliesRecursive = (
 						list: CommentType[],
 					): CommentType[] => {
@@ -398,7 +376,6 @@ export default function CommentModal({
 		): number => {
 			for (const item of list) {
 				if (item.id === targetId) {
-					// Hitung dirinya sendiri (1) + semua total replies di dalamnya
 					const countReplies = (replies: CommentType[]): number => {
 						return replies.reduce(
 							(acc, reply) =>
@@ -419,7 +396,6 @@ export default function CommentModal({
 			return 0;
 		};
 
-		// Hitung berapa banyak yang akan berkurang
 		const totalToReduce = countItemsRecursive(comments, commentId);
 
 		const previousComments = comments;
@@ -427,16 +403,15 @@ export default function CommentModal({
 		const previousPostData = currentPost;
 
 		try {
-			// Optimistic Update: Hapus dari state lokal
 			setComments((prev) => {
 				const removeRecursive = (
 					list: CommentType[],
 				): CommentType[] => {
 					return list
-						.filter((c) => c.id !== commentId) // Hapus jika ID cocok
+						.filter((c) => c.id !== commentId)
 						.map((c) => ({
 							...c,
-							replies: removeRecursive(c.replies || []), // Cek di balasan
+							replies: removeRecursive(c.replies || []),
 						}));
 				};
 				return removeRecursive(prev);
@@ -444,7 +419,7 @@ export default function CommentModal({
 
 			if (focusedComment) {
 				if (focusedComment.id === commentId) {
-					setFocusedComment(null); // Jika kepala thread dihapus, keluar dari mode fokus
+					setFocusedComment(null);
 				} else {
 					setFocusedComment((prev) => {
 						if (!prev) return null;
@@ -470,13 +445,11 @@ export default function CommentModal({
 
 			await deleteCommentAPI(commentId, postId);
 
-			// Update Local Comment Count
 			setCurrentPost((prev) => ({
 				...prev,
 				comments: Math.max(0, (prev.comments || 0) - totalToReduce),
 			}));
 
-			// Update Data Parent (...Post.tsx)
 			if (onCommentDeleted) {
 				onCommentDeleted(commentId, totalToReduce);
 			}
@@ -485,7 +458,6 @@ export default function CommentModal({
 		} catch (err) {
 			console.error("Gagal menghapus:", err);
 
-			// Rollback
 			setComments(previousComments);
 			setFocusedComment(previousFocused);
 			setCurrentPost(previousPostData);
@@ -499,7 +471,6 @@ export default function CommentModal({
 		type: "post" | "comment";
 	} | null>(null);
 
-	// Buat Fokus Child Comment agar tidak kepanjangan ke kanan
 	const [focusedComment, setFocusedComment] = useState<CommentType | null>(
 		null,
 	);
@@ -510,6 +481,37 @@ export default function CommentModal({
 		setFocusedComment(null);
 	};
 
+	useEffect(() => {
+		// Hanya jalankan logika ini jika modal dibuka sebagai pop-up (bukan standalone page)
+		if (!isStandalonePage) {
+			sessionStorage.setItem("is_comment_modal_open", "true");
+			// Kirim sinyal (event) ke seluruh aplikasi bahwa status modal berubah
+			window.dispatchEvent(new Event("modal-route-change"));
+		}
+
+		return () => {
+			if (!isStandalonePage) {
+				sessionStorage.removeItem("is_comment_modal_open");
+				// Kirim sinyal kembali saat modal ditutup
+				window.dispatchEvent(new Event("modal-route-change"));
+			}
+		};
+	}, [isStandalonePage]);
+
+	useEffect(() => {
+		return () => {
+			// Ketika modal di-unmount (ditutup), bersihkan flag agar tidak tertinggal jika user menekan tombol back/forward browser
+			if (
+				typeof window !== "undefined" &&
+				window.history.state?.isModalView
+			) {
+				const newState = { ...window.history.state };
+				delete newState.isModalView;
+				window.history.replaceState(newState, "");
+			}
+		};
+	}, []);
+
 	const modalContent = (
 		<div
 			className={
@@ -518,7 +520,6 @@ export default function CommentModal({
 					: "fixed inset-0 z-[999] flex items-center justify-center p-0 sm:p-4"
 			}
 		>
-			{/* Backdrop dengan Blur (Hanya untuk Modal Pop-up) */}
 			{!isStandalonePage && (
 				<motion.div
 					initial={{ opacity: 0 }}
@@ -529,7 +530,6 @@ export default function CommentModal({
 				/>
 			)}
 
-			{/* Main Modal Container */}
 			<motion.div
 				initial={isStandalonePage ? {} : { y: "100%", opacity: 0 }}
 				animate={isStandalonePage ? {} : { y: 0, opacity: 1 }}
@@ -541,7 +541,6 @@ export default function CommentModal({
 						: "relative bg-gray-950 w-full max-w-2xl h-full sm:h-[90vh] rounded-t-[2rem] sm:rounded-2xl border-t sm:border border-gray-800 flex flex-col shadow-2xl overflow-hidden"
 				}
 			>
-				{/* Header (Hanya untuk Modal Pop-up) */}
 				{!isStandalonePage && (
 					<div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-950/50 backdrop-blur-md sticky top-0 z-10">
 						<div>
@@ -561,7 +560,6 @@ export default function CommentModal({
 					</div>
 				)}
 
-				{/* Scrollable Comment List */}
 				<div
 					className={
 						isStandalonePage
@@ -569,7 +567,6 @@ export default function CommentModal({
 							: "flex-1 overflow-y-auto custom-scrollbar"
 					}
 				>
-					{/* CATATAN: Di halaman standalone, kita matikan 'overflow-y-auto' agar scrollbar utama browser yang bekerja secara alami */}
 					<div className="border-b border-gray-800 bg-gray-900/20">
 						{type === "analysis" ? (
 							<AnalysisPost
@@ -588,7 +585,6 @@ export default function CommentModal({
 						)}
 					</div>
 
-					{/* FOCUS MODE */}
 					{focusedComment && (
 						<div className="p-4 bg-blue-500/5 border-b border-gray-800 flex items-center justify-between">
 							<button
@@ -666,49 +662,69 @@ export default function CommentModal({
 							: "p-4 border-t border-gray-800 bg-gray-900/80 backdrop-blur-md"
 					}
 				>
-					{replyTo && (
-						<div className="flex justify-between items-center bg-blue-500/10 border-l-2 border-blue-500 px-3 py-1.5 mb-2 rounded-r-lg">
-							<p className="text-[10px] text-blue-400">
-								Replying to{" "}
-								<span className="font-bold">
-									@{replyTo.username}
-								</span>
-							</p>
-							<button
-								onClick={() => setReplyTo(null)}
-								className="text-gray-500 hover:text-white transition"
-							>
-								<X size={14} />
-							</button>
+					{/* 🔥 KONDISI 1: JIKA USER KENA SUSPEND */}
+					{isSuspended ? (
+						<div className="w-full bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-4 py-3 text-xs flex items-center gap-2 font-medium">
+							<AlertCircle
+								size={16}
+								className="shrink-0 text-red-400"
+							/>
+							<span>
+								Your account is suspended. You are restricted
+								from participating in discussions.
+							</span>
 						</div>
-					)}
+					) : (
+						/* KONDISI 2: JIKA USER NORMAL */
+						<>
+							{replyTo && (
+								<div className="flex justify-between items-center bg-blue-500/10 border-l-2 border-blue-500 px-3 py-1.5 mb-2 rounded-r-lg">
+									<p className="text-[10px] text-blue-400">
+										Replying to{" "}
+										<span className="font-bold">
+											@{replyTo.username}
+										</span>
+									</p>
+									<button
+										onClick={() => setReplyTo(null)}
+										className="text-gray-500 hover:text-white transition"
+									>
+										<X size={14} />
+									</button>
+								</div>
+							)}
 
-					<div className="flex gap-3 items-end">
-						<textarea
-							ref={inputRef}
-							value={commentText}
-							onChange={(e) => setCommentText(e.target.value)}
-							placeholder={
-								replyTo
-									? `Replying to @${replyTo.username}...`
-									: "Write your opinion..."
-							}
-							className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 resize-none transition-all"
-							rows={1}
-						/>
-						<button
-							onClick={handleSendComment}
-							disabled={!commentText.trim() || submitting}
-							className="p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:opacity-50 rounded-full transition-all"
-						>
-							<Send size={18} className="text-white" />
-						</button>
-					</div>
+							<div className="flex gap-3 items-end">
+								<textarea
+									ref={inputRef}
+									value={commentText}
+									onChange={(e) =>
+										setCommentText(e.target.value)
+									}
+									placeholder={
+										replyTo
+											? `Replying to @${replyTo.username}...`
+											: "Write your opinion..."
+									}
+									className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 resize-none transition-all"
+									rows={1}
+								/>
+								<button
+									onClick={handleSendComment}
+									disabled={!commentText.trim() || submitting}
+									className="p-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:opacity-50 rounded-full transition-all cursor-pointer"
+								>
+									<Send size={18} className="text-white" />
+								</button>
+							</div>
+						</>
+					)}
 				</div>
 			</motion.div>
 
+			{/* 🔥 Proteksi berlapis agar user suspended juga tidak bisa memicu modal report komentar */}
 			<ReportModal
-				isOpen={!!reportTarget}
+				isOpen={!!reportTarget && !isSuspended}
 				onClose={() => setReportTarget(null)}
 				entityId={reportTarget?.id || 0}
 				entityType={reportTarget?.type || "comment"}

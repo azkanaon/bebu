@@ -920,7 +920,19 @@ func (r *bookRepository) GetRecommendationsByAuthors(ctx context.Context, curren
 func (r *bookRepository) GetBookPosts(ctx context.Context, bookID uint, postType string, cursor uint, limit int, userID uint) ([]models.Post, error) {
 	var posts []models.Post
 
+	// Catatan Cursor: Karena kita mengurutkan berdasarkan Skor Tren yang dinamis, 
+	// kita sebaiknya menggunakan Offset Pagination konvensional demi keakuratan skor,
+	// atau jika tetap ingin cursor, ubah cursor menjadi berbasis 'score' (namun rawan data duplikat jika score sama).
+	// Di bawah ini kita asumsikan 'cursor' beralih fungsi menjadi pemicu offset/page (page = cursor jika frontend mengirim page).
+	offset := 0
+	if cursor > 0 {
+		// Jika frontend mengirim cursor sebagai penanda halaman (misal: 1, 2, 3...)
+		offset = (int(cursor) - 1) * limit
+	}
+
 	query := r.db.WithContext(ctx).
+		// 1. Lakukan LEFT JOIN ke post_stats untuk mendapatkan hot_score dasar
+		Joins("LEFT JOIN post_stats ON post_stats.post_id = posts.post_id").
 		Select(`posts.*, 
 			(SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
 			(SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
@@ -929,22 +941,32 @@ func (r *bookRepository) GetBookPosts(ctx context.Context, bookID uint, postType
 		Preload("Book.BookAuthors.Author").
 		Preload("Book.BookGenres.Genre").
 		Preload("Stats").
-		Preload("Categories"). // Untuk keperluan post tipe Analysis
+		Preload("Categories"). 
 		Where("posts.book_id = ?", bookID).
 		Where("posts.post_type = ?", postType).
-		Where("posts.publish_status = ?", "published")
+		// 2. MODIFIKASI STATUS: Izinkan 'published' ATAU 'shadowbanned' muncul di Book Profile
+		Where("posts.publish_status IN ?", []string{"published", "shadowbanned"})
 
-	// Cursor Pagination
-	if cursor > 0 {
-		query = query.Where("posts.post_id < ?", cursor)
-	}
+	// 3. LOGIKA TIME DECAY DI POSTGRESQL (Menggunakan kombinasi hot_score dan selisih waktu dalam jam)
+	// Rumus: COALESCE(hot_score, 0) / ( (Waktu Sekarang - Waktu Post) dalam Jam + 2 ) pangkat 1.5
+	decayOrderSQL := `
+		COALESCE(post_stats.hot_score, 0) / 
+		POWER(
+			(EXTRACT(EPOCH FROM (NOW() - posts.created_at)) / 3600) + 2, 
+			1.5
+		) DESC, 
+		posts.created_at DESC
+	`
 
-	err := query.Order("posts.post_id DESC").Limit(limit).Find(&posts).Error
+	err := query.Order(decayOrderSQL).
+		Limit(limit).
+		Offset(offset). // Menggunakan offset agar pengurutan skor dinamis tidak tumpang tindih
+		Find(&posts).Error
+
 	if err != nil {
 		return nil, err
 	}
 
-	// Map GORM virtual column ke struct field jika diperlukan
 	for i := range posts {
 		if posts[i].Stats != nil {
 			posts[i].TotalLikes = posts[i].Stats.LikeCount

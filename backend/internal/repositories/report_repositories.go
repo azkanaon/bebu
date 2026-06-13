@@ -1,15 +1,16 @@
 package repositories
 
 import (
-	"backend-bebu/internal/models"
 	"backend-bebu/internal/dto"
+	"backend-bebu/internal/models"
+
 	"gorm.io/gorm"
 
+	"context"
+	"errors"
 	"fmt"
 	"strings"
-	"context"
 	"time"
-	"errors"
 )
 
 type ReportRepository interface {
@@ -28,6 +29,8 @@ type ReportRepository interface {
 	GetUserProfileForModeration(ctx context.Context, userID uint) (*models.UserProfile, error)
 	ExecuteUserAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction, targetUserStatus string) error
 	ExecutePostAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction, targetPostStatus string, isHardDelete bool) error
+	clearUserDependencies(tx *gorm.DB, userID uint) error
+	clearSinglePostDependencies(tx *gorm.DB, postID uint) error
 	ExecuteDismissAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction) error
 }
 
@@ -113,7 +116,6 @@ func (r *reportRepository) CreateReportWithSummary(userID uint, entityID int, en
 }
 
 /* --- REPORT SUMMARY --- */
-
 func (r *reportRepository) GetDashboardSummaries(filters dto.ReportFilterRequest) ([]dto.ReportDashboardResponse, int64, error) {
 	var results []dto.ReportDashboardResponse
 	var totalCount int64
@@ -131,8 +133,10 @@ func (r *reportRepository) GetDashboardSummaries(filters dto.ReportFilterRequest
 				rs.status,
 				COALESCE(u.username, p.description, '') AS target
 			FROM report_summaries rs
-			LEFT JOIN users u ON rs.entity_type = 'user' AND rs.entity_id = u.user_id AND u.deleted_at IS NULL
-			LEFT JOIN posts p ON rs.entity_type = 'post' AND rs.entity_id = p.post_id AND p.deleted_at IS NULL
+			LEFT JOIN users u ON rs.entity_type = 'user' AND rs.entity_id = u.user_id
+			LEFT JOIN posts p ON rs.entity_type = 'post' AND rs.entity_id = p.post_id
+			WHERE (rs.entity_type = 'user' AND u.user_id IS NOT NULL AND u.deleted_at IS NULL) 
+			OR (rs.entity_type = 'post' AND p.post_id IS NOT NULL AND p.deleted_at IS NULL)
 		) AS aggregated_reports
 		WHERE 1=1
 	`
@@ -387,9 +391,56 @@ func (r *reportRepository) ExecuteUserAction(ctx context.Context, summary *model
 			return err
 		}
 
-		// 3. Ubah Status Target User
-		if err := tx.Model(&models.User{}).Where("user_id = ?", summary.EntityID).Update("status", targetUserStatus).Error; err != nil {
-			return err
+		userID := uint(summary.EntityID)
+
+		// 3. Eksekusi Berdasarkan Status Target
+		if targetUserStatus == "banned" {
+			// Ambil fungsi helper pembersihan dependensi
+			if err := r.clearUserDependencies(tx, userID); err != nil {
+				return err
+			}
+
+			// Update fields status & is_active
+			err := tx.Model(&models.User{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
+				"status":    "banned",
+				"is_active": false,
+			}).Error
+			if err != nil {
+				return err
+			}
+
+			// Picu Soft Delete bawaan GORM untuk mengisi kolom deleted_at pada tabel users
+			if err := tx.Where("user_id = ?", userID).Delete(&models.User{}).Error; err != nil {
+				return err
+			}
+		} else {
+			// Jika statusnya adalah "shadowbanned" atau "suspended"
+			isActive := targetUserStatus == "active"
+			err := tx.Model(&models.User{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
+				"status":    targetUserStatus,
+				"is_active": isActive,
+			}).Error
+			if err != nil {
+				return err
+			}
+
+			// ==================== ATURAN BARU SHADOWBAN USER ====================
+			if targetUserStatus == "shadowbanned" {
+				// A. Reset hot_score milik user tersebut di tabel user_stats ke 0
+				if err := tx.Exec("UPDATE user_stats SET hot_score = 0 WHERE user_id = ?", userID).Error; err != nil {
+					return err
+				}
+
+				// B. Reset hot_score SEMUA postingan buatan user tersebut di tabel post_stats ke 0
+				updatePostStatsSQL := `
+					UPDATE post_stats 
+					SET hot_score = 0 
+					WHERE post_id IN (SELECT post_id FROM posts WHERE user_id = ?)`
+				if err := tx.Exec(updatePostStatsSQL, userID).Error; err != nil {
+					return err
+				}
+			}
+			// ====================================================================
 		}
 
 		return nil
@@ -413,28 +464,119 @@ func (r *reportRepository) ExecutePostAction(ctx context.Context, summary *model
 			return err
 		}
 
-		// 3. Ubah Status Target Post (Soft Delete vs Hard Delete vs Shadowban)
+		postID := uint(summary.EntityID)
+
+		// 3. Kondisional Siklus Penghapusan / Moderasi Postingan
 		if isHardDelete {
-			if err := tx.Unscoped().Delete(&models.Post{}, "post_id = ?", summary.EntityID).Error; err != nil {
+			// Bersihkan dependensi post terlebih dahulu (Hard Delete ulasan sosial + message NULL)
+			if err := r.clearSinglePostDependencies(tx, postID); err != nil {
+				return err
+			}
+
+			// Hapus fisik data post secara permanen (.Unscoped)
+			if err := tx.Unscoped().Delete(&models.Post{}, "post_id = ?", postID).Error; err != nil {
+				return err
+			}
+		} else if targetPostStatus == "soft_deleted" {
+			// Bersihkan dependensi post terlebih dahulu (Hard Delete ulasan sosial + message NULL)
+			if err := r.clearSinglePostDependencies(tx, postID); err != nil {
+				return err
+			}
+
+			// Lakukan Soft Delete bawaan GORM (isi deleted_at)
+			if err := tx.Delete(&models.Post{}, "post_id = ?", postID).Error; err != nil {
+				return err
+			}
+
+			// Update status publikasinya menjadi soft_deleted
+			if err := tx.Model(&models.Post{}).Where("post_id = ?", postID).Update("publish_status", "soft_deleted").Error; err != nil {
 				return err
 			}
 		} else {
-			updates := map[string]interface{}{"publish_status": targetPostStatus}
-			
-			// Jika melakukan soft_delete bawaan GORM, set gorm.DeletedAt
-			if targetPostStatus == "soft_deleted" {
-				if err := tx.Delete(&models.Post{}, "post_id = ?", summary.EntityID).Error; err != nil {
+			// Kasus modifikasi status ulasan (misal: "shadowban_post")
+			if err := tx.Model(&models.Post{}).Where("post_id = ?", postID).Update("publish_status", targetPostStatus).Error; err != nil {
+				return err
+			}
+
+			// ==================== ATURAN BARU SHADOWBAN POST ====================
+			if targetPostStatus == "shadowbanned" {
+				// Reset hot_score spesifik milik postingan ini ke 0 pada tabel post_stats
+				if err := tx.Exec("UPDATE post_stats SET hot_score = 0 WHERE post_id = ?", postID).Error; err != nil {
 					return err
 				}
 			}
-			
-			if err := tx.Model(&models.Post{}).Where("post_id = ?", summary.EntityID).Updates(updates).Error; err != nil {
-				return err
-			}
+			// ====================================================================
 		}
 
 		return nil
 	})
+}
+
+// Private helper function untuk mereduksi boilerplate query pembersihan dependensi USER
+func (r *reportRepository) clearUserDependencies(tx *gorm.DB, userID uint) error {
+	tables := []string{
+		"user_settings", "user_stats", "password_resets",
+		"user_sessions", "user_social_links", "user_categories", "user_reading_stats",
+	}
+
+	for _, table := range tables {
+		if err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE user_id = ?", table), userID).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Exec("DELETE FROM user_follows WHERE user_followed_id = ? OR user_following_id = ?", userID, userID).Error; err != nil {
+		return err
+	}
+	if err := tx.Exec("DELETE FROM user_blocks WHERE user_blocked_id = ? OR user_blocking_id = ?", userID, userID).Error; err != nil {
+		return err
+	}
+	if err := tx.Exec("DELETE FROM user_badges WHERE user_id = ?", userID).Error; err != nil {
+		return err
+	}
+	if err := tx.Exec("DELETE FROM user_achievements WHERE user_id = ?", userID).Error; err != nil {
+		return err
+	}
+
+	// Tangani pembersihan Post milik user yang di-ban beserta seluruh dependensinya
+	var postIDs []uint
+	if err := tx.Model(&models.Post{}).Where("user_id = ?", userID).Pluck("post_id", &postIDs).Error; err != nil {
+		return err
+	}
+	
+	if len(postIDs) > 0 {
+		if err := tx.Exec("UPDATE messages SET post_id = NULL WHERE post_id IN ?", postIDs).Error; err != nil {
+			return err
+		}
+
+		dependencyTables := []string{"post_categories", "post_comments", "post_likes", "post_saves", "post_shares", "post_stats"}
+		for _, table := range dependencyTables {
+			if err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE post_id IN ?", table), postIDs).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Exec("DELETE FROM posts WHERE user_id = ?", userID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Private helper function untuk mereduksi boilerplate query pembersihan dependensi SATU POST
+func (r *reportRepository) clearSinglePostDependencies(tx *gorm.DB, postID uint) error {
+	// Putus relasi di tabel messages terlebih dahulu dengan mengubahnya jadi NULL
+	if err := tx.Exec("UPDATE messages SET post_id = NULL WHERE post_id = ?", postID).Error; err != nil {
+		return err
+	}
+
+	dependencyTables := []string{"post_categories", "post_comments", "post_likes", "post_saves", "post_shares", "post_stats"}
+	for _, table := range dependencyTables {
+		// PERBAIKAN: Parameter kedua harusnya postID, bukan table
+		if err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE post_id = ?", table), postID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *reportRepository) ExecuteDismissAction(ctx context.Context, summary *models.ReportSummary, action *models.AdminAction) error {

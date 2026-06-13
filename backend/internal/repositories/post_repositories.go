@@ -54,57 +54,73 @@ func (r *postRepository) WithTx(tx *gorm.DB) PostRepository {
 }
 
 func (r *postRepository) GetPosts(userID uint, tab string, cursor uint, limit int, categoryID uint) ([]models.Post, error) {
-    var posts []models.Post
+	var posts []models.Post
 
-    query := r.db.Debug().
-        Select(`posts.*, 
-            (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
-            (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
-            userID, userID).
-        Preload("User.Profile").
-        Preload("Book.BookAuthors.Author"). 
-        Preload("Book.BookGenres.Genre").
-        Preload("Stats").
-        Preload("Categories").
-        Preload("Comments", func(db *gorm.DB) *gorm.DB {
-            return db.Where("post_comment_id IN (SELECT post_comment_id FROM (SELECT post_comment_id, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY created_at DESC) as rn FROM post_comments WHERE parent_comment_id IS NULL) tmp WHERE rn <= 3)")
-        }).
-        Preload("Comments.User.Profile").
-        Where("publish_status = ?", "published")
+	query := r.db.Debug().
+		Select(`posts.*, 
+			(SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
+			(SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
+			userID, userID).
+		Preload("User.Profile").
+		Preload("Book.BookAuthors.Author"). 
+		Preload("Book.BookGenres.Genre").
+		Preload("Stats").
+		Preload("Categories").
+		Preload("Comments", func(db *gorm.DB) *gorm.DB {
+			return db.Where("post_comment_id IN (SELECT post_comment_id FROM (SELECT post_comment_id, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY created_at DESC) as rn FROM post_comments WHERE parent_comment_id IS NULL) tmp WHERE rn <= 3)")
+		}).
+		Preload("Comments.User.Profile")
 
-    // --- Filtering ---
-    if categoryID > 0 {
-        query = query.Where(`
-            posts.post_id IN (SELECT post_id FROM post_categories WHERE category_id = ?) 
-            OR 
-            posts.book_id IN (SELECT book_id FROM book_genres WHERE genre_id = (
-                SELECT genre_id FROM genres WHERE genre_name = (SELECT category_name FROM categories WHERE category_id = ?)
-            ))`, categoryID, categoryID)
-    }
+	// ==================== KONDISI DINAMIS SHADOWBAN (USER & POST) ====================
+	// Selalu lakukan JOIN ke tabel users agar kita bisa memeriksa kolom users.status penulis
+	query = query.Joins("JOIN users ON users.user_id = posts.user_id")
 
-    // Filter Tab Following
-    if tab == "following" && userID != 0 {
-        followingSubquery := r.db.Model(&models.UserFollow{}).
-            Select("user_followed_id").
-            Where("user_following_id = ? AND following_status = ?", userID, "accepted")
-        query = query.Where("user_id IN (?)", followingSubquery)
-    }
+	if tab == "following" && userID != 0 {
+		// Jika tab following: postingan yang 'published' atau 'shadowbanned' boleh muncul.
+		// Status akun user yang diikuti (apakah shadowbanned atau tidak) juga dilewatkan/diizinkan.
+		allowedStatuses := []string{"published", "shadowbanned"}
+		query = query.Where("posts.publish_status IN ?", allowedStatuses)
+	} else {
+		// Default (tab recommended / ulasan publik / anonim):
+		// 1. Postingan harus berstatus 'published' (Bukan shadowban_post)
+		// 2. Penulis ulasan (User) tidak boleh berstatus 'shadowbanned' (Bukan shadowban_user)
+		query = query.Where("posts.publish_status = ? AND users.status != ?", "published", "shadowbanned")
+	}
+	// =================================================================================
 
-    // Cursor Pagination
-    if cursor > 0 {
-        query = query.Where("post_id < ?", cursor)
-    }
+	// --- Filtering ---
+	if categoryID > 0 {
+		query = query.Where(`
+			posts.post_id IN (SELECT post_id FROM post_categories WHERE category_id = ?) 
+			OR 
+			posts.book_id IN (SELECT book_id FROM book_genres WHERE genre_id = (
+				SELECT genre_id FROM genres WHERE genre_name = (SELECT category_name FROM categories WHERE category_id = ?)
+			))`, categoryID, categoryID)
+	}
 
-    err := query.Order("post_id DESC").Limit(limit).Find(&posts).Error
+	// Filter Tab Following
+	if tab == "following" && userID != 0 {
+		followingSubquery := r.db.Model(&models.UserFollow{}).
+			Select("user_followed_id").
+			Where("user_following_id = ? AND following_status = ?", userID, "accepted")
+		query = query.Where("posts.user_id IN (?)", followingSubquery) 
+	}
 
-    // Map TotalLikes
-    for i := range posts {
-        if posts[i].Stats != nil {
-            posts[i].TotalLikes = posts[i].Stats.LikeCount
-        }
-    }
+	// Cursor Pagination
+	if cursor > 0 {
+		query = query.Where("posts.post_id < ?", cursor)
+	}
 
-    return posts, err
+	err := query.Order("posts.post_id DESC").Limit(limit).Find(&posts).Error
+
+	// Map TotalLikes
+	for i := range posts {
+		if posts[i].Stats != nil {
+			posts[i].TotalLikes = posts[i].Stats.LikeCount
+		}
+	}
+
+	return posts, err
 }
 
 func (r *postRepository) GetPostByPublicID(userID uint, publicID string) (models.Post, error) {
@@ -144,18 +160,17 @@ func (r *postRepository) GetPostsByUserID(viewerID uint, targetUserID uint, page
 	var total int64
 	offset := (page - 1) * limit
 
+	// PERBAIKAN: Menggunakan tanda kurung untuk mengelompokkan kondisi OR
 	query := r.db.Model(&models.Post{}).
-		Where("user_id = ? AND publish_status = ?", targetUserID, "published")
+		Where("user_id = ? AND (publish_status = ? OR publish_status = ?)", targetUserID, "published", "shadowbanned")
 
 	query.Count(&total)
 
 	err := query.
-		// --- TAMBAHKAN SUBQUERY INI ---
 		Select(`posts.*, 
             (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
             (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
             viewerID, viewerID).
-		// ------------------------------
 		Preload("Stats").
 		Preload("User.Profile").
 		Preload("Book.BookAuthors.Author").
@@ -219,22 +234,22 @@ func (r *postRepository) GetLikedPostsByUserID(viewerID uint, targetUserID uint,
 	var total int64
 	offset := (page - 1) * limit
 
+	// PERBAIKAN: Menggunakan tanda kurung logika OR pada status publikasi post
 	countQuery := r.db.Model(&models.Post{}).
 		Joins("JOIN post_likes ON post_likes.post_id = posts.post_id").
-		Where("post_likes.user_id = ? AND posts.publish_status = ?", targetUserID, "published")
+		Where("post_likes.user_id = ? AND (posts.publish_status = ? OR posts.publish_status = ?)", targetUserID, "published", "shadowbanned")
 
 	err := countQuery.Count(&total).Error
 	if err != nil { return nil, 0, err }
 
 	err = r.db.
-		// --- SUBQUERY UNTUK STATUS LIKE/SAVE ---
 		Select(`posts.*, 
             (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
             (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
             viewerID, viewerID).
-		// ----------------------------------------
 		Joins("JOIN post_likes ON post_likes.post_id = posts.post_id").
-		Where("post_likes.user_id = ? AND posts.publish_status = ?", targetUserID, "published").
+		// PERBAIKAN: Samakan kondisi Where dengan countQuery di atas
+		Where("post_likes.user_id = ? AND (posts.publish_status = ? OR posts.publish_status = ?)", targetUserID, "published", "shadowbanned").
 		Preload("User.Profile").
 		Preload("Stats").
 		Preload("Book.BookAuthors.Author").
@@ -250,22 +265,22 @@ func (r *postRepository) GetSavedPostsByUserID(viewerID uint, targetUserID uint,
 	var total int64
 	offset := (page - 1) * limit
 
+	// PERBAIKAN: Menggunakan tanda kurung logika OR pada status publikasi post
 	countQuery := r.db.Model(&models.Post{}).
 		Joins("JOIN post_saves ON post_saves.post_id = posts.post_id").
-		Where("post_saves.user_id = ? AND posts.publish_status = ?", targetUserID, "published")
+		Where("post_saves.user_id = ? AND (posts.publish_status = ? OR posts.publish_status = ?)", targetUserID, "published", "shadowbanned")
 
 	err := countQuery.Count(&total).Error
 	if err != nil { return nil, 0, err }
 
 	err = r.db.
-		// --- SUBQUERY UNTUK STATUS LIKE/SAVE ---
 		Select(`posts.*, 
             (SELECT EXISTS (SELECT 1 FROM post_likes WHERE post_id = posts.post_id AND user_id = ?)) as is_liked,
             (SELECT EXISTS (SELECT 1 FROM post_saves WHERE post_id = posts.post_id AND user_id = ?)) as is_saved`,
             viewerID, viewerID).
-		// ----------------------------------------
 		Joins("JOIN post_saves ON post_saves.post_id = posts.post_id").
-		Where("post_saves.user_id = ? AND posts.publish_status = ?", targetUserID, "published").
+		// PERBAIKAN: Samakan kondisi Where dengan countQuery di atas
+		Where("post_saves.user_id = ? AND (posts.publish_status = ? OR posts.publish_status = ?)", targetUserID, "published", "shadowbanned").
 		Preload("User.Profile").
 		Preload("Stats").
 		Preload("Book.BookAuthors.Author").
@@ -355,13 +370,26 @@ func (r *postRepository) SyncPostStats(db *gorm.DB, postID uint, field string, a
 	if field == "comment_count" { fComments = fmt.Sprintf("(%s + %d)", fComments, amount) }
 	if field == "save_count" { fSaves = fmt.Sprintf("(%s + %d)", fSaves, amount) }
 
-	hotScoreFormula := fmt.Sprintf(`
-		(%s * 1) + (%s * 3) + (%s * 5)
-	`, fLikes, fComments, fSaves)
+	// Formula dasar perhitungan hot score
+	baseFormula := fmt.Sprintf(`(%s * 1) + (%s * 3) + (%s * 5)`, fLikes, fComments, fSaves)
+
+	// KONDISI BARU: Cek shadowban post ataupun shadowban owner (user)
+	// Kita gunakan CASE WHEN dengan subquery pembantu ke tabel posts dan users
+	hotScoreFormulaWithShadowban := fmt.Sprintf(`
+		CASE 
+			WHEN (
+				SELECT TRUE FROM posts 
+				JOIN users ON users.user_id = posts.user_id 
+				WHERE posts.post_id = %d AND (posts.publish_status = 'shadowbanned' OR users.status = 'shadowbanned')
+				LIMIT 1
+			) THEN 0
+			ELSE %s
+		END
+	`, postID, baseFormula)
 
 	return db.Model(&models.PostStat{}).Where("post_id = ?", postID).Updates(map[string]interface{}{
-		field:       gorm.Expr("post_stats."+field+" + ?", amount),
-		"hot_score":  gorm.Expr(hotScoreFormula),
+		field:        gorm.Expr("post_stats."+field+" + ?", amount),
+		"hot_score":  gorm.Expr(hotScoreFormulaWithShadowban),
 		"updated_at": time.Now(),
 	}).Error
 }

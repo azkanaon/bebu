@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import { UserSearchResponse } from "@/types/post";
 import debounce from "lodash/debounce";
+import UserAvatar from "@/components/UserAvatar";
 
 interface ShareModalProps {
 	isOpen: boolean;
@@ -206,13 +207,11 @@ const ShareModal: React.FC<ShareModalProps> = ({
 								>
 									<div className="flex items-center gap-3">
 										<div className="w-10 h-10 rounded-full bg-gray-700 overflow-hidden border border-gray-800">
-											<img
-												src={
-													user.avatar ||
-													"/default-avatar.png"
-												}
-												alt={user.username}
-												className="w-full h-full object-cover"
+											<UserAvatar
+												user={{
+													avatar_url:
+														user.avatar,
+												}}
 											/>
 										</div>
 										<div className="flex flex-col">
