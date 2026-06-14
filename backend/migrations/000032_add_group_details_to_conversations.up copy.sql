@@ -1,0 +1,2 @@
+ALTER TABLE conversations DROP COLUMN IF EXISTS title;
+ALTER TABLE conversations DROP COLUMN IF EXISTS img_url;

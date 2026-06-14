@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"backend-bebu/internal/ws"
+	"log"
 	"net/http"
+
+	"backend-bebu/internal/repositories"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -17,33 +20,60 @@ var upgrader = websocket.Upgrader{
 
 type WSHandler struct {
 	hub *ws.Hub
+	chatRepo repositories.ChatRepository
 }
 
-func NewWSHandler(hub *ws.Hub) *WSHandler {
-	return &WSHandler{hub: hub}
+func NewWSHandler(hub *ws.Hub, repo repositories.ChatRepository) *WSHandler {
+	return &WSHandler{hub: hub, chatRepo: repo}
+}
+
+type WSRequest struct {
+	Type           string `json:"type"` // START_TYPING atau STOP_TYPING
+	ConversationID uint   `json:"conversationId"`
 }
 
 func (h *WSHandler) HandleWS(c *gin.Context) {
-	// 1. Ambil UserID dari Token (Wajib login untuk buka socket)
 	userIDValue, _ := c.Get("userID")
 	userID := userIDValue.(uint)
 
-	// 2. Upgrade koneksi HTTP ke WebSocket
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil { return }
+
+	h.hub.Register(userID, conn)
+	defer h.hub.Unregister(userID)
+
+	log.Printf("[WS] User %d connected", userID)
+
+	for {
+		var req WSRequest
+		err := conn.ReadJSON(&req)
+		if err != nil {
+			break
+		}
+
+		if req.Type == "START_TYPING" || req.Type == "STOP_TYPING" {
+			h.broadcastTypingStatus(userID, req)
+		}
+	}
+}
+
+func (h *WSHandler) broadcastTypingStatus(senderID uint, req WSRequest) {
+	conv, err := h.chatRepo.FindConversationByID(req.ConversationID)
 	if err != nil {
 		return
 	}
 
-	// 3. Masukkan ke daftar online
-	h.hub.Register(userID, conn)
-
-	// 4. Pastikan dihapus saat user disconnect
-	defer h.hub.Unregister(userID)
-
-	// Jaga koneksi tetap terbuka (listening)
-	for {
-		if _, _, err := conn.NextReader(); err != nil {
-			break
+	for _, m := range conv.Members {
+		if m.UserID != senderID {
+			log.Printf("[WS] Sending typing status to user %d", m.UserID)
+			h.hub.SendToUser(m.UserID, gin.H{
+				"type": "USER_TYPING_STATUS",
+				"payload": gin.H{
+					"conversationId": req.ConversationID,
+					"userId":         senderID,
+					"isTyping":       req.Type == "START_TYPING",
+				},
+			})
 		}
 	}
 }

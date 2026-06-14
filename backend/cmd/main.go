@@ -40,10 +40,14 @@ func main() {
 	bookshelfHandler := handlers.NewBookshelfHandler(bookshelfService)
 
 	hub := ws.NewHub()
+	chatRepo := repositories.NewChatRepository(db)
+	chatService := services.NewChatService(chatRepo, userRepo, hub, db)
+	chatHandler := handlers.NewChatHandler(chatService)
+
 	notifRepo := repositories.NewNotificationRepository(db)
 	notifService := services.NewNotificationService(notifRepo, hub)
 	notifHandler := handlers.NewNotificationHandler(notifService)
-	wsHandler := handlers.NewWSHandler(hub)
+	wsHandler := handlers.NewWSHandler(hub, chatRepo)
 
 	pgRepo := repositories.NewPostgresRepository(db)
 	redisRepo := repositories.NewRedisRepository(rdb)
@@ -125,13 +129,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, recommendationHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, submissionHandler, bookManagementHandler, leaderboardHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, recommendationHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, submissionHandler, bookManagementHandler, leaderboardHandler, chatHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, recommendationHandler *handlers.RecommendationHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, submissionHandler *handlers.BookSubmissionHandler, bookManagementHandler *handlers.BookManagementHandler, leaderboardHandler *handlers.LeaderboardHandler,) {
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, recommendationHandler *handlers.RecommendationHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, submissionHandler *handlers.BookSubmissionHandler, bookManagementHandler *handlers.BookManagementHandler, leaderboardHandler *handlers.LeaderboardHandler, chatHandler *handlers.ChatHandler) {
 	// --> Praktik yang baik: Gunakan group untuk versioning API
 	v1 := r.Group("/api/v1")
 
@@ -180,6 +184,19 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
     		users.GET("/:username/achievements", authMiddleware.OptionalAuth(), gamificationHandler.GetUserAchievements)
 
 			users.GET("/:username/reading-stats", authMiddleware.OptionalAuth(), bookshelfHandler.GetReadingStreak)
+		}
+
+		chats := v1.Group("/chats").Use(authMiddleware.RequiredAuth())
+		{
+			chats.POST("/send", chatHandler.SendMessage)
+			chats.GET("/conversations", chatHandler.GetInbox)
+			chats.GET("/conversations/:id/messages", chatHandler.GetMessages)
+			chats.PUT("/conversations/:id/read", chatHandler.MarkAsRead)
+			chats.POST("/groups", chatHandler.CreateGroup)
+			chats.POST("/conversations/:id/members", chatHandler.AddMembers)
+    		chats.PUT("/conversations/:id/rename", chatHandler.RenameGroup)
+			chats.DELETE("/conversations/:id/leave", chatHandler.LeaveGroup)
+    		chats.DELETE("/conversations/:id/members/:userId", chatHandler.KickMember)
 		}
 
 		profile := v1.Group("/profile").Use(authMiddleware.RequiredAuth())
