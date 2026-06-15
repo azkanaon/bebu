@@ -48,95 +48,97 @@ func NewUserService(db *gorm.DB, userRepo repositories.UserRepository, nService 
 }
 
 func (s *userService) GetProfileByUsername(username string, viewerID *uint) (*dto.ProfileResponseDTO, error) {
-	// 1. Dapatkan data user utama
-	user, err := s.userRepo.FindByUsername(username)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		return nil, err
-	}
+    // 1. Dapatkan data user utama
+    user, err := s.userRepo.FindByUsername(username)
+    if err != nil {
+        if errors.Is(err, gorm.ErrRecordNotFound) {
+            return nil, err
+        }
+        return nil, err
+    }
 
-	actualIsPrivateAccount := false
-	if user.Settings != nil {
-		actualIsPrivateAccount = !user.Settings.IsProfilePublic
-	}
+    actualIsPrivateAccount := false
+    if user.Settings != nil {
+        actualIsPrivateAccount = !user.Settings.IsProfilePublic
+    }
 
-	// --- LOGIKA BLOKIR ASIMETRIS BARU ---
-	var isBlockedByTarget, isBlockedByViewer, isOwnProfile bool
-	if viewerID != nil {
-		isOwnProfile = (*viewerID == user.UserID)
-		if !isOwnProfile {
-			// Cek blokir hanya jika bukan profil sendiri
-			g, _ := errgroup.WithContext(context.Background())
-			g.Go(func() error {
-				var errCheck error; isBlockedByTarget, errCheck = s.userRepo.IsBlocked(user.UserID, *viewerID); return errCheck
-			})
-			g.Go(func() error {
-				var errCheck error; isBlockedByViewer, errCheck = s.userRepo.IsBlocked(*viewerID, user.UserID); return errCheck
-			})
-			if err := g.Wait(); err != nil { return nil, err }
-		}
-	}
+    // --- LOGIKA BLOKIR ASIMETRIS BARU ---
+    var isBlockedByTarget, isBlockedByViewer, isOwnProfile bool
+    if viewerID != nil {
+        isOwnProfile = (*viewerID == user.UserID)
+        if !isOwnProfile {
+            g, _ := errgroup.WithContext(context.Background())
+            g.Go(func() error {
+                var errCheck error; isBlockedByTarget, errCheck = s.userRepo.IsBlocked(user.UserID, *viewerID); return errCheck
+            })
+            g.Go(func() error {
+                var errCheck error; isBlockedByViewer, errCheck = s.userRepo.IsBlocked(*viewerID, user.UserID); return errCheck
+            })
+            if err := g.Wait(); err != nil { return nil, err }
+        }
+    }
 
-	// 3. Terapkan aturan akses utama
-	if isBlockedByTarget {
-		return nil, gorm.ErrRecordNotFound // Jika saya diblokir, akses ditolak sepenuhnya.
-	}
+    if isBlockedByTarget {
+        return nil, gorm.ErrRecordNotFound
+    }
 
-	stats, err := s.userRepo.GetUserStats(user.UserID)
+    stats, err := s.userRepo.GetUserStats(user.UserID)
     if err != nil {
         return nil, err
     }
-	
-	// 2. Siapkan viewerContext jika ada viewer.
-	var viewerContext *dto.ViewerContextDTO
-	var followStatus string = "not_following"
-	if viewerID != nil {
-		isOwnProfile := (*viewerID == user.UserID)
-		g, _ := errgroup.WithContext(context.Background())
-		// Ambil status follow
-		g.Go(func() error {
-			var errStatus error
-			// Kita tidak perlu memanggil repo lagi jika sudah punya status dari pengecekan akses di atas
-			// Tapi untuk membuat blok ini mandiri, kita panggil lagi. Ini lebih bersih.
-			followStatus, errStatus = s.userRepo.GetFollowStatus(*viewerID, user.UserID)
-			return errStatus
-		})
+    
+    // 2. Siapkan viewerContext jika ada viewer.
+    var viewerContext *dto.ViewerContextDTO
+    var followStatus string = "not_following"
+    var hasPendingAppeal bool = false // 💡 Tambah state default variabel awal
 
-		if err := g.Wait(); err != nil {
-			return nil, err
-		}
+    if viewerID != nil {
+        isOwnProfile := (*viewerID == user.UserID)
+        g, _ := errgroup.WithContext(context.Background())
+        
+        // Ambil status follow
+        g.Go(func() error {
+            var errStatus error
+            followStatus, errStatus = s.userRepo.GetFollowStatus(*viewerID, user.UserID)
+            return errStatus
+        })
 
-		// Buat DTO viewerContext dengan semua data yang sudah terkumpul.
-		// Pastikan DTO ViewerContextDTO sudah diupdate dengan field IsPending.
-		viewerContext = &dto.ViewerContextDTO{
-			IsFollowing:  (followStatus == "accepted"),
-			IsPending:    (followStatus == "pending"),
-			IsBlocked:      isBlockedByTarget, // Sudah kita hitung di atas
-			IsBlockedByYou: isBlockedByViewer, // Sudah kita hitung di atas
-			IsOwnProfile: isOwnProfile,
-		}
-	}
+        // 💡 Ambil status pending appeal jika ini adalah profil miliknya sendiri
+        if isOwnProfile {
+            g.Go(func() error {
+                var errAppeal error
+                hasPendingAppeal, errAppeal = s.userRepo.CheckPendingAppealStatus(*viewerID)
+                return errAppeal
+            })
+        }
 
-	// 5. Tentukan apakah viewer punya akses ke konten LENGKAP
-	var hasFullAccess bool
-	isProfilePublic := (user.Settings == nil || user.Settings.IsProfilePublic)
+        if err := g.Wait(); err != nil {
+            return nil, err
+        }
 
-	if isProfilePublic || isOwnProfile || (followStatus == "accepted") {
-		hasFullAccess = true
-	}
+        viewerContext = &dto.ViewerContextDTO{
+            IsFollowing:      (followStatus == "accepted"),
+            IsPending:        (followStatus == "pending"),
+            IsBlocked:        isBlockedByTarget,
+            IsBlockedByYou:   isBlockedByViewer,
+            IsOwnProfile:     isOwnProfile,
+            HasPendingAppeal: hasPendingAppeal, // 💡 Petakan hasilnya ke DTO
+        }
+    }
 
-	// 6. Buat response berdasarkan akses
-	if !hasFullAccess {
-		// Jika tidak punya akses penuh (karena profil privat dan belum di-follow),
-		// kembalikan data terbatas TAPI DENGAN viewerContext.
-		return s.mapToPrivateProfileDTO(user, stats,actualIsPrivateAccount, viewerContext), nil
-	}
-	
-	// 3. Panggil mapper untuk merakit response akhir.
-	response := s.mapToPublicProfileDTO(user, stats,actualIsPrivateAccount, viewerContext)
-	return response, nil
+    var hasFullAccess bool
+    isProfilePublic := (user.Settings == nil || user.Settings.IsProfilePublic)
+
+    if isProfilePublic || isOwnProfile || (followStatus == "accepted") {
+        hasFullAccess = true
+    }
+
+    if !hasFullAccess {
+        return s.mapToPrivateProfileDTO(user, stats, actualIsPrivateAccount, viewerContext), nil
+    }
+    
+    response := s.mapToPublicProfileDTO(user, stats, actualIsPrivateAccount, viewerContext)
+    return response, nil
 }
 
 func (s *userService) mapToPublicProfileDTO(
@@ -187,6 +189,7 @@ func (s *userService) mapToPublicProfileDTO(
 		UserID: user.UserID,
 		PublicID: user.PublicID.String(),
 		Username: user.Username,
+		Status: user.Status,
 		IsPrivateAccount: isPrivateAcc,
 		Settings: &dto.UserSettingsDTO{
 			IsProfilePublic: user.Settings != nil && user.Settings.IsProfilePublic,
@@ -234,6 +237,7 @@ func (s *userService) mapToPrivateProfileDTO(user *models.User, stats *models.Us
 	dto := &dto.ProfileResponseDTO{
 		UserID: user.UserID,
 		PublicID: user.PublicID.String(),
+		Status: user.Status,
 		Username: user.Username,
         IsPrivate: true,
 		IsPrivateAccount: isPrivateAccount,

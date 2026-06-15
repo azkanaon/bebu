@@ -58,3 +58,26 @@ type AdminAction struct {
 
 	ReportSummary ReportSummary `gorm:"foreignKey:ReportSummaryID;references:ReportSummaryID"`
 }
+
+type AccountAppeal struct {
+	AccountAppealID    uint       `gorm:"column:account_appeal_id;primaryKey;autoIncrement"`
+	UserID             uint       `gorm:"column:user_id;not null"`
+	AdminActionID      *uint      `gorm:"column:admin_action_id"` // Opsional, merujuk ke aksi suspend-nya
+	AppealReason       string     `gorm:"column:appeal_reason;type:text;not null"`
+	EvidenceURL        *string    `gorm:"column:evidence_url;type:text"`
+	Status             string     `gorm:"column:status;type:varchar(20);default:'Pending';not null"` // Pending, Approved, Rejected
+	AdminNotes         *string    `gorm:"column:admin_notes;type:text"`
+	ReviewedByAdminID  *uint      `gorm:"column:reviewed_by_admin_id"`
+	ReviewedAt         *time.Time `gorm:"column:reviewed_at"`
+	CreatedAt          time.Time  `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt          time.Time  `gorm:"column:updated_at;autoUpdateTime"`
+
+	// Relations
+	User          User         `gorm:"foreignKey:UserID;references:UserID"`
+	AdminAction   *AdminAction `gorm:"foreignKey:AdminActionID;references:AdminActionID"`
+	ReviewedAdmin *User        `gorm:"foreignKey:ReviewedByAdminID;references:UserID"`
+}
+
+func (AccountAppeal) TableName() string {
+	return "account_appeals"
+}

@@ -38,6 +38,7 @@ import {
 	AuthorResponse,
 	GenreResponse,
 } from "@/types/book-management";
+import { CreateAppealResponse } from "@/types/appeal";
 import { FriendRecommendationItem } from "@/types/user";
 import { LeaderboardResponse, TabType } from "@/types/leaderboard";
 import api from "@/lib/axios";
@@ -299,6 +300,17 @@ export async function createReportAPI(
 	data: ReportRequest,
 ): Promise<ReportResponse> {
 	const res = await api.post("/v1/report", data);
+	return res.data;
+}
+
+export async function createAccountAppealAPI(
+	payload: FormData,
+): Promise<CreateAppealResponse> {
+	const res = await api.post<CreateAppealResponse>("/v1/appeal", payload, {
+		headers: {
+			"Content-Type": "multipart/form-data",
+		},
+	});
 	return res.data;
 }
 
