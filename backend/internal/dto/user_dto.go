@@ -16,6 +16,7 @@ type ProfileResponseDTO struct {
 	FavoriteBadges        []BadgeDTO `json:"favoriteBadges"`
 	FavoriteAchievements  []AchievementDTO `json:"favoriteAchievements"`
 	Settings      *UserSettingsDTO `json:"settings,omitempty"` // omitempty: field ini tidak akan muncul di JSON jika nil (misal, user belum mengatur preferensi)
+	Status        string           `json:"status"`
 
 	ViewerContext *ViewerContextDTO `json:"viewerContext,omitempty"` // omitempty: field ini tidak akan muncul di JSON jika nilainya nil (misal, user tidak login)
 	IsPrivate 	  bool 				`json:"isPrivate"`
@@ -64,7 +65,7 @@ type ViewerContextDTO struct {
 	IsBlocked     bool `json:"isBlocked"` // Ini berarti: Apakah target memblokir SAYA?
     IsBlockedByYou bool `json:"isBlockedByYou"` // Ini berarti: Apakah SAYA memblokir target?
 	IsOwnProfile bool `json:"isOwnProfile"` // Apakah ini profil milik viewer sendiri?
-	
+	HasPendingAppeal bool `json:"hasPendingAppeal"`
 }
 
 type UpdateProfileRequestDTO struct {

@@ -28,6 +28,7 @@ type UserRepository interface {
 	// user profile
 	FindUserByPublicID(publicID uuid.UUID) (*models.User, error)
 	FindByUsername(username string) (*models.User, error)
+	CheckPendingAppealStatus(userID uint) (bool, error)
 	IsFollowing(viewerID, targetID uint) (bool, error)
 	IsBlocked(viewerID, targetID uint) (bool, error)
 	FollowUser(db *gorm.DB, sourceUserID, targetUserID uint, status string) (string, bool, error)
@@ -183,6 +184,15 @@ func (r *userRepository) FindByUsername(username string) (*models.User, error) {
 		return nil, err // GORM akan return gorm.ErrRecordNotFound jika tidak ada
 	}
 	return &user, nil
+}
+
+func (r *userRepository) CheckPendingAppealStatus(userID uint) (bool, error) {
+    var count int64
+    // Ganti "account_appeals" sesuai dengan nama tabel asli di database Anda
+    err := r.db.Table("account_appeals").
+        Where("user_id = ? AND status = ?", userID, "Pending").
+        Count(&count).Error
+    return count > 0, err
 }
 
 // IsFollowing memeriksa apakah viewerID mengikuti targetID

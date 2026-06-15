@@ -1,16 +1,17 @@
 export interface UserProfileResponse {
-  userId: number
-  publicId: string
-  username: string
-  profile: ProfileInfo
-  stats: ProfileStats
-  socialLinks: SocialLink[]
-  favoriteBadges: FavoriteBadge[]
-  favoriteAchievements: FavoriteAchievement[]
-  settings?: UserSetting
-  viewerContext?: ViewerContext
-  isPrivate: boolean
-  isPrivateAccount: boolean
+	userId: number;
+	publicId: string;
+	username: string;
+	profile: ProfileInfo;
+	stats: ProfileStats;
+	socialLinks: SocialLink[];
+	favoriteBadges: FavoriteBadge[];
+	favoriteAchievements: FavoriteAchievement[];
+	settings?: UserSetting;
+	viewerContext?: ViewerContext;
+	isPrivate: boolean;
+	isPrivateAccount: boolean;
+	status: "active" | "suspended" | "banned" | "shadowbanned" | string;
 }
 
 export interface ProfileInfo {
@@ -50,11 +51,12 @@ export interface Achievement {
 }
 
 export interface ViewerContext {
-  isFollowing: boolean
-  isPending: boolean
-  isBlocked: boolean
-  isBlockedByYou: boolean
-  isOwnProfile: boolean
+	isFollowing: boolean;
+	isPending: boolean;
+	isBlocked: boolean;
+	isBlockedByYou: boolean;
+	isOwnProfile: boolean;
+	hasPendingAppeal: boolean;
 }
 
 export interface UserSetting {

@@ -91,6 +91,10 @@ func main() {
     bookManagementService := services.NewBookManagementService(bookManagementRepo)
     bookManagementHandler := handlers.NewBookManagementHandler(bookManagementService)
 
+	appealRepo := repositories.NewAccountAppealRepository(db)
+	appealService := services.NewAccountAppealService(appealRepo)
+	appealHandler := handlers.NewAccountAppealHandler(appealService)
+
 	shareRepo := repositories.NewPostShareRepository(db)
 	shareService := services.NewPostShareService(shareRepo)
 	shareHandler := handlers.NewPostShareHandler(shareService)
@@ -129,14 +133,13 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, recommendationHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, submissionHandler, bookManagementHandler, leaderboardHandler, chatHandler)
+	SetupRoutes(r, bookshelfHandler, authHandler, postHandler, bookHandler, categoryHandler, userHandler, recommendationHandler, authMiddleware, commentHandler, reportHandler, shareHandler,gamificationHandler, platformHandler, searchHandler, notifHandler, wsHandler, userManagementHandler, postManagementHandler, submissionHandler, bookManagementHandler, leaderboardHandler, chatHandler, appealHandler)
 
 	r.Run(":8080")
 }
 
 // --> Ubah signature fungsi untuk menerima AuthHandler
-func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, recommendationHandler *handlers.RecommendationHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, submissionHandler *handlers.BookSubmissionHandler, bookManagementHandler *handlers.BookManagementHandler, leaderboardHandler *handlers.LeaderboardHandler, chatHandler *handlers.ChatHandler) {
-	// --> Praktik yang baik: Gunakan group untuk versioning API
+func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, authHandler *handlers.AuthHandler, postHandler *handlers.PostHandler, bookHandler *handlers.BookHandler, categoryHandler *handlers.CategoryHandler, userHandler *handlers.UserHandler, recommendationHandler *handlers.RecommendationHandler, authMiddleware *middlewares.AuthMiddleware, commentHandler *handlers.CommentHandler, reportHandler *handlers.ReportHandler, shareHandler *handlers.PostShareHandler, gamificationHandler *handlers.GamificationHandler, platformHandler *handlers.PlatformHandler, searchHandler *handlers.SearchHandler, notifHandler *handlers.NotificationHandler, wsHandler *handlers.WSHandler, userManagementHandler *handlers.UserManagementHandler, postManagementHandler *handlers.PostManagementHandler, submissionHandler *handlers.BookSubmissionHandler, bookManagementHandler *handlers.BookManagementHandler, leaderboardHandler *handlers.LeaderboardHandler, chatHandler *handlers.ChatHandler, appealHandler *handlers.AccountAppealHandler) {
 	v1 := r.Group("/api/v1")
 
 	v1.Use()
@@ -340,6 +343,7 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 		v1.GET("/platforms", platformHandler.GetAllPlatforms)
 
 		v1.POST("/report", authMiddleware.RequiredAuth(), reportHandler.CreateReport)
+		v1.POST("/appeal", authMiddleware.RequiredAuth(), appealHandler.AddAppeal)
 
 		// Search Authors
 		v1.GET("/authors/search", authMiddleware.RequiredAuth(), bookManagementHandler.SearchAuthors)
