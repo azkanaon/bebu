@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
+	"backend-bebu/internal/dto"
 )
 
 // DTO (Data Transfer Object) untuk request body
@@ -16,7 +18,13 @@ type CreateAppealRequest struct {
 }
 
 type AccountAppealService interface {
+	// User Side
 	SubmitAppeal(ctx context.Context, userID uint, req CreateAppealRequest) (*models.AccountAppeal, error)
+
+	// Admin Side
+	GetAppealsForAdmin(ctx context.Context) ([]dto.AdminAppealListResponse, error)
+	GetAppealDetailForAdmin(ctx context.Context, appealID uint) (*dto.AdminAppealDetailResponse, error)
+	ProcessAppealAction(ctx context.Context, appealID uint, adminID uint, req dto.ActionAppealRequest) error
 }
 
 type accountAppealService struct {
@@ -72,4 +80,84 @@ func (s *accountAppealService) SubmitAppeal(ctx context.Context, userID uint, re
 	}
 
 	return newAppeal, nil
+}
+
+// GetAppealsForAdmin memetakan data model mentah dari DB menjadi list ringkas siap pakai untuk FE tabel admin
+func (s *accountAppealService) GetAppealsForAdmin(ctx context.Context) ([]dto.AdminAppealListResponse, error) {
+	appeals, err := s.appealRepo.FindAllAppeals(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []dto.AdminAppealListResponse
+	for _, a := range appeals {
+		response = append(response, dto.AdminAppealListResponse{
+			AccountAppealID: a.AccountAppealID,
+			Username:        a.User.Username,
+			DisplayName:     a.User.Profile.DisplayName,
+			Status:          a.Status,
+			CreatedAt:       a.CreatedAt,
+		})
+	}
+	return response, nil
+}
+
+// GetAppealDetailForAdmin merakit data mendalam untuk kebutuhan isi Pop-up modal peninjauan
+func (s *accountAppealService) GetAppealDetailForAdmin(ctx context.Context, appealID uint) (*dto.AdminAppealDetailResponse, error) {
+	appeal, err := s.appealRepo.FindAppealByID(ctx, appealID)
+	if err != nil {
+		return nil, err
+	}
+
+	suspensionReason := "Tidak ada catatan suspensi tertulis"
+
+if appeal.AdminAction != nil && appeal.AdminAction.Reason != nil {
+    suspensionReason = *appeal.AdminAction.Reason
+}
+
+	return &dto.AdminAppealDetailResponse{
+		AccountAppealID:   appeal.AccountAppealID,
+		UserID:            appeal.UserID,
+		Username:          appeal.User.Username,
+		AppealReason:      appeal.AppealReason,
+		EvidenceURL:       appeal.EvidenceURL,
+		Status:            appeal.Status,
+		SuspensionReason:  suspensionReason,
+		AdminNotes:        appeal.AdminNotes,
+		ReviewedByAdminID: appeal.ReviewedByAdminID,
+		ReviewedAt:        appeal.ReviewedAt,
+		CreatedAt:         appeal.CreatedAt,
+	}, nil
+}
+
+// ProcessAppealAction mengeksekusi logika perubahan status banding sekaligus memulihkan akun user jika diterima
+func (s *accountAppealService) ProcessAppealAction(ctx context.Context, appealID uint, adminID uint, req dto.ActionAppealRequest) error {
+	appeal, err := s.appealRepo.FindAppealByID(ctx, appealID)
+	if err != nil {
+		return err
+	}
+
+	if appeal.Status != "Pending" {
+		return errors.New("banding ini sudah diproses sebelumnya dan tidak bisa diubah kembali")
+	}
+
+	now := time.Now()
+	appeal.Status = req.Status
+	appeal.AdminNotes = &req.AdminNotes
+	appeal.ReviewedByAdminID = &adminID
+	appeal.ReviewedAt = &now
+
+	// Simpan keputusan berkas banding
+	if err := s.appealRepo.UpdateAppealStatus(ctx, appeal); err != nil {
+		return err
+	}
+
+	// JIKA DISETUJUI, kembalikan status akun pemilik banding menjadi active
+	if req.Status == "Approved" {
+		if err := s.appealRepo.UpdateUserStatus(ctx, appeal.UserID, "active"); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

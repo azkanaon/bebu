@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, ShieldAlert } from "lucide-react";
+import { Search, Flag } from "lucide-react";
 
 import { ReportQueryParams } from "@/types/report";
 
@@ -33,13 +33,13 @@ export default function FilterBar({ filters, onFilterChange }: FilterBarProps) {
 						className="
 							flex h-10 w-10 items-center justify-center
 							rounded-2xl
-							bg-blue-500/10
-							text-blue-300
-							ring-1 ring-blue-400/10
+							bg-red-500/10
+							text-red-300
+							ring-1 ring-red-400/10
 							shrink-0
 						"
 					>
-						<ShieldAlert size={16} />
+						<Flag size={16} />
 					</div>
 
 					<div
@@ -48,8 +48,8 @@ export default function FilterBar({ filters, onFilterChange }: FilterBarProps) {
 							border border-white/10
 							bg-black/20
 							transition-all duration-300
-							focus-within:border-blue-400/40
-							focus-within:shadow-[0_0_0_1px_rgba(96,165,250,0.15)]
+							focus-within:border-red-400/40
+							focus-within:shadow-[0_0_0_1px_rgba(239,68,68,0.15)]
 						"
 					>
 						<div
@@ -58,7 +58,7 @@ export default function FilterBar({ filters, onFilterChange }: FilterBarProps) {
 								-translate-y-1/2
 								text-zinc-500
 								transition-colors duration-300
-								group-focus-within/search:text-blue-300
+								group-focus-within/search:text-red-300
 							"
 						>
 							<Search size={15} />

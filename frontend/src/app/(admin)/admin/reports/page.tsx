@@ -67,15 +67,18 @@ export default function ReportManagementPage() {
 		<div className="relative min-h-screen overflow-hidden">
 			{/* Ambient Background */}
 			<div className="absolute inset-0 pointer-events-none">
-				<div className="absolute top-[-120px] left-[15%] h-[320px] w-[320px] rounded-full bg-blue-500/10 blur-3xl" />
-				<div className="absolute bottom-[-150px] right-[10%] h-[280px] w-[280px] rounded-full bg-indigo-500/10 blur-3xl" />
+				{/* Ambient Top - Merah Utama */}
+				<div className="absolute top-[-120px] left-[15%] h-[320px] w-[320px] rounded-full bg-red-500/10 blur-3xl" />
+
+				{/* Ambient Bottom - Merah Rose/Maroon untuk Gradasi Elegan */}
+				<div className="absolute bottom-[-150px] right-[10%] h-[280px] w-[280px] rounded-full bg-rose-500/10 blur-3xl" />
 			</div>
 
 			<div className="relative z-10 space-y-6 py-6">
 				{/* HEADER */}
 				<div className="flex items-start justify-between">
 					<div>
-						<p className="text-xs uppercase tracking-[0.3em] text-blue-400/70">
+						<p className="text-xs uppercase tracking-[0.3em] text-red-400/70">
 							Moderation Console
 						</p>
 

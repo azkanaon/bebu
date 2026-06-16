@@ -323,7 +323,8 @@ export default function ReportTable({
 				"
 			>
 				<div className="flex items-center gap-2 text-xs">
-					<div className="h-1.5 w-1.5 rounded-full bg-blue-400/70" />
+					{/* Sudah berwarna merah sesuai request sebelumnya */}
+					<div className="h-1.5 w-1.5 rounded-full bg-red-400/70" />
 
 					<p className="text-zinc-500">
 						Moderation queue ·{" "}
@@ -341,20 +342,20 @@ export default function ReportTable({
 						}
 						disabled={currentPage === 1}
 						className="
-							flex h-9 w-9 items-center justify-center
-							rounded-xl
-							border border-white/10
-							bg-black/20
-							text-zinc-400
+                flex h-9 w-9 items-center justify-center
+                rounded-xl
+                border border-white/10
+                bg-black/20
+                text-zinc-400
 
-							transition-all duration-200
+                transition-all duration-200
 
-							hover:border-white/20
-							hover:text-white
+                hover:border-white/20
+                hover:text-white
 
-							disabled:pointer-events-none
-							disabled:opacity-30
-						"
+                disabled:pointer-events-none
+                disabled:opacity-30
+            "
 					>
 						<ChevronLeft size={16} />
 					</button>
@@ -374,23 +375,23 @@ export default function ReportTable({
 										onClick={() => onPageChange(pageNum)}
 										className={clsx(
 											`
-													h-9 w-9 rounded-xl
-													text-sm font-medium
+                                    h-9 w-9 rounded-xl
+                                    text-sm font-medium
 
-													transition-all
-													duration-200
-												`,
+                                    transition-all
+                                    duration-200
+                                `,
 											currentPage === pageNum
 												? `
-														border border-blue-500/20
-														bg-blue-500/[0.10]
-														text-blue-200
-													`
+                                        border border-red-500/20
+                                        bg-red-500/[0.10]
+                                        text-red-200
+                                    ` // <--- DIUBAH KE RED THEME
 												: `
-														text-zinc-500
-														hover:bg-white/[0.04]
-														hover:text-white
-													`,
+                                        text-zinc-500
+                                        hover:bg-white/[0.04]
+                                        hover:text-white
+                                    `,
 										)}
 									>
 										{pageNum}
@@ -419,20 +420,20 @@ export default function ReportTable({
 						}
 						disabled={currentPage === totalPages}
 						className="
-							flex h-9 w-9 items-center justify-center
-							rounded-xl
-							border border-white/10
-							bg-black/20
-							text-zinc-400
+                flex h-9 w-9 items-center justify-center
+                rounded-xl
+                border border-white/10
+                bg-black/20
+                text-zinc-400
 
-							transition-all duration-200
+                transition-all duration-200
 
-							hover:border-white/20
-							hover:text-white
+                hover:border-white/20
+                hover:text-white
 
-							disabled:pointer-events-none
-							disabled:opacity-30
-						"
+                disabled:pointer-events-none
+                disabled:opacity-30
+            "
 					>
 						<ChevronRight size={16} />
 					</button>

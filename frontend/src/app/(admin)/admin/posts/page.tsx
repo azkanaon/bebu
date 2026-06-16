@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FileText, Layers, EyeOff, Trash2 } from "lucide-react";
 
 import { getPostManagementAPIs } from "@/lib/api";
 import {

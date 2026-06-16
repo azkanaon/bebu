@@ -38,7 +38,13 @@ import {
 	AuthorResponse,
 	GenreResponse,
 } from "@/types/book-management";
-import { CreateAppealResponse } from "@/types/appeal";
+import {
+	CreateAppealResponse,
+	AdminAppealListResponse,
+	AdminAppealDetailResponse,
+	ActionAppealRequest,
+	ActionAppealResponse,
+} from "@/types/appeal";
 import { FriendRecommendationItem } from "@/types/user";
 import { LeaderboardResponse, TabType } from "@/types/leaderboard";
 import api from "@/lib/axios";
@@ -303,17 +309,6 @@ export async function createReportAPI(
 	return res.data;
 }
 
-export async function createAccountAppealAPI(
-	payload: FormData,
-): Promise<CreateAppealResponse> {
-	const res = await api.post<CreateAppealResponse>("/v1/appeal", payload, {
-		headers: {
-			"Content-Type": "multipart/form-data",
-		},
-	});
-	return res.data;
-}
-
 // Pencarian user umum
 export async function searchUsersAPI(
 	query: string,
@@ -488,4 +483,43 @@ export async function getFriendRecommendationsAPI(): Promise<
 > {
 	const res = await api.get("/v1/users/recommendation");
 	return res.data;
+}
+
+/* --- APPEAL MANAGEMENT --- */
+// API Add Appeal untuk User
+export async function createAccountAppealAPI(
+	payload: FormData,
+): Promise<CreateAppealResponse> {
+	const res = await api.post<CreateAppealResponse>("/v1/appeal", payload, {
+		headers: {
+			"Content-Type": "multipart/form-data",
+		},
+	});
+	return res.data;
+}
+
+// Mengambil semua daftar pengajuan banding untuk tabel admin
+export async function getAdminAppealsAPI(): Promise<AdminAppealListResponse> {
+  const res = await api.get<AdminAppealListResponse>("/v1/admin/appeal");
+  return res.data;
+}
+
+// Mengambil detail satu data banding berdasarkan ID untuk Pop-up Modal
+export async function getAdminAppealDetailAPI(
+  appealID: number,
+): Promise<AdminAppealDetailResponse> {
+  const res = await api.get<AdminAppealDetailResponse>(`/v1/admin/appeal/${appealID}`);
+  return res.data;
+}
+
+// Mengirim aksi Terima (Approved) atau Tolak (Rejected) beserta catatan admin
+export async function submitAdminAppealActionAPI(
+  appealID: number,
+  payload: ActionAppealRequest,
+): Promise<ActionAppealResponse> {
+  const res = await api.post<ActionAppealResponse>(
+    `/v1/admin/appeal/${appealID}/action`,
+    payload,
+  );
+  return res.data;
 }
