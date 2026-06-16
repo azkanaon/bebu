@@ -15,7 +15,7 @@ import (
 
 type ChatService interface {
 	SendMessage(senderID uint, req dto.SendMessageRequest) (*dto.MessageResponse, error)
-	GetInbox(userID uint) ([]dto.ConversationResponseDTO, error)
+	GetInbox(userID uint, page, limit int) ([]dto.ConversationResponseDTO, *dto.PaginationDTO, error)
 	GetMessages(userID, convID uint, page, limit int) ([]dto.MessageResponse, *dto.PaginationDTO, error)
 	MarkAsRead(userID, convID uint) error
 	CreateGroup(ownerID uint, req dto.CreateGroupRequest) (*dto.ConversationResponseDTO, error)
@@ -110,7 +110,20 @@ func (s *chatService) SendMessage(senderID uint, req dto.SendMessageRequest) (*d
 			BookID:          req.BookID,
 			ParentMessageID: req.ParentMessageID,
 		}
-		return txRepo.CreateMessage(newMessage)
+		
+		if err := txRepo.CreateMessage(newMessage); err != nil {
+			return err
+		}
+
+		// --- PERBAIKAN DI SINI: AUTO-MARK AS READ BAGI PENGIRIM ---
+		// Kita langsung update status baca si pengirim ke ID pesan terbaru ini.
+		// Dengan begitu, di Inbox si pengirim, unreadCount-nya akan tetap 0.
+		if err := txRepo.MarkAsRead(conversation.ConversationID, senderID, newMessage.MessageID); err != nil {
+			return err
+		}
+		// ---------------------------------------------------------
+
+		return nil
 	})
 
 	if err != nil { return nil, err }
@@ -145,7 +158,7 @@ func (s *chatService) SendMessage(senderID uint, req dto.SendMessageRequest) (*d
 	}
 
 	go func() {
-		chatEvent := gin.H{"type": "NEW_MESSAGE", "payload": res}
+		chatEvent := gin.H{"event": "NEW_MESSAGE", "payload": res}
 		
 		// Kirim ke SEMUA anggota grup/DM kecuali pengirim sendiri
 		for _, m := range conversation.Members {
@@ -158,11 +171,11 @@ func (s *chatService) SendMessage(senderID uint, req dto.SendMessageRequest) (*d
 	return res, nil
 }
 
-func (s *chatService) GetInbox(userID uint) ([]dto.ConversationResponseDTO, error) {
-	// 1. Ambil data dari repo
-	convs, err := s.repo.GetUserConversations(userID)
+func (s *chatService) GetInbox(userID uint, page, limit int) ([]dto.ConversationResponseDTO, *dto.PaginationDTO, error) {
+	// 1. Ambil data dan total dari repo
+	convs, total, err := s.repo.GetUserConversations(userID, page, limit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var response []dto.ConversationResponseDTO
@@ -170,20 +183,11 @@ func (s *chatService) GetInbox(userID uint) ([]dto.ConversationResponseDTO, erro
 		var pName string
 		var pAvatar string
 
-		// --- LOGIKA CABANG: GRUP VS DM ---
+		// --- LOGIKA CABANG: GRUP VS DM (Sesuai kode Anda) ---
 		if c.ConversationType == "group" {
-			// JIKA GRUP: Gunakan judul grup dan foto grup
-			if c.Title != nil {
-				pName = *c.Title
-			} else {
-				pName = "Grup Tanpa Nama"
-			}
-			
-			if c.ImgURL != nil {
-				pAvatar = *c.ImgURL
-			}
+			if c.Title != nil { pName = *c.Title } else { pName = "Grup Tanpa Nama" }
+			if c.ImgURL != nil { pAvatar = *c.ImgURL }
 		} else {
-			// JIKA DM: Cari satu member yang bukan diri saya sendiri
 			var partner models.User
 			found := false
 			for _, m := range c.Members {
@@ -193,9 +197,7 @@ func (s *chatService) GetInbox(userID uint) ([]dto.ConversationResponseDTO, erro
 					break
 				}
 			}
-
 			if found {
-				// Gunakan DisplayName, fallback ke Username
 				pName = partner.Username
 				if partner.Profile != nil && partner.Profile.DisplayName != "" {
 					pName = partner.Profile.DisplayName
@@ -217,7 +219,7 @@ func (s *chatService) GetInbox(userID uint) ([]dto.ConversationResponseDTO, erro
 			}
 		}
 		unread, _ := s.repo.GetUnreadCount(c.ConversationID, userID, lastReadID)
-
+		isGroup := (c.ConversationType == "group") 
 		// --- RAKIT DTO ---
 		response = append(response, dto.ConversationResponseDTO{
 			ID:            c.ConversationID,
@@ -226,10 +228,14 @@ func (s *chatService) GetInbox(userID uint) ([]dto.ConversationResponseDTO, erro
 			LastMessage:   c.LastMessageBody,
 			UpdatedAt:     c.UpdatedAt,
 			UnreadCount:   unread,
+			IsGroup:       isGroup,
 		})
 	}
 
-	return response, nil
+	// 2. Buat metadata paginasi
+	pagination := dto.NewPaginationDTO(total, page, limit)
+
+	return response, pagination, nil
 }
 
 func (s *chatService) GetMessages(userID, convID uint, page, limit int) ([]dto.MessageResponse, *dto.PaginationDTO, error) {
@@ -260,6 +266,9 @@ func (s *chatService) GetMessages(userID, convID uint, page, limit int) ([]dto.M
 			ID:             m.MessageID,
 			ConversationID: m.ConversationID,
 			SenderID:       m.SenderUserID,
+			SenderUsername: m.Sender.Username,
+			SenderDisplayName: m.Sender.Profile.DisplayName,
+			SenderAvatar: m.Sender.Profile.AvatarUrl,
 			Body:           bodyText,
 			MessageType:    m.MessageType,
 			CreatedAt:      m.CreatedAt,

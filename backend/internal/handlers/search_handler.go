@@ -195,3 +195,73 @@ func (h *SearchHandler) SearchGenres(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"data": genres})
 }
+
+func (h *SearchHandler) SearchChatConversations(c *gin.Context) {
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userID, ok := userIDValue.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user context"})
+		return
+	}
+	query := c.Query("q")
+
+	results, err := h.service.SearchChatConversations(userID, query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search conversations"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": results})
+}
+
+func (h *SearchHandler) SearchChatMessages(c *gin.Context) {
+	userIDValue, _ := c.Get("userID")
+	userID := userIDValue.(uint)
+	query := c.Query("q")
+	
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	results, pagination, err := h.service.SearchChatMessages(userID, query, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search messages"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": results,
+		"meta": pagination,
+	})
+}
+
+func (h *SearchHandler) SearchInConversation(c *gin.Context) {
+	userIDValue, _ := c.Get("userID")
+	userID := userIDValue.(uint)
+
+	// Ambil ID ruangan dari URL
+	convID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	query := c.Query("q")
+	
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	results, pagination, err := h.service.SearchMessagesInConversation(userID, uint(convID), query, page, limit)
+	if err != nil {
+		if err.Error() == "forbidden: you are not a member of this conversation" {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search in conversation"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": results,
+		"meta": pagination,
+	})
+}
