@@ -6,6 +6,8 @@ import (
 	"backend-bebu/internal/repositories"
 	"backend-bebu/internal/ws"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 
@@ -73,8 +75,12 @@ func (s *notificationService) Send(receiverID, actorID uint, notifType, entityTy
 		// (Kita panggil fungsi mapping yang sudah ada agar format JSON-nya sama)
 		fullNotif, _ := s.GetLatestNotificationForWS(receiverID, notifType, entityID)
 		if fullNotif != nil {
-			s.hub.SendToUser(receiverID, fullNotif)
-		}
+            // --- MODIFIKASI DI SINI ---
+            s.hub.SendToUser(receiverID, gin.H{
+                "event":   "NEW_NOTIFICATION", // Ganti dari "type" menjadi "event"
+                "payload": fullNotif,          // DTO Notifikasi sebagai payload
+            })
+        }
 	}
 }
 

@@ -20,6 +20,9 @@ type SearchRepository interface {
 	ClearAllSearchHistory(userID uint) error
 	SearchAuthorsOnly(query string, limit int) ([]models.Author, error)
 	SearchGenresOnly(query string, limit int) ([]models.Genre, error)
+	SearchChatConversations(userID uint, query string) ([]models.Conversation, error)
+	SearchChatMessages(userID uint, query string, page, limit int) ([]models.Message, int64, error)
+	SearchMessagesInConversation(convID uint, query string, page, limit int) ([]models.Message, int64, error)
 }
 
 type searchRepository struct {
@@ -199,4 +202,86 @@ func (r *searchRepository) SearchGenresOnly(query string, limit int) ([]models.G
 		Order("genre_name ASC").
 		Find(&genres).Error
 	return genres, err
+}
+
+func (r *searchRepository) SearchChatConversations(userID uint, query string) ([]models.Conversation, error) {
+	var conversations []models.Conversation
+	searchTerm := "%" + strings.ToLower(query) + "%"
+
+	// Query kompleks menggunakan JOIN untuk mengecek Judul Grup ATAU Nama Lawan Bicara
+	err := r.db.Model(&models.Conversation{}).
+		Distinct("conversations.*").
+		// 1. Join ke tabel member untuk memastikan ini chat milik si user
+		Joins("JOIN conversation_members cm ON cm.conversation_id = conversations.conversation_id").
+		// 2. Join ke member lain (lawan bicara) untuk keperluan filter DM
+		Joins("LEFT JOIN conversation_members partner_cm ON partner_cm.conversation_id = conversations.conversation_id AND partner_cm.user_id != ?", userID).
+		Joins("LEFT JOIN user_profiles up ON up.user_id = partner_cm.user_id").
+		Joins("LEFT JOIN users u ON u.user_id = partner_cm.user_id").
+		// 3. Filter Utama
+		Where("cm.user_id = ?", userID).
+		Where(
+			r.db.Where("conversations.conversation_type = 'group' AND LOWER(conversations.title) LIKE ?", searchTerm).
+				Or("conversations.conversation_type = 'direct' AND (LOWER(up.display_name) LIKE ? OR LOWER(u.username) LIKE ?)", searchTerm, searchTerm),
+		).
+		Preload("Members.User.Profile"). // Butuh data ini untuk mapping nama di service nanti
+		Order("conversations.last_message_at DESC").
+		Find(&conversations).Error
+
+	return conversations, err
+}
+
+func (r *searchRepository) SearchChatMessages(userID uint, query string, page, limit int) ([]models.Message, int64, error) {
+	var messages []models.Message
+	var total int64
+	offset := (page - 1) * limit
+	searchTerm := "%" + strings.ToLower(query) + "%"
+
+	// Base Query: Cari pesan di mana userID adalah member room tersebut
+	baseQuery := r.db.Model(&models.Message{}).
+		Joins("JOIN conversation_members cm ON cm.conversation_id = messages.conversation_id").
+		Where("cm.user_id = ? AND LOWER(messages.body) LIKE ?", userID, searchTerm).
+		Where("messages.message_type != ?", "system") 
+
+	// 1. Hitung total
+	baseQuery.Count(&total)
+
+	// 2. Ambil data dengan Preload yang dibutuhkan
+	err := baseQuery.
+		Preload("Sender.Profile").
+		Preload("ParentMessage.Sender.Profile").
+		Preload("Post.User.Profile").             // <-- WAJIB
+		Preload("Post.Stats").                    // <-- WAJIB
+		Preload("Book.BookAuthors.Author").       // <-- WAJIB
+		Order("created_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&messages).Error
+
+	return messages, total, err
+}
+
+func (r *searchRepository) SearchMessagesInConversation(convID uint, query string, page, limit int) ([]models.Message, int64, error) {
+	var messages []models.Message
+	var total int64
+	offset := (page - 1) * limit
+	searchTerm := "%" + strings.ToLower(query) + "%"
+
+	baseQuery := r.db.Model(&models.Message{}).
+		Where("conversation_id = ? AND LOWER(body) LIKE ?", convID, searchTerm).
+		Where("message_type != ?", "system") 
+
+	// 1. Hitung total hasil di ruangan ini
+	baseQuery.Count(&total)
+
+	// 2. Ambil data pesan beserta pengirimnya
+	err := baseQuery.
+		Preload("Sender.Profile").
+		Preload("ParentMessage.Sender.Profile").
+		Preload("Post.User.Profile").             // <-- WAJIB
+		Preload("Post.Stats").                    // <-- WAJIB
+		Preload("Book.BookAuthors.Author").       // <-- WAJIB
+		Order("created_at DESC").
+		Limit(limit).Offset(offset).
+		Find(&messages).Error
+
+	return messages, total, err
 }

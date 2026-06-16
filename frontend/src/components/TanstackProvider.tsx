@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { ReactNode, useState } from 'react'
-import NotificationHandler from './NotificationHandler'
+import SocketHandler from './SocketHandler'
 
 export default function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -20,7 +20,7 @@ export default function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NotificationHandler /> {children}
+      <SocketHandler /> {children}
     </QueryClientProvider>
   )
 }

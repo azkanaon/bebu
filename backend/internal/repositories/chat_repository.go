@@ -13,7 +13,7 @@ type ChatRepository interface {
 	CreateConversation(conv *models.Conversation) error
 	CreateMessage(msg *models.Message) error
 	UpdateLastMessage(convID uint, t time.Time) error
-	GetUserConversations(userID uint) ([]models.Conversation, error)
+	GetUserConversations(userID uint, page, limit int) ([]models.Conversation, int64, error)
 	IsMember(convID, userID uint) (bool, error)
 	GetMessages(convID uint, page, limit int) ([]models.Message, int64, error)
 	MarkAsRead(convID, userID, lastMsgID uint) error
@@ -78,16 +78,30 @@ func (r *chatRepository) UpdateLastMessage(convID uint, t time.Time) error {
 		Update("last_message_at", t).Error
 }
 
-func (r *chatRepository) GetUserConversations(userID uint) ([]models.Conversation, error) {
-    var conversations []models.Conversation
-    err := r.db.
-        Select("conversations.*"). // Mengambil semua kolom termasuk title & img_url
-        Joins("JOIN conversation_members ON conversation_members.conversation_id = conversations.conversation_id").
-        Where("conversation_members.user_id = ?", userID).
-        Preload("Members.User.Profile"). // Tetap preload untuk DM
-        Order("last_message_at DESC").
-        Find(&conversations).Error
-    return conversations, err
+func (r *chatRepository) GetUserConversations(userID uint, page, limit int) ([]models.Conversation, int64, error) {
+	var conversations []models.Conversation
+	var total int64
+	offset := (page - 1) * limit
+
+	// 1. Buat query dasar
+	query := r.db.Model(&models.Conversation{}).
+		Joins("JOIN conversation_members ON conversation_members.conversation_id = conversations.conversation_id").
+		Where("conversation_members.user_id = ?", userID)
+
+	// 2. Hitung total seluruh percakapan milik user ini
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// 3. Ambil data dengan paginasi dan preload
+	err := query.
+		Preload("Members.User.Profile").
+		Order("conversations.last_message_at DESC"). // Urutkan dari yang terbaru
+		Limit(limit).
+		Offset(offset).
+		Find(&conversations).Error
+
+	return conversations, total, err
 }
 
 func (r *chatRepository) IsMember(convID, userID uint) (bool, error) {

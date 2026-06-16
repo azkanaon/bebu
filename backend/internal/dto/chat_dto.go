@@ -23,6 +23,9 @@ type MessageResponse struct {
 	SenderID       uint             `json:"senderId"`
 	Body           string           `json:"body"`
 	MessageType    string           `json:"messageType"`
+	SenderUsername string 			`json:"senderUsername"`
+	SenderDisplayName string `json:"senderDisplayName"` // Tambahkan ini
+    SenderAvatar      string `json:"senderAvatar"`
 
 	SharedPost     *PostSummaryDTO  `json:"sharedPost,omitempty"`
 	SharedBook     *BookSummaryDTO  `json:"sharedBook,omitempty"`
@@ -38,6 +41,7 @@ type ConversationResponseDTO struct {
 	LastMessage   string    `json:"lastMessage"`   // Cuplikan pesan terakhir
 	UpdatedAt     time.Time `json:"updatedAt"`     // Waktu pesan terakhir
 	UnreadCount   int       `json:"unreadCount"`   // (Nanti kita isi di Fase 4)
+	IsGroup       bool      `json:"isGroup"`
 }
 
 type CreateGroupRequest struct {

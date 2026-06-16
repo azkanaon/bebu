@@ -67,7 +67,7 @@ func (h *WSHandler) broadcastTypingStatus(senderID uint, req WSRequest) {
 		if m.UserID != senderID {
 			log.Printf("[WS] Sending typing status to user %d", m.UserID)
 			h.hub.SendToUser(m.UserID, gin.H{
-				"type": "USER_TYPING_STATUS",
+				"event": "USER_TYPING_STATUS",
 				"payload": gin.H{
 					"conversationId": req.ConversationID,
 					"userId":         senderID,

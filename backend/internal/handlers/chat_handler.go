@@ -42,16 +42,32 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 }
 
 func (h *ChatHandler) GetInbox(c *gin.Context) {
-	userIDValue, _ := c.Get("userID")
+	// Ambil userID dengan pola aman
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 	userID := userIDValue.(uint)
 
-	inbox, err := h.service.GetInbox(userID)
+	// Parsing parameter paginasi
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 { page = 1 }
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
+	if limit < 1 { limit = 15 }
+
+	// Panggil service
+	inbox, pagination, err := h.service.GetInbox(userID, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch inbox"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": inbox})
+	// Response dengan data dan meta
+	c.JSON(http.StatusOK, gin.H{
+		"data": inbox,
+		"meta": pagination,
+	})
 }
 
 func (h *ChatHandler) GetMessages(c *gin.Context) {

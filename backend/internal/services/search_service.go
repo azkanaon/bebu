@@ -5,10 +5,12 @@ import (
 	"backend-bebu/internal/models"
 	"backend-bebu/internal/repositories"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
+	"gorm.io/gorm"
 )
 
 type SearchService interface {
@@ -22,17 +24,22 @@ type SearchService interface {
 	ClearAllHistory(userID uint) error
 	SearchAuthors(query string) ([]dto.SubmissionItemInput, error)
 	SearchGenres(query string) ([]dto.SubmissionItemInput, error)
+	SearchChatConversations(userID uint, query string) ([]dto.ConversationResponseDTO, error)
+	SearchChatMessages(userID uint, query string, page, limit int) ([]dto.MessageSearchResponseDTO, *dto.PaginationDTO, error)
+	SearchMessagesInConversation(userID, convID uint, query string, page, limit int) ([]dto.MessageResponse, *dto.PaginationDTO, error)
 }
 
 type searchService struct {
 	searchRepo repositories.SearchRepository
 	userRepo   repositories.UserRepository
+	db         *gorm.DB 
 }
 
-func NewSearchService(sRepo repositories.SearchRepository, uRepo repositories.UserRepository) SearchService {
+func NewSearchService(sRepo repositories.SearchRepository, uRepo repositories.UserRepository, db *gorm.DB) SearchService {
 	return &searchService{
 		searchRepo: sRepo,
 		userRepo:   uRepo,
+		db:         db,
 	}
 }
 
@@ -265,4 +272,195 @@ func (s *searchService) SearchGenres(query string) ([]dto.SubmissionItemInput, e
 		})
 	}
 	return dtos, nil
+}
+
+func (s *searchService) SearchChatConversations(userID uint, query string) ([]dto.ConversationResponseDTO, error) {
+	if query == "" {
+		return []dto.ConversationResponseDTO{}, nil
+	}
+
+	convs, err := s.searchRepo.SearchChatConversations(userID, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []dto.ConversationResponseDTO
+	for _, c := range convs {
+		var pName, pAvatar string
+
+		// Gunakan logika yang sama dengan GetInbox
+		if c.ConversationType == "group" {
+			if c.Title != nil { pName = *c.Title } else { pName = "Grup Tanpa Nama" }
+			if c.ImgURL != nil { pAvatar = *c.ImgURL }
+		} else {
+			// Cari partner di DM
+			for _, m := range c.Members {
+				if m.UserID != userID {
+					pName = m.User.Username
+					if m.User.Profile != nil {
+						if m.User.Profile.DisplayName != "" { pName = m.User.Profile.DisplayName }
+						pAvatar = m.User.Profile.AvatarUrl
+					}
+					break
+				}
+			}
+		}
+
+		response = append(response, dto.ConversationResponseDTO{
+			ID:            c.ConversationID,
+			PartnerName:   pName,
+			PartnerAvatar: pAvatar,
+			LastMessage:   c.LastMessageBody,
+			UpdatedAt:     c.UpdatedAt,
+			// UnreadCount bisa dikosongkan atau dihitung jika diperlukan
+		})
+	}
+
+	return response, nil
+}
+
+func (s *searchService) SearchChatMessages(userID uint, query string, page, limit int) ([]dto.MessageSearchResponseDTO, *dto.PaginationDTO, error) {
+	if query == "" {
+		return []dto.MessageSearchResponseDTO{}, dto.NewPaginationDTO(0, page, limit), nil
+	}
+
+	msgs, total, err := s.searchRepo.SearchChatMessages(userID, query, page, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var response []dto.MessageSearchResponseDTO
+	for _, m := range msgs {
+		roomName := "Grup/Chat"
+		
+		// Logika menentukan nama ruangan (Sama dengan GetInbox)
+		if m.Conversation.ConversationType == "group" && m.Conversation.Title != nil {
+			roomName = *m.Conversation.Title
+		} else {
+			for _, mem := range m.Conversation.Members {
+				if mem.UserID != userID {
+					roomName = mem.User.Username
+					if mem.User.Profile != nil && mem.User.Profile.DisplayName != "" {
+						roomName = mem.User.Profile.DisplayName
+					}
+					break
+				}
+			}
+		}
+
+		bodyText := ""
+		if m.Body != nil { bodyText = *m.Body }
+
+		response = append(response, dto.MessageSearchResponseDTO{
+			MessageID:      m.MessageID,
+			Body:           bodyText,
+			CreatedAt:      m.CreatedAt,
+			SenderName:     m.Sender.Username, // Bisa gunakan display name juga
+			ConversationID: m.ConversationID,
+			RoomName:       roomName,
+		})
+	}
+
+	return response, dto.NewPaginationDTO(total, page, limit), nil
+}
+
+func (s *searchService) SearchMessagesInConversation(userID, convID uint, query string, page, limit int) ([]dto.MessageResponse, *dto.PaginationDTO, error) {
+	// 1. VALIDASI KEAMANAN: Cek apakah user adalah anggota ruangan ini
+	var count int64
+	err := s.db.Table("conversation_members").
+		Where("conversation_id = ? AND user_id = ?", convID, userID).
+		Count(&count).Error
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if count == 0 {
+		return nil, nil, errors.New("forbidden: you are not a member of this conversation")
+	}
+
+	// 2. EKSEKUSI PENCARIAN
+	if query == "" {
+		return []dto.MessageResponse{}, dto.NewPaginationDTO(0, page, limit), nil
+	}
+
+	msgs, total, err := s.searchRepo.SearchMessagesInConversation(convID, query, page, limit)
+	if err != nil { return nil, nil, err }
+
+	// 3. GUNAKAN HELPER MAPPING (Ini yang memperbaiki masalah Anda)
+	dtos := s.mapMessagesToDTO(msgs)
+
+	return dtos, dto.NewPaginationDTO(total, page, limit), nil
+}
+
+func (s *searchService) mapMessagesToDTO(messages []models.Message) []dto.MessageResponse {
+	dtos := make([]dto.MessageResponse, 0, len(messages))
+	for _, m := range messages {
+		bodyText := ""
+		if m.Body != nil {
+			bodyText = *m.Body
+		}
+
+		res := dto.MessageResponse{
+			ID:             m.MessageID,
+			ConversationID: m.ConversationID,
+			SenderID:       m.SenderUserID,
+			Body:           bodyText,
+			MessageType:    m.MessageType,
+			CreatedAt:      m.CreatedAt,
+		}
+
+		// 1. Logic Balasan (Reply)
+		if m.ParentMessageID != nil && m.ParentMessage != nil {
+			pSenderName := m.ParentMessage.Sender.Username
+			if m.ParentMessage.Sender.Profile != nil && m.ParentMessage.Sender.Profile.DisplayName != "" {
+				pSenderName = m.ParentMessage.Sender.Profile.DisplayName
+			}
+			pBody := ""
+			if m.ParentMessage.Body != nil { pBody = *m.ParentMessage.Body }
+
+			res.ReplyTo = &dto.ReplyPreviewDTO{
+				ID:         m.ParentMessage.MessageID,
+				Body:       pBody,
+				SenderName: pSenderName,
+			}
+		}
+
+		// 2. Logic Share Buku
+		if m.MessageType == "share_book" && m.Book != nil {
+			var authorNames []string
+			for _, ba := range m.Book.BookAuthors {
+				if ba.Author.AuthorID > 0 {
+					authorNames = append(authorNames, ba.Author.AuthorName)
+				}
+			}
+			res.SharedBook = &dto.BookSummaryDTO{
+				PublicID:    m.Book.PublicID.String(),
+				Title:       m.Book.Title,
+				CoverImgURL: m.Book.CoverImgURL,
+				Authors:     authorNames,
+			}
+		}
+
+		// 3. Logic Share Post
+		if m.MessageType == "share_post" && m.Post != nil {
+			pDisplayName := m.Post.User.Username
+			if m.Post.User.Profile != nil && m.Post.User.Profile.DisplayName != "" {
+				pDisplayName = m.Post.User.Profile.DisplayName
+			}
+			res.SharedPost = &dto.PostSummaryDTO{
+				PublicID:    m.Post.PublicID.String(),
+				Description: m.Post.Description,
+				ImgURL:      m.Post.ImgURL,
+				User: dto.PostUserDTO{
+					Username:    m.Post.User.Username,
+					DisplayName: pDisplayName,
+					AvatarURL:   m.Post.User.Profile.AvatarUrl,
+				},
+			}
+		}
+
+		dtos = append(dtos, res)
+	}
+	return dtos
 }

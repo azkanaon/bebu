@@ -108,7 +108,7 @@ func main() {
 	platformHandler := handlers.NewPlatformHandler(platformService)
 
 	searchRepo := repositories.NewSearchRepository(db)
-	searchService := services.NewSearchService(searchRepo, userRepo)
+	searchService := services.NewSearchService(searchRepo, userRepo, db)
 	searchHandler := handlers.NewSearchHandler(searchService)
 
 	submissionRepo := repositories.NewBookSubmissionRepository(db)
@@ -292,6 +292,10 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 			
 			search.DELETE("/history/all",authMiddleware.RequiredAuth(), searchHandler.ClearAllHistory)
 			search.DELETE("/history/:id",authMiddleware.RequiredAuth(), searchHandler.DeleteHistory)
+
+			search.GET("/chats/conversations", authMiddleware.RequiredAuth(), searchHandler.SearchChatConversations)
+			search.GET("/chats/messages", authMiddleware.RequiredAuth(), searchHandler.SearchChatMessages)
+			chats.GET("/conversations/:id/search", searchHandler.SearchInConversation)
 		}
 
 		notifRoutes := v1.Group("/notifications").Use(authMiddleware.RequiredAuth())

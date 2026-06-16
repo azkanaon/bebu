@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Sidebar from '@/components/leftbar/Sidebar'
 import RightSidebar from '@/components/rightbar/RightSidebar'
 import CreatePostModal from '@/components/feed/CreatePostModal'
@@ -15,6 +15,10 @@ type Props = {
 }
 
 export default function Layout({ children, modal }: Props) {
+  const pathname = usePathname()
+
+  // Sembunyikan sidebar kanan jika berada di halaman chat
+  const isChatPage = pathname.startsWith('/chat')
   // ... (Sisa kode useEffect, state, dan logic Anda biarkan tetap sama) ...
   const searchParams = useSearchParams()
   const currentTab = searchParams.get('tab')
@@ -112,25 +116,32 @@ export default function Layout({ children, modal }: Props) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex flex-col flex-1 w-full max-w-[600px] z-0 px-3 sm:px-0 min-h-screen h-fit">
+        <main
+          className={`
+          flex flex-col flex-1 w-full z-0 px-3 sm:px-0 min-h-screen h-fit transition-all duration-300
+          ${isChatPage ? 'max-w-[936px]' : 'max-w-[600px]'}
+        `}
+        >
           {children}
         </main>
 
         {/* Right Sidebar */}
-        <aside className="w-84 hidden xl:block relative">
-          <div
-            id="right-sidebar"
-            className="sticky top-4 h-fit"
-            style={{
-              transform: `translateY(-${offset}px)`,
-              transition: isResetting
-                ? 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)'
-                : 'none',
-            }}
-          >
-            <RightSidebar />
-          </div>
-        </aside>
+        {!isChatPage && (
+          <aside className="w-84 hidden xl:block relative shrink-0">
+            <div
+              id="right-sidebar"
+              className="sticky top-4 h-fit"
+              style={{
+                transform: `translateY(-${offset}px)`,
+                transition: isResetting
+                  ? 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1)'
+                  : 'none',
+              }}
+            >
+              <RightSidebar />
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* 2. Render slot modal di luar struktur layout utama agar bertindak sebagai overlay */}
