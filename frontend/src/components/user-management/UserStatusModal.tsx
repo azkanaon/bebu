@@ -130,7 +130,7 @@ export default function UserStatusModal({
 				{/* HEADER */}
 				<div className="relative flex items-start justify-between border-b border-white/5 px-6 py-5">
 					<div>
-						<div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-blue-300/80">
+						<div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-purple-400/70">
 							<User size={12} />
 							User Management
 						</div>
@@ -345,7 +345,7 @@ export default function UserStatusModal({
 				{/* FOOTER */}
 				<div className="flex items-center justify-between border-t border-white/5 bg-black/20 px-6 py-4">
 					<div className="flex items-center gap-2 text-[10px] text-zinc-500">
-						<Clock3 size={12} className="text-blue-400/70" />
+						<Clock3 size={12} className="text-purple-400/70" />
 						Changes take effect immediately
 					</div>
 
@@ -367,7 +367,7 @@ export default function UserStatusModal({
 								selectedStatus === user.status ||
 								isLockedByBan
 							}
-							className="h-9 rounded-xl bg-blue-500 px-4 text-xs font-semibold text-white transition-all duration-200 hover:bg-blue-400 disabled:pointer-events-none disabled:opacity-40"
+							className="h-9 rounded-xl bg-purple-600/70 px-4 text-xs font-semibold text-white transition-all duration-200 hover:bg-blue-400 disabled:pointer-events-none disabled:opacity-40"
 						>
 							{submitting ? "Processing..." : "Update Status"}
 						</button>

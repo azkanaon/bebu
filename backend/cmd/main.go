@@ -327,6 +327,13 @@ func SetupRoutes(r *gin.Engine, bookshelfHandler *handlers.BookshelfHandler, aut
 				adminBook.POST("/submissions/:id/approve", bookManagementHandler.ApproveSubmission)
 				adminBook.POST("/submissions/:id/reject", bookManagementHandler.RejectSubmission)
 			}
+
+			adminAppeal := admin.Group("/appeal")
+			{
+				adminAppeal.GET("", appealHandler.GetAllAppeals)
+				adminAppeal.GET("/:id", appealHandler.GetAppealDetail)
+				adminAppeal.POST("/:id/action", appealHandler.HandleAppealAction)
+			}
 		}
 
 		sub := v1.Group("/submissions").Use(authMiddleware.RequiredAuth())

@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
+	
 	"backend-bebu/internal/services"
+	"backend-bebu/internal/dto"
 	"backend-bebu/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -69,4 +72,63 @@ func (h *AccountAppealHandler) AddAppeal(c *gin.Context) {
 		"message": "Pengajuan banding berhasil dikirim. Akun Anda akan ditinjau kembali oleh admin.",
 		"data":    appeal,
 	})
+}
+
+// GetAllAppeals digunakan oleh Admin untuk mendapatkan data baris tabel
+func (h *AccountAppealHandler) GetAllAppeals(c *gin.Context) {
+	appeals, err := h.appealService.GetAppealsForAdmin(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil daftar banding admin"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": appeals})
+}
+
+// GetAppealDetail digunakan ketika admin membuka pop-up modal review
+func (h *AccountAppealHandler) GetAppealDetail(c *gin.Context) {
+	idParam := c.Param("id")
+	appealID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID pengajuan banding tidak valid"})
+		return
+	}
+
+	detail, err := h.appealService.GetAppealDetailForAdmin(c.Request.Context(), uint(appealID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memuat detail data banding"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": detail})
+}
+
+// HandleAppealAction dipicu saat admin menekan tombol "Terima" atau "Tolak" di dalam modal
+func (h *AccountAppealHandler) HandleAppealAction(c *gin.Context) {
+	idParam := c.Param("id")
+	appealID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID pengajuan banding tidak valid"})
+		return
+	}
+
+	// Ambil Admin ID dari JWT Token / Auth Middleware Admin
+	adminIDVal, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Akses admin ditolak, sesi tidak valid"})
+		return
+	}
+	adminID := adminIDVal.(uint)
+
+	var req dto.ActionAppealRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err = h.appealService.ProcessAppealAction(c.Request.Context(), uint(appealID), adminID, req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Keputusan banding berhasil disimpan dan status akun pengguna telah diperbarui"})
 }

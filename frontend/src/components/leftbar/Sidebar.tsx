@@ -6,13 +6,14 @@ import {
   MessageCircle,
   Bell,
   Search,
-  Shield,
   Flag,
   User,
   Users,
   FileText,
   Library,
   BookDown,
+  BookOpen,
+  ShieldAlert,
 } from 'lucide-react'
 import { SidebarItem } from './SidebarItem'
 import { UserProfile } from './UserProfile'
@@ -165,7 +166,7 @@ export default function Sidebar({ user }: SidebarProps) {
 								ADMIN
 							</div>
 							<SidebarItem
-								icon={<Shield size={20} />}
+								icon={<BookOpen size={20} />}
 								label="Book Management"
 								href="/admin/books"
 								currentPathname={effectivePathname}
@@ -186,6 +187,12 @@ export default function Sidebar({ user }: SidebarProps) {
 								icon={<Flag size={20} />}
 								label="Report Management"
 								href="/admin/reports"
+								currentPathname={effectivePathname}
+							/>
+							<SidebarItem
+								icon={<ShieldAlert size={20} />}
+								label="Appeal Management"
+								href="/admin/appeals"
 								currentPathname={effectivePathname}
 							/>
 						</>

@@ -394,54 +394,56 @@ func (r *reportRepository) ExecuteUserAction(ctx context.Context, summary *model
 		userID := uint(summary.EntityID)
 
 		// 3. Eksekusi Berdasarkan Status Target
-		if targetUserStatus == "banned" {
-			// Ambil fungsi helper pembersihan dependensi
-			if err := r.clearUserDependencies(tx, userID); err != nil {
-				return err
-			}
-
-			// Update fields status & is_active
-			err := tx.Model(&models.User{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
-				"status":    "banned",
-				"is_active": false,
-			}).Error
-			if err != nil {
-				return err
-			}
-
-			// Picu Soft Delete bawaan GORM untuk mengisi kolom deleted_at pada tabel users
-			if err := tx.Where("user_id = ?", userID).Delete(&models.User{}).Error; err != nil {
-				return err
-			}
-		} else {
-			// Jika statusnya adalah "shadowbanned" atau "suspended"
-			isActive := targetUserStatus == "active"
-			err := tx.Model(&models.User{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
-				"status":    targetUserStatus,
-				"is_active": isActive,
-			}).Error
-			if err != nil {
-				return err
-			}
-
-			// ==================== ATURAN BARU SHADOWBAN USER ====================
-			if targetUserStatus == "shadowbanned" {
-				// A. Reset hot_score milik user tersebut di tabel user_stats ke 0
-				if err := tx.Exec("UPDATE user_stats SET hot_score = 0 WHERE user_id = ?", userID).Error; err != nil {
-					return err
-				}
-
-				// B. Reset hot_score SEMUA postingan buatan user tersebut di tabel post_stats ke 0
-				updatePostStatsSQL := `
-					UPDATE post_stats 
-					SET hot_score = 0 
-					WHERE post_id IN (SELECT post_id FROM posts WHERE user_id = ?)`
-				if err := tx.Exec(updatePostStatsSQL, userID).Error; err != nil {
-					return err
-				}
-			}
-			// ====================================================================
+	if targetUserStatus == "banned" {
+		// Ambil fungsi helper pembersihan dependensi
+		if err := r.clearUserDependencies(tx, userID); err != nil {
+			return err
 		}
+
+		// Update fields status & is_active (Banned pasti is_active: false)
+		err := tx.Model(&models.User{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
+			"status":    "banned",
+			"is_active": false,
+		}).Error
+		if err != nil {
+			return err
+		}
+
+		// Picu Soft Delete bawaan GORM untuk mengisi kolom deleted_at pada tabel users
+		if err := tx.Where("user_id = ?", userID).Delete(&models.User{}).Error; err != nil {
+			return err
+		}
+	} else {
+		// Jika statusnya adalah "shadowbanned" atau "suspended", is_active HARUS TETAP true
+		// Kita ubah kondisinya: selama status target BUKAN "banned", maka is_active bernilai true
+		isActive := targetUserStatus != "banned" 
+
+		err := tx.Model(&models.User{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
+			"status":    targetUserStatus,
+			"is_active": isActive, // Akan bernilai true untuk "suspended" dan "shadowbanned"
+		}).Error
+		if err != nil {
+			return err
+		}
+
+		// ==================== ATURAN BARU SHADOWBAN USER ====================
+		if targetUserStatus == "shadowbanned" {
+			// A. Reset hot_score milik user tersebut di tabel user_stats ke 0
+			if err := tx.Exec("UPDATE user_stats SET hot_score = 0 WHERE user_id = ?", userID).Error; err != nil {
+				return err
+			}
+
+			// B. Reset hot_score SEMUA postingan buatan user tersebut di tabel post_stats ke 0
+			updatePostStatsSQL := `
+				UPDATE post_stats 
+				SET hot_score = 0 
+				WHERE post_id IN (SELECT post_id FROM posts WHERE user_id = ?)`
+			if err := tx.Exec(updatePostStatsSQL, userID).Error; err != nil {
+				return err
+			}
+		}
+		// ====================================================================
+	}
 
 		return nil
 	})
